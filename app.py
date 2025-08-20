@@ -13,7 +13,7 @@ app = Flask(__name__)
 
 DB_FILE = 'database.db'
 ENCODE_FILE = 'EncodeFile_Insight.pkl'
-REATTENDANCE_INTERVAL_MINUTES = 10
+REATTENDANCE_INTERVAL_MINUTES = 2
 FACE_MATCH_THRESHOLD = 0.5
 EMAIL_USER = 'arnavp128@gmail.com'
 EMAIL_PASS = 'cyhy ppki rdny rjwc'
@@ -183,100 +183,103 @@ def submit_student():
 
 @app.route('/upload_photo', methods=['POST'])
 def upload_photo():
-    if 'image' not in request.files:
-        return jsonify({"results": [], "annotated_image": ""})
+    if 'images' not in request.files:
+        return jsonify({"images": []})
 
-    file = request.files['image']
     lecture = request.form.get('lecture', '').strip()
     section = request.form.get('section', '').strip()
-    npimg = np.frombuffer(file.read(), np.uint8)
-    frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
-    original = frame.copy()
-    faces = model.get(frame)
-
-    if not faces:
-        return jsonify({"results": [], "annotated_image": ""})
+    files = request.files.getlist('images')
 
     def cosine_sim(a, b):
         return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
-    results = []
     now = datetime.now()
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
 
+    all_outputs = []
     conn = get_db_connection()
 
-    for face in faces:
-        bbox = [int(v) for v in face.bbox]
-        embedding = face.embedding
-        best_score = -1
-        best_name = None
+    for file in files:
+        npimg = np.frombuffer(file.read(), np.uint8)
+        frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
+        original = frame.copy()
+        faces = model.get(frame)
 
-        for known_embedding, name in known_embeddings:
-            score = cosine_sim(embedding, known_embedding)
-            if score > best_score:
-                best_score = score
-                best_name = name
+        results = []
+        if faces:
+            for face in faces:
+                bbox = [int(v) for v in face.bbox]
+                embedding = face.embedding
+                best_score = -1
+                best_name = None
 
-        color = (0, 255, 0) if best_score >= FACE_MATCH_THRESHOLD else (0, 0, 255)
-        label = best_name if best_score >= FACE_MATCH_THRESHOLD else "Unknown"
+                for known_embedding, name in known_embeddings:
+                    score = cosine_sim(embedding, known_embedding)
+                    if score > best_score:
+                        best_score = score
+                        best_name = name
 
-        cv2.rectangle(original, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
-        cv2.putText(original, f"{label} ({best_score:.2f})", (bbox[0], bbox[1] - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                color = (0, 255, 0) if best_score >= FACE_MATCH_THRESHOLD else (0, 0, 255)
+                label = best_name if best_score >= FACE_MATCH_THRESHOLD else "Unknown"
 
-        if best_score < FACE_MATCH_THRESHOLD:
-            results.append({"name": "Unknown", "status": "Unknown", "confidence": f"{best_score:.2f}"})
-            continue
+                cv2.rectangle(original, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
+                cv2.putText(original, f"{label} ({best_score:.2f})", (bbox[0], bbox[1] - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
 
-        student = conn.execute('SELECT * FROM students WHERE Name=?', (best_name,)).fetchone()
-        if not student:
-            results.append({"name": best_name, "status": "Not Found", "confidence": f"{best_score:.2f}"})
-            continue
+                if best_score < FACE_MATCH_THRESHOLD:
+                    results.append({"name": "Unknown", "status": "Unknown", "confidence": f"{best_score:.2f}"})
+                    continue
 
-        # Check last mark time
-        last_mark = conn.execute(
-            "SELECT Timestamp FROM attendance WHERE Student_ID=? ORDER BY Timestamp DESC LIMIT 1",
-            (student['ID'],)
-        ).fetchone()
+                student = conn.execute('SELECT * FROM students WHERE Name=?', (best_name,)).fetchone()
+                if not student:
+                    results.append({"name": best_name, "status": "Not Found", "confidence": f"{best_score:.2f}"})
+                    continue
 
-        remark = False
-        if last_mark:
-            last_time = datetime.strptime(last_mark['Timestamp'], "%Y-%m-%d %H:%M:%S")
-            elapsed = (now - last_time).total_seconds() / 60
-            if elapsed < REATTENDANCE_INTERVAL_MINUTES:
+                # Check last mark time
+                last_mark = conn.execute(
+                    "SELECT Timestamp FROM attendance WHERE Student_ID=? ORDER BY Timestamp DESC LIMIT 1",
+                    (student['ID'],)
+                ).fetchone()
+
+                remark = False
+                if last_mark:
+                    last_time = datetime.strptime(last_mark['Timestamp'], "%Y-%m-%d %H:%M:%S")
+                    elapsed = (now - last_time).total_seconds() / 60
+                    if elapsed < REATTENDANCE_INTERVAL_MINUTES:
+                        results.append({
+                            "name": best_name,
+                            "status": "Already Marked",
+                            "confidence": f"{best_score:.2f}",
+                            "timestamp": last_time.strftime("%Y-%m-%d %H:%M:%S")
+                        })
+                        continue
+                    else:
+                        remark = True
+
+                status = 'Re-Marked' if remark else 'Present'
+                conn.execute('''
+                    INSERT INTO attendance (Student_ID, Name, Program, Branch, Mobile, Status, Timestamp, Lecture, Section)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (student['ID'], student['Name'], student['Program'], student['Branch'],
+                      student['Mobile'], status, timestamp, lecture, section))
+                conn.commit()
+
                 results.append({
                     "name": best_name,
-                    "status": "Already Marked",
+                    "status": status,
                     "confidence": f"{best_score:.2f}",
-                    "timestamp": last_time.strftime("%Y-%m-%d %H:%M:%S")
+                    "timestamp": timestamp
                 })
-                continue
-            else:
-                remark = True
 
-        status = 'Re-Marked' if remark else 'Present'
-        conn.execute('''
-            INSERT INTO attendance (Student_ID, Name, Program, Branch, Mobile, Status, Timestamp, Lecture, Section)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (student['ID'], student['Name'], student['Program'], student['Branch'],
-              student['Mobile'], status, timestamp, lecture, section))
-        conn.commit()
+        # Encode annotated image
+        _, buffer = cv2.imencode('.jpg', original)
+        encoded_img = base64.b64encode(buffer).decode('utf-8')
+        image_url = f"data:image/jpeg;base64,{encoded_img}"
 
-        results.append({
-            "name": best_name,
-            "status": status,
-            "confidence": f"{best_score:.2f}",
-            "timestamp": timestamp
-        })
+        all_outputs.append({"results": results, "annotated": image_url})
 
     conn.close()
-
-    _, buffer = cv2.imencode('.jpg', original)
-    encoded_img = base64.b64encode(buffer).decode('utf-8')
-    image_url = f"data:image/jpeg;base64,{encoded_img}"
-
-    return jsonify({"results": results, "annotated_image": image_url})
+    return jsonify({"images": all_outputs})
 
 if __name__ == '__main__':
     app.run(debug=True)

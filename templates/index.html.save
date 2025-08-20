@@ -17,7 +17,9 @@
       <nav class="hidden md:flex gap-6">
         <button onclick="window.location.href='/viewer'" class="text-white/80 hover:text-white transition font-medium">Attendance Records</button>
         <button onclick="window.location.href='/add_student'" class="text-white/80 hover:text-white transition font-medium">Add Student</button>
-        <button onclick="window.location.href='/students'" class="text-white/80 hover:text-white transition font-medium">View Students</button>
+         <button onclick="window.location.href='/students'" class="text-white/80 hover:text-white transition font-medium">
+  View Students
+</button>
       </nav>
     </div>
   </header>
@@ -25,7 +27,7 @@
   <!-- Main Content -->
   <main class="flex-grow flex flex-col items-center px-4 py-10">
     <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-2xl border border-gray-100">
-      <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Upload Photos & Mark Attendance</h2>
+      <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Upload Photo & Mark Attendance</h2>
       <form id="uploadForm" class="space-y-6">
 
         <!-- Lecture -->
@@ -39,23 +41,34 @@
           <label class="block text-gray-700 font-medium mb-1">Section</label>
           <input type="text" name="section" required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-400 focus:outline-none"/>
         </div>
+        
+        
 
         <!-- Upload -->
         <div>
-          <label class="block text-gray-700 font-medium mb-1">Upload Photos</label>
-          <input type="file" name="images" accept="image/*" multiple required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-400 focus:outline-none"/>
+          <label class="block text-gray-700 font-medium mb-1">Upload Photo</label>
+          <input type="file" name="image" accept="image/*" required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-400 focus:outline-none"/>
         </div>
 
         <!-- Submit -->
         <button type="submit" class="w-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:opacity-90 shadow-md transition">
-          📤 Upload & Mark Attendance
+          📤 Upload to  Mark Attendance
         </button>
+       
       </form>
     </div>
 
     <!-- Result -->
-    <div id="result" class="w-full max-w-5xl mt-10"></div>
+    <div id="result" class="w-full max-w-4xl mt-10"></div>
   </main>
+
+  <!-- Mobile Nav -->
+  <footer class="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 shadow-inner md:hidden">
+    <div class="flex justify-around py-3">
+      <button onclick="window.location.href='/viewer'" class="text-white/90 hover:text-white transition">📋 Records</button>
+      <button onclick="window.location.href='/add_student'" class="text-white/90 hover:text-white transition">➕ Add</button>
+    </div>
+  </footer>
 
   <!-- JS -->
   <script>
@@ -70,42 +83,39 @@
       const res = await fetch("/upload_photo", { method: "POST", body: formData });
       const data = await res.json();
 
-      if (!data.images.length) {
+      if (!data.results.length) {
         resultBox.innerHTML = "<p class='text-red-600 font-semibold'>No faces recognized.</p>";
         return;
       }
 
-      let html = "";
-      data.images.forEach((img, idx) => {
+      let html = `
+        <div class="bg-white shadow-lg rounded-xl p-6 border border-gray-100">
+          <h2 class="text-xl font-semibold text-gray-800 mb-4">Annotated Image</h2>
+          <img src="${data.annotated_image}" alt="Detected Faces" class="rounded-lg shadow max-w-full mb-6"/>
+          <h2 class="text-xl font-semibold text-gray-800 mb-4">Detection Results</h2>
+          <div class="grid md:grid-cols-2 gap-4">
+      `;
+
+      data.results.forEach(person => {
+        const color = person.status === "Unknown" ? "border-red-400 bg-red-50"
+                      : person.status === "Already Marked" ? "border-yellow-400 bg-yellow-50"
+                      : "border-green-400 bg-green-50";
+
         html += `
-          <div class="bg-white shadow-lg rounded-xl p-6 border border-gray-100 mb-10">
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">Annotated Image ${idx + 1}</h2>
-            <img src="${img.annotated}" alt="Detected Faces" class="rounded-lg shadow max-w-full mb-6"/>
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">Detection Results</h2>
-            <div class="grid md:grid-cols-2 gap-4">
+          <div class="p-4 rounded-lg shadow-sm border-l-4 ${color}">
+            <p><strong>Name:</strong> ${person.name}</p>
+            <p><strong>Status:</strong> ${person.status}</p>
+            <p><strong>Confidence:</strong> ${person.confidence}</p>
+            ${person.timestamp ? `<p><strong>Time:</strong> ${person.timestamp}</p>` : ''}
+          </div>
         `;
-
-        img.results.forEach(person => {
-          const color = person.status === "Unknown" ? "border-red-400 bg-red-50"
-                        : person.status === "Already Marked" ? "border-yellow-400 bg-yellow-50"
-                        : "border-green-400 bg-green-50";
-
-          html += `
-            <div class="p-4 rounded-lg shadow-sm border-l-4 ${color}">
-              <p><strong>Name:</strong> ${person.name}</p>
-              <p><strong>Status:</strong> ${person.status}</p>
-              <p><strong>Confidence:</strong> ${person.confidence}</p>
-              ${person.timestamp ? `<p><strong>Time:</strong> ${person.timestamp}</p>` : ''}
-            </div>
-          `;
-        });
-
-        html += "</div></div>";
       });
 
+      html += "</div></div>";
       resultBox.innerHTML = html;
     });
   </script>
+
 </body>
 </html>
 
