@@ -4,7 +4,7 @@
 [![Flask](https://img.shields.io/badge/Flask-2.0%2B-black?logo=flask)](https://flask.palletsprojects.com/)  
 [![InsightFace](https://img.shields.io/badge/InsightFace-Buffalo__L-orange?logo=ai)](https://github.com/deepinsight/insightface)  
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.0%2B-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)  
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)  
+  
 
 A modern, **web-based attendance system** powered by **InsightFace** for accurate face recognition and automatic attendance logging.  
 Built with **Flask**, **SQLite**, and **TailwindCSS**, it allows **photo-based student recognition**, smart attendance tracking, and intuitive record management.  
