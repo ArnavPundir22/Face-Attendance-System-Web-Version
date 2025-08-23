@@ -1,35 +1,58 @@
-
 # 📸 Face Attendance Web System
 
-A modern, web-based attendance system that uses **InsightFace** for accurate face recognition and automatic attendance logging. Built with **Flask**, **SQLite**, and a sleek **TailwindCSS** frontend, this system allows for photo-based student recognition and intuitive record management.
+[![Python](https://img.shields.io/badge/Python-3.9%2B-blue?logo=python)](https://www.python.org/)  
+[![Flask](https://img.shields.io/badge/Flask-2.0%2B-black?logo=flask)](https://flask.palletsprojects.com/)  
+[![InsightFace](https://img.shields.io/badge/InsightFace-Buffalo__L-orange?logo=ai)](https://github.com/deepinsight/insightface)  
+[![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3.0%2B-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)  
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)  
+
+A modern, **web-based attendance system** powered by **InsightFace** for accurate face recognition and automatic attendance logging.  
+Built with **Flask**, **SQLite**, and **TailwindCSS**, it allows **photo-based student recognition**, smart attendance tracking, and intuitive record management.  
+
+---
+
+## 📑 Table of Contents
+
+- [🚀 Features](#-features)  
+- [🖥️ Tech Stack](#️-tech-stack)  
+- [📁 Project Structure](#-project-structure)  
+- [⚙️ Setup Instructions](#️-setup-instructions)  
+- [🔑 Configuration](#-configuration)  
+- [📝 Database Schema](#-database-schema)  
+- [📷 Face Encoding Workflow](#-face-encoding-workflow)  
+- [📬 Email Export](#-email-export)  
+- [🔐 Security Notes](#-security-notes)  
+- [🤝 Contributions](#-contributions)  
+- [💡 Future Enhancements](#-future-enhancements)  
+- [👨‍💻 Developed By](#-developed-by)  
 
 ---
 
 ## 🚀 Features
 
-- **Face Recognition using InsightFace**  
-  High-accuracy face embeddings using the Buffalo_L model.
+- **🔍 Face Recognition with InsightFace**  
+  High-accuracy embeddings using the **Buffalo_L** model.  
 
-- **Photo Upload for Attendance**  
-  Upload group or individual photos and automatically detect & mark students present.
+- **📷 Photo Upload for Attendance**  
+  Detects multiple faces from **group or individual photos** and marks students present.  
 
-- **Lecture & Section Tagging**  
-  Easily associate attendance with specific lectures and sections.
+- **📚 Lecture & Section Tagging**  
+  Attendance linked to specific **lectures & sections**.  
 
-- **Smart Re-Attendance Prevention**  
-  Prevents duplicate entries within a configurable time window (default: 10 minutes).
+- **✅ Smart Re-Attendance Prevention**  
+  Prevents duplicate entries within a configurable time window (**default: 10 minutes**).  
 
-- **Live Attendance Viewer**  
-  View all attendance logs with filters (date, status, section, lecture), export options, and styled rows.
+- **📊 Live Attendance Viewer**  
+  Full attendance history with **filters, search, row styling, and export options**.  
 
-- **Student Management**  
-  Add new students with details and face photos. Automatically encodes and saves embeddings.
+- **👨‍🎓 Student Management**  
+  Add new students with full details + face photo → system **auto-encodes** embeddings.  
 
-- **Email Attendance Report**  
-  Email filtered attendance records as a PDF report to any Gmail ID.
+- **📧 Email Attendance Reports**  
+  Send **filtered PDF attendance reports** to any Gmail ID.  
 
-- **Persistent Storage**  
-  Uses SQLite (`database.db`) and Pickle (`EncodeFile_Insight.pkl`) for storing metadata and face encodings.
+- **💾 Persistent Storage**  
+  Face encodings stored in `EncodeFile_Insight.pkl`, records in `database.db`.  
 
 ---
 
@@ -38,9 +61,9 @@ A modern, web-based attendance system that uses **InsightFace** for accurate fac
 | Layer         | Tools / Libraries                          |
 |---------------|---------------------------------------------|
 | Backend       | Flask, SQLite3, InsightFace, OpenCV         |
-| Frontend      | HTML, TailwindCSS, DataTables, JS           |
-| Face Encoding | InsightFace (Buffalo_L), NumPy, cv2         |
-| PDF Report    | ReportLab                                   |
+| Frontend      | HTML, TailwindCSS, DataTables, JavaScript   |
+| Face Encoding | InsightFace (Buffalo_L), NumPy, OpenCV      |
+| PDF Export    | ReportLab                                   |
 | Email         | smtplib, EmailMessage                       |
 
 ---
@@ -49,16 +72,16 @@ A modern, web-based attendance system that uses **InsightFace** for accurate fac
 
 ```bash
 ├── app.py                     # Main Flask server
-├── encode_faces.py           # Script to encode all known faces
+├── encode_faces.py            # Script to encode all known faces
 ├── templates/
-│   ├── index.html            # Main UI for uploading photos
-│   ├── viewer.html           # Attendance viewer & filters
-│   ├── add_student.html      # Add new student with photo
-├── static/                   # (Optional) Static assets if any
-├── known_faces/              # Folder to store face images
-├── EncodeFile_Insight.pkl    # Pickled list of (embedding, name)
-├── database.db               # SQLite DB storing students & logs
-├── requirements.txt          # All Python dependencies
+│   ├── index.html             # Upload photos for attendance
+│   ├── viewer.html            # Attendance viewer + filters
+│   ├── add_student.html       # Add student form + photo upload
+├── static/                    # Static assets (CSS/JS if any)
+├── known_faces/               # Stores student photos
+├── EncodeFile_Insight.pkl     # Saved embeddings
+├── database.db                # SQLite DB (students + attendance)
+├── requirements.txt           # Python dependencies
 ```
 
 ---
@@ -72,29 +95,28 @@ A modern, web-based attendance system that uses **InsightFace** for accurate fac
    ```
 
 2. **Install dependencies**:
-   *(preferably in a virtualenv)*
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Run the encoding script (if not already encoded)**:
+3. **Encode faces**:
    ```bash
    python encode_faces.py
    ```
 
-4. **Start the server**:
+4. **Run the server**:
    ```bash
    python app.py
    ```
 
-5. **Open in browser**:  
-   Navigate to `http://127.0.0.1:5000`
+5. **Access in browser**:  
+   👉 [http://127.0.0.1:5000](http://127.0.0.1:5000)
 
 ---
 
 ## 🔑 Configuration
 
-You can modify some values inside `app.py`:
+Inside **`app.py`**:
 
 ```python
 ENCODE_FILE = 'EncodeFile_Insight.pkl'
@@ -102,78 +124,76 @@ DB_FILE = 'database.db'
 REATTENDANCE_INTERVAL_MINUTES = 10
 FACE_MATCH_THRESHOLD = 0.5
 EMAIL_USER = 'your_email@gmail.com'
-EMAIL_PASS = 'your_app_password'  # Use App Password for Gmail
+EMAIL_PASS = 'your_app_password'  # Use Gmail App Password
 ```
 
 ---
 
 ## 📝 Database Schema
 
-- `students` table:
+- **students**  
   ```
   ID | Name | Program | Branch | Mobile | Gmail
   ```
 
-- `attendance` table:
+- **attendance**  
   ```
   Student_ID | Name | Program | Branch | Mobile | Status | Timestamp | Lecture | Section
   ```
 
 ---
 
-## 📷 Face Encoding Logic
+## 📷 Face Encoding Workflow
 
-- Run `encode_faces.py` to:
-  - Load all images from `known_faces/`
-  - Detect faces and generate embeddings
-  - Average multiple images per person
-  - Save to `EncodeFile_Insight.pkl`
+- `encode_faces.py`:
+  - Loads images from `known_faces/`
+  - Detects faces → generates embeddings
+  - Averages multiple embeddings per student
+  - Saves to `EncodeFile_Insight.pkl`
 
 - During attendance:
-  - Embedding is compared using cosine similarity
-  - If score > `FACE_MATCH_THRESHOLD`, it's considered a match
+  - Uploaded photo → embeddings generated
+  - Compared with stored encodings using **cosine similarity**
+  - Match if similarity > `FACE_MATCH_THRESHOLD`
 
 ---
 
 ## 📬 Email Export
 
-- Users can filter attendance records and email the results as a **PDF report** directly from the UI.
-- Emails are sent using **Gmail SMTP**, configured in `app.py`.
+- Filter logs in **Attendance Viewer**  
+- Export them as a **styled PDF**  
+- Email directly via Gmail SMTP  
 
 ---
 
 ## 🔐 Security Notes
 
-- For email to work, generate an [App Password](https://myaccount.google.com/apppasswords) for Gmail.
-- Do **not** commit `database.db` or `EncodeFile_Insight.pkl` to public repositories.
+- Use **App Passwords** for Gmail → [Setup Here](https://myaccount.google.com/apppasswords)  
+- Never commit `database.db` or `EncodeFile_Insight.pkl` in public repos  
 
 ---
-
 
 ## 🤝 Contributions
 
-Feel free to fork this project and submit pull requests. Suggestions, bug reports, and ideas are welcome!
+Pull requests, suggestions, and feature ideas are **always welcome** 🚀  
 
 ---
 
+## 💡 Future Enhancements
 
-
-## 💡 Future Improvements
-
-- Add face quality checks (blur/tilt)
-- Use live webcam again (optional)
-- Support multi-face detection with bounding boxes
-- Admin dashboard for report generation and editing attendance
-- OTP verification before adding student?
+- ✅ Face quality checks (blur / tilt detection)  
+- ✅ Optional live webcam attendance  
+- ✅ Multi-face detection with bounding box previews  
+- ✅ Admin dashboard for attendance editing  
+- ✅ OTP verification before student enrollment  
 
 ---
-
 
 ## 👨‍💻 Developed By
 
 **Arnav Pundir**  
-B.Tech CSE | COER University Roorkee  
-Email: *arnavp128@gmail.com*  
-Portfolio: *arnavpundir22.github.io*  
+🎓 B.Tech CSE | COER University Roorkee  
+📧 Email: *arnavp128@gmail.com*  
+🌐 Portfolio: [arnavpundir22.github.io](https://arnavpundir22.github.io)  
 
 ---

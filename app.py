@@ -89,7 +89,7 @@ def send_attendance_email():
         styles = getSampleStyleSheet()
         title_style = styles['Title']
         subtitle_style = styles['Heading2']
-
+        
         # Add Title & Subtitle
         elements.append(Paragraph("Attendance Report", title_style))
         elements.append(Paragraph(datetime.now().strftime("Generated on %d %B %Y, %I:%M %p"), subtitle_style))
@@ -154,32 +154,40 @@ def submit_student():
         conn.close()
         return redirect(url_for('add_student', status='error', message='Duplicate Name or ID found'))
 
+    # Save photo to known_faces folder
     filename = f"{name.replace(' ', '_')}.jpg"
     filepath = os.path.join('known_faces', filename)
     photo.save(filepath)
 
+    # Save student record in DB
     conn.execute('INSERT INTO students (ID, Name, Program, Branch, Mobile, Gmail) VALUES (?, ?, ?, ?, ?, ?)',
                  (student_id, name, program, branch, mobile, gmail))
     conn.commit()
     conn.close()
 
+    # --- Face Encoding Part ---
     image = cv2.imread(filepath)
     faces = model.get(image)
     if not faces:
         return redirect(url_for('add_student', status='error', message='No face detected in uploaded image'))
 
-    embedding = faces[0].embedding
+    # Load existing encodings
     if os.path.exists(ENCODE_FILE):
         with open(ENCODE_FILE, 'rb') as f:
             known_embeddings = pickle.load(f)
     else:
         known_embeddings = []
 
-    known_embeddings.append((embedding, name))
+    # Add all detected faces' embeddings for this student
+    for face in faces:
+        embedding = face.embedding
+        known_embeddings.append((embedding, name))
+
+    # Save updated encodings
     with open(ENCODE_FILE, 'wb') as f:
         pickle.dump(known_embeddings, f)
 
-    return redirect(url_for('add_student', status='success', message=f'{name} added successfully'))
+    return redirect(url_for('add_student', status='success', message=f'{name} added successfully with {len(faces)} encodings'))
 
 @app.route('/upload_photo', methods=['POST'])
 def upload_photo():
