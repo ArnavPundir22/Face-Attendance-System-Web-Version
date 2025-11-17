@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+# app.py (full updated file)
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 import cv2, numpy as np, os, pickle, sqlite3, base64
 from datetime import datetime
 import insightface, smtplib
@@ -8,9 +9,13 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
+import bcrypt
 
 app = Flask(__name__)
 
+# -------------------------
+# Configuration
+# -------------------------
 DB_FILE = 'database.db'
 ENCODE_FILE = 'EncodeFile_Insight.pkl'
 REATTENDANCE_INTERVAL_MINUTES = 2
@@ -18,12 +23,85 @@ FACE_MATCH_THRESHOLD = 0.5
 EMAIL_USER = 'arnavp128@gmail.com'
 EMAIL_PASS = 'pshk aoim hjde ydol'
 
+# Secret key for sessions — change in production or load from env
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'CHANGE_ME_TO_SOMETHING_SECRET')
+
 # --- Database utility functions ---
 def get_db_connection():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
     return conn
 
+def init_users_table_and_admin():
+    """
+    Create users table if not exists and auto-create an admin user if there are no users.
+    Admin credentials (first-run):
+        username: admin
+        password: admin123
+    """
+    conn = get_db_connection()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            password BLOB,
+            is_admin INTEGER DEFAULT 0
+        )
+    """)
+    conn.commit()
+
+    # Check if any user exists
+    cur = conn.execute("SELECT COUNT(*) AS cnt FROM users")
+    row = cur.fetchone()
+    count = row['cnt'] if row else 0
+
+    if count == 0:
+        # create default admin
+        admin_user = "admin"
+        admin_pass = "admin123"
+        hashed = bcrypt.hashpw(admin_pass.encode(), bcrypt.gensalt())
+        conn.execute("INSERT INTO users (username, password, is_admin) VALUES (?, ?, ?)",
+                     (admin_user, hashed, 1))
+        conn.commit()
+        app.logger.info("Auto-created default admin -> username: 'admin', password: 'admin123' (please change immediately)")
+    conn.close()
+
+def create_user(username: str, password: str, is_admin: int = 0):
+    """Create a user with hashed password. Returns True on success, False if username exists."""
+    conn = get_db_connection()
+    try:
+        hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+        conn.execute("INSERT INTO users (username, password, is_admin) VALUES (?, ?, ?)",
+                     (username, hashed, is_admin))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
+def is_current_user_admin():
+    """Return True if current logged in user is admin."""
+    if 'username' not in session:
+        return False
+    username = session['username']
+    conn = get_db_connection()
+    user = conn.execute("SELECT is_admin FROM users WHERE username=?", (username,)).fetchone()
+    conn.close()
+    if not user:
+        return False
+    return bool(user['is_admin'])
+
+
+# -------------------------
+# Ensure users table and admin exist at startup
+# -------------------------
+init_users_table_and_admin()
+
+
+# -------------------------
+# Face recognition setup (unchanged logic)
+# -------------------------
 # ensure directories exist
 os.makedirs('known_faces', exist_ok=True)
 
@@ -87,7 +165,6 @@ def load_encodings_from_file():
     known_encoding_dict = cleaned
     known_embeddings = [(emb, name) for name, emb in known_encoding_dict.items()]
 
-
 def save_encodings_to_file():
     """Save the current known_encoding_dict to disk (pickle)."""
     try:
@@ -96,11 +173,109 @@ def save_encodings_to_file():
     except Exception as e:
         app.logger.exception("Failed to save encodings: %s", e)
 
-
 # Load encodings at startup
 load_encodings_from_file()
 
 
+# -------------------------
+# Authentication enforcement
+# -------------------------
+@app.before_request
+def require_login():
+    """
+    Option A: protect all routes except /login and static files.
+    /register is admin-only — so it is NOT publicly accessible.
+    """
+    allowed_paths = [
+    '/login',
+    '/forgot_password',
+    '/favicon.ico'
+]
+
+    # allow static files (css/js/img served from /static/…)
+    if request.path.startswith('/static/') or request.path in allowed_paths:
+        return None
+
+    # If user not logged in, redirect to login
+    if 'logged_in' not in session:
+        return redirect(url_for('login'))
+
+    # if user is logged in, allow (further admin checks are done inside /register)
+    return None
+
+
+# -------------------------
+# Routes: Authentication
+# -------------------------
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    # Public route
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+
+        if not username or not password:
+            return render_template('login.html', error="Username and password required")
+
+        conn = get_db_connection()
+        user = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+        conn.close()
+
+        if not user:
+            return render_template('login.html', error="Invalid username or password")
+
+        stored_hash = user['password']  # this is bytes (BLOB)
+
+        # stored_hash might be a memoryview (depending on sqlite). Ensure bytes.
+        if isinstance(stored_hash, memoryview):
+            stored_hash = stored_hash.tobytes()
+
+        try:
+            if bcrypt.checkpw(password.encode(), stored_hash):
+                session['logged_in'] = True
+                session['username'] = username
+                return redirect(url_for('index'))
+            else:
+                return render_template('login.html', error="Invalid username or password")
+        except Exception:
+            return render_template('login.html', error="Invalid username or password")
+
+    return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
+
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """
+    Admin-only registration route.
+    The before_request ensures user is logged in; here we check if that user is admin.
+    """
+    if not is_current_user_admin():
+        return render_template('login.html', error="Admin access required to create new users")
+
+    if request.method == 'POST':
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+
+        if not username or not password:
+            return render_template('register.html', error="All fields required")
+
+        success = create_user(username, password, is_admin=0)
+        if not success:
+            return render_template('register.html', error="Username already exists")
+        return render_template('register.html', success="User created successfully!")
+
+    return render_template('register.html')
+
+
+# -------------------------
+# Face Attendance / App routes (protected by before_request)
+# -------------------------
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -109,12 +284,10 @@ def index():
 def viewer():
     return render_template('viewer.html')
 
-import sqlite3
-
 @app.route('/get_attendance_data')
 def get_attendance_data():
     try:
-        conn = sqlite3.connect("database.db")
+        conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute("""
             SELECT Student_ID, Name, Program, Branch, Mobile, Status, Timestamp, Lecture, Section 
@@ -126,11 +299,10 @@ def get_attendance_data():
     except Exception as e:
         return jsonify([])
 
-
 @app.route('/students')
 def students():
     try:
-        conn = sqlite3.connect('database.db')
+        conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute("SELECT ID, Name, Program, Branch, Mobile, Gmail FROM students")
         data = cursor.fetchall()
@@ -184,7 +356,6 @@ def send_attendance_email():
         doc.build(elements)
         pdf_data = buffer.getvalue()
 
-
         msg = EmailMessage()
         msg['Subject'] = 'Attendance Report'
         msg['From'] = EMAIL_USER
@@ -200,9 +371,37 @@ def send_attendance_email():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
 
+
 @app.route('/add_student')
 def add_student():
     return render_template('add_student.html')
+
+
+@app.route('/forgot_password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        username = request.form['username'].strip()
+        new_password = request.form['new_password'].strip()
+
+        conn = get_db_connection()
+        user = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+
+        if not user:
+            conn.close()
+            return render_template('forgot_password.html', error="User does not exist.")
+
+        # 🔐 Hash new password before saving
+        hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt())
+
+        conn.execute("UPDATE users SET password=? WHERE username=?", (hashed, username))
+        conn.commit()
+        conn.close()
+
+        return redirect(url_for('login'))
+
+    return render_template('forgot_password.html')
+    
+
 
 @app.route('/submit_student', methods=['POST'])
 def submit_student():
@@ -233,7 +432,7 @@ def submit_student():
         return redirect(url_for('add_student', status='error', message='Duplicate Name or ID found'))
 
     # Save photo to known_faces folder WITHOUT underscore
-    clean_name = name.replace(" ", " ")   # AvanyaPundir.jpg (no underscore)
+    clean_name = name.replace(" ", " ")   # Avanya Pundir.jpg (no underscore)
     filename = f"{clean_name}.jpg"
     filepath = os.path.join('known_faces', filename)
     photo.save(filepath)

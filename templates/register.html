@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register • Face Attendance</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body {
+      background-color: #0d0d1a;
+      color: #e4e4e7;
+      background-image: radial-gradient(#2a2a3e 1px, transparent 0);
+      background-size: 40px 40px;
+    }
+
+    .dark-card {
+      background-color: rgba(32,32,50,0.7);
+      border: 1px solid rgba(168,85,247,0.3);
+      border-top: 4px solid #a855f7;
+      backdrop-filter: blur(6px);
+    }
+
+    .input-dark {
+      background-color: rgba(13,13,26,0.6);
+      border: 1px solid #3b3b55;
+      color: #e4e4e7;
+    }
+    .input-dark:focus {
+      border-color: #a855f7;
+      box-shadow: 0 0 0 1px #a855f7;
+    }
+
+    .neon-glow {
+      box-shadow: 0 0 5px #a855f7, 0 0 10px #a855f7, 0 0 15px #c084fc;
+      transition: all 0.3s ease-in-out;
+    }
+    .neon-glow:hover {
+      box-shadow: 0 0 10px #a855f7, 0 0 20px #a855f7, 0 0 30px #c084fc;
+    }
+  </style>
+</head>
+
+<body class="flex justify-center items-center min-h-screen px-4">
+
+  <div class="dark-card w-full max-w-md rounded-xl p-8 shadow-2xl">
+
+    <h1 class="text-center text-3xl font-extrabold text-purple-300 mb-6">
+      ➕ Register New User
+    </h1>
+
+    {% if error %}
+    <p class="text-red-400 text-center mb-4 font-semibold">{{ error }}</p>
+    {% endif %}
+
+    {% if success %}
+    <p class="text-green-400 text-center mb-4 font-semibold">{{ success }}</p>
+    {% endif %}
+
+    <form action="/register" method="POST" class="space-y-5">
+
+      <div>
+        <label class="text-gray-300 mb-1 block">Username</label>
+        <input name="username" type="text" required
+          class="input-dark w-full rounded-lg px-4 py-2">
+      </div>
+
+      <div>
+        <label class="text-gray-300 mb-1 block">Password</label>
+        <input name="password" type="password" required
+          class="input-dark w-full rounded-lg px-4 py-2">
+      </div>
+
+      <button type="submit"
+        class="w-full bg-gradient-to-r from-purple-600 to-indigo-500 text-white py-3 mt-4 rounded-lg font-extrabold neon-glow">
+        Create Account
+      </button>
+    </form>
+
+    <div class="mt-6 text-center">
+      <a href="/login" class="text-purple-300 font-semibold hover:text-purple-400">
+        🔙 Back to Login
+      </a>
+    </div>
+
+  </div>
+
+</body>
+</html>
+
