@@ -5,217 +5,395 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Face Attendance System</title>
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body {
+        background-color: #0d0d1a;
+        color: #e4e4e7;
+        background-image: radial-gradient(#2a2a3e 1px, transparent 0);
+        background-size: 40px 40px;
+    }
+    .neon-glow {
+        box-shadow: 0 0 5px #a855f7, 0 0 10px #a855f7, 0 0 15px #c084fc;
+        transition: all 0.3s ease-in-out;
+    }
+    .neon-glow:hover {
+        box-shadow: 0 0 10px #a855f7, 0 0 20px #a855f7, 0 0 30px #c084fc;
+    }
+    .dark-card {
+        background-color: rgba(32, 32, 50, 0.7);
+        backdrop-filter: blur(5px);
+        border: 1px solid rgba(168, 85, 247, 0.3);
+        border-top: 4px solid #a855f7;
+    }
+    .input-dark {
+        background-color: rgba(13, 13, 26, 0.5);
+        border-color: #3b3b55;
+        color: #e4e4e7;
+    }
+    .input-dark:focus {
+        border-color: #a855f7;
+        box-shadow: 0 0 0 1px #a855f7;
+    }
+    .result-status-card {
+        background-color: rgba(42, 42, 62, 0.7);
+        border-left: 4px solid;
+    }
+
+    /* ------------------------
+          NAVIGATION STYLES
+    ------------------------- */
+    nav {
+        box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);
+    }
+    .nav-link {
+        position: relative;
+        padding: 8px 14px;
+        border-radius: 8px;
+        font-weight: 600;
+        color: #c3c3d9;
+        transition: all 0.3s ease;
+    }
+    .nav-link:hover {
+        color: #ffffff;
+        text-shadow: 0 0 6px #a855f7, 0 0 10px #c084fc;
+    }
+    .nav-link::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: -2px;
+        width: 0%;
+        height: 2px;
+        background: linear-gradient(to right, #a855f7, #6366f1);
+        border-radius: 4px;
+        transition: all 0.3s ease;
+        transform: translateX(-50%);
+    }
+    .nav-link:hover::after {
+        width: 80%;
+    }
+  </style>
+
 </head>
-<body class="bg-gradient-to-br from-white to-gray-50 min-h-screen font-sans flex flex-col">
 
-  <!-- Header -->
-  <header class="bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 shadow-md sticky top-0 z-10">
+<body class="min-h-screen font-sans flex flex-col">
+
+  <!-- HEADER -->
+  <header class="bg-[#121223] shadow-2xl sticky top-0 z-10 border-b border-purple-800">
     <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-      <h1 class="text-2xl font-extrabold text-white tracking-wide flex items-center gap-2">
-        <span class="text-3xl">📸</span> Face Attendance System
+      <h1 class="text-2xl font-extrabold text-white flex items-center gap-2">
+        <span class="text-3xl text-purple-400 neon-glow p-1 leading-none">🤖</span> 
+        <span class="text-indigo-300">Face Attendance Marker</span>
       </h1>
-
-      <!-- Desktop Nav -->
-      <nav class="hidden md:flex gap-6">
-        <button onclick="window.location.href='/viewer'" class="text-white/80 hover:text-white transition font-medium">Attendance Records</button>
-        <button onclick="window.location.href='/add_student'" class="text-white/80 hover:text-white transition font-medium">Add Student</button>
-        <button onclick="window.location.href='/students'" class="text-white/80 hover:text-white transition font-medium">View Students</button>
-      </nav>
-
-      <!-- Mobile Nav -->
-      <div class="md:hidden relative">
-        <button id="menuBtn" class="text-white text-2xl">☰</button>
-        <div id="menuBox" class="hidden absolute right-0 mt-2 bg-white rounded-lg shadow-lg text-gray-700 w-40 z-20">
-          <button onclick="window.location.href='/viewer'" class="block w-full text-left px-4 py-2 hover:bg-gray-100">Attendance Records</button>
-          <button onclick="window.location.href='/add_student'" class="block w-full text-left px-4 py-2 hover:bg-gray-100">Add Student</button>
-          <button onclick="window.location.href='/students'" class="block w-full text-left px-4 py-2 hover:bg-gray-100">View Students</button>
-        </div>
-      </div>
     </div>
+
+    <!-- UPDATED NAVIGATION BAR -->
+    <nav class="flex gap-6 px-6 py-3 bg-[#0d0d1a]/80 backdrop-blur-md border-t border-purple-800 justify-center">
+      <a href="/" class="nav-link">Home</a>
+      <a href="/viewer" class="nav-link">View Attendance</a>
+      <a href="/students" class="nav-link">All Students</a>
+      <a href="/add_student" class="nav-link">Add Student</a>
+    </nav>
   </header>
 
-  <!-- Main Content -->
   <main class="flex-grow flex flex-col items-center px-4 py-10">
-    <div class="bg-white rounded-2xl shadow-lg p-8 w-full max-w-2xl border border-gray-100">
-      <h2 class="text-2xl font-semibold text-gray-800 mb-6 text-center">Upload Photos & Mark Attendance</h2>
+    <div class="dark-card rounded-xl shadow-2xl p-8 w-full max-w-2xl">
+
+      <h2 class="text-3xl text-center font-bold text-purple-300 mb-8">
+        Mark Attendance with Photo
+      </h2>
+
       <form id="uploadForm" class="space-y-6">
 
-        <!-- Lecture -->
-        <div>
-          <label class="block text-gray-700 font-medium mb-1">Lecture Name</label>
-          <input type="text" name="lecture" required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-400 focus:outline-none"/>
+        <!-- Lecture + Section -->
+        <div class="grid sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-gray-300 mb-1">Lecture Name</label>
+                <input type="text" name="lecture" required class="input-dark w-full rounded-lg px-4 py-2"/>
+            </div>
+            <div>
+                <label class="block text-gray-300 mb-1">Section</label>
+                <input type="text" name="section" required class="input-dark w-full rounded-lg px-4 py-2"/>
+            </div>
         </div>
 
-        <!-- Section -->
+        <!-- Gmail -->
         <div>
-          <label class="block text-gray-700 font-medium mb-1">Section</label>
-          <input type="text" name="section" required class="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-400 focus:outline-none"/>
+            <label class="block text-gray-300 mb-1">Send Report To (Gmail)</label>
+            <input type="email" id="gmailInput" placeholder="example@gmail.com"
+                   class="input-dark w-full rounded-lg px-4 py-2"/>
         </div>
 
-        <!-- Upload / Camera -->
-        <div>
-          <label class="block text-gray-700 font-medium mb-1">Upload Photos</label>
-          <input id="fileInput" type="file" name="images" accept="image/*" multiple class="w-full bg-gray-50 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-purple-400 focus:outline-none"/>
+        <!-- File upload -->
+        <div class="pt-4 border-t border-[#3b3b55]">
+          <label class="block text-gray-300 font-semibold mb-3 text-lg">Upload Images</label>
+          <input id="fileInput" type="file" name="images" accept="image/*" multiple
+            class="input-dark w-full rounded-lg px-4 py-2"/>
+        </div>
 
-          <!-- Capture Option -->
-          <div class="mt-3 flex flex-col gap-2">
-            <button type="button" id="openCameraBtn" class="bg-blue-500 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-600">
-              📷 Open Camera
+        <!-- CAMERA -->
+        <div class="mt-6 p-4 bg-indigo-900/30 border border-indigo-700/50 rounded-lg">
+            <button type="button" id="openCameraBtn"
+                class="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold neon-glow">
+                📷 Open Camera / Webcam
             </button>
-            <div id="cameraBox" class="hidden flex flex-col items-center gap-3">
-              <video id="video" autoplay playsinline class="rounded-lg border border-gray-300 max-w-full"></video>
-              <div class="flex gap-3">
-                <button type="button" id="captureBtn" class="bg-green-500 text-white px-4 py-2 rounded-lg shadow hover:bg-green-600">
+
+            <div id="cameraBox" class="hidden flex flex-col items-center gap-4 pt-4">
+              <video id="video" autoplay playsinline
+                     class="rounded-lg shadow-2xl border-4 border-purple-500 w-full max-w-full"></video>
+
+              <div class="flex flex-wrap justify-center gap-3 w-full">
+                <!-- Manual Snapshot -->
+                <button type="button" id="captureBtn"
+                        class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">
                   📸 Take Snapshot
                 </button>
-                <button type="button" id="switchCameraBtn" class="bg-purple-500 text-white px-4 py-2 rounded-lg shadow hover:bg-purple-600">
+
+                <!-- Switch Camera -->
+                <button type="button" id="switchCameraBtn"
+                        class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold">
                   🔄 Switch Camera
                 </button>
+
+                <!-- AUTO CAPTURE -->
+                <button type="button" id="autoCaptureBtn"
+                        class="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold">
+                  🤖 Auto Capture 5 Photos
+                </button>
               </div>
+
               <canvas id="canvas" class="hidden"></canvas>
             </div>
-          </div>
+        </div>
 
-          <!-- Previews -->
-          <div id="previewBox" class="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3"></div>
+        <!-- Previews -->
+        <div id="previewBox"
+             class="mt-6 p-3 border border-dashed border-purple-500/50 rounded-lg grid grid-cols-3 gap-3">
+          <p class="text-sm text-gray-400 col-span-full text-center">Image Previews will appear here...</p>
         </div>
 
         <!-- Submit -->
-        <button type="submit" class="w-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white py-3 rounded-lg font-semibold hover:opacity-90 shadow-md transition">
-          📤 Upload & Mark Attendance
+        <button type="submit"
+          class="w-full bg-gradient-to-r from-purple-600 to-indigo-500 text-white py-3 rounded-lg font-extrabold neon-glow">
+          📤 EXECUTE SCAN & MARK ATTENDANCE
         </button>
       </form>
     </div>
 
-    <!-- Result -->
-    <div id="result" class="w-full max-w-5xl mt-10"></div>
+    <!-- Scan Results -->
+    <div id="result" class="w-full max-w-5xl mt-12 space-y-8"></div>
+
   </main>
 
-  <!-- JS -->
-  <script>
-    const form = document.getElementById("uploadForm");
-    const resultBox = document.getElementById("result");
-    const previewBox = document.getElementById("previewBox");
+<!-- SCRIPT -->
+<script>
 
-    // Show thumbnails
-    function updatePreviews(files) {
-      previewBox.innerHTML = "";
-      Array.from(files).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = e => {
-          const img = document.createElement("img");
-          img.src = e.target.result;
-          img.className = "rounded-lg border shadow max-h-32 object-cover";
-          previewBox.appendChild(img);
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-    document.getElementById("fileInput").addEventListener("change", (e) => updatePreviews(e.target.files));
+  /* ------------------------------
+        IMAGE PREVIEWS
+  ------------------------------- */
+  const previewBox = document.getElementById("previewBox");
+  document.getElementById("fileInput").addEventListener("change", updatePreviews);
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      resultBox.innerHTML = "<p class='text-gray-700 font-semibold'>⏳ Processing...</p>";
-      const formData = new FormData(form);
+  function updatePreviews(files) {
+    previewBox.innerHTML = "";
+    files = files.target ? files.target.files : files;
 
-      const res = await fetch("/upload_photo", { method: "POST", body: formData });
-      const data = await res.json();
+    Array.from(files).forEach(file => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = document.createElement("img");
+        img.src = ev.target.result;
+        img.className = "rounded-lg border border-purple-700 h-24 w-full object-cover";
+        previewBox.appendChild(img);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
 
-      if (!data.images.length) {
-        resultBox.innerHTML = "<p class='text-red-600 font-semibold'>No faces recognized.</p>";
-        return;
-      }
 
-      let html = "";
-      data.images.forEach((img, idx) => {
-        html += `
-          <div class="bg-white shadow-lg rounded-xl p-6 border border-gray-100 mb-10">
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">Annotated Image ${idx + 1}</h2>
-            <img src="${img.annotated}" alt="Detected Faces" class="rounded-lg shadow max-w-full mb-6"/>
-            <h2 class="text-xl font-semibold text-gray-800 mb-4">Detection Results</h2>
-            <div class="grid md:grid-cols-2 gap-4">
-        `;
-        img.results.forEach(person => {
-          const color = person.status === "Unknown" ? "border-red-400 bg-red-50"
-                        : person.status === "Already Marked" ? "border-yellow-400 bg-yellow-50"
-                        : "border-green-400 bg-green-50";
-          html += `
-            <div class="p-4 rounded-lg shadow-sm border-l-4 ${color}">
-              <p><strong>Name:</strong> ${person.name}</p>
-              <p><strong>Status:</strong> ${person.status}</p>
-              <p><strong>Confidence:</strong> ${person.confidence}</p>
-              ${person.timestamp ? `<p><strong>Time:</strong> ${person.timestamp}</p>` : ''}
-            </div>
-          `;
-        });
-        html += "</div></div>";
-      });
+  /* ------------------------------
+        CAMERA HANDLING
+  ------------------------------- */
+  let stream = null;
+  let usingFrontCamera = true;
 
-      resultBox.innerHTML = html;
+  const openCameraBtn = document.getElementById("openCameraBtn");
+  const cameraBox = document.getElementById("cameraBox");
+  const video = document.getElementById("video");
+  const canvas = document.getElementById("canvas");
+  const captureBtn = document.getElementById("captureBtn");
+  const switchCameraBtn = document.getElementById("switchCameraBtn");
+  const autoCaptureBtn = document.getElementById("autoCaptureBtn");
+  const fileInput = document.getElementById("fileInput");
+
+  async function startCamera() {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: usingFrontCamera ? "user" : "environment" }
     });
 
-    // mobile menu
-    document.getElementById("menuBtn").addEventListener("click", () => {
-      document.getElementById("menuBox").classList.toggle("hidden");
-    });
+    video.srcObject = stream;
+  }
 
-    // Camera functionality
-    const openCameraBtn = document.getElementById("openCameraBtn");
-    const switchCameraBtn = document.getElementById("switchCameraBtn");
-    const cameraBox = document.getElementById("cameraBox");
-    const video = document.getElementById("video");
-    const canvas = document.getElementById("canvas");
-    const captureBtn = document.getElementById("captureBtn");
-    const fileInput = document.getElementById("fileInput");
-    let stream;
-    let usingFrontCamera = true;
+  openCameraBtn.addEventListener("click", () => {
+    cameraBox.classList.toggle("hidden");
 
-    async function startCamera() {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: usingFrontCamera ? "user" : "environment" }
-        });
-        video.srcObject = stream;
-      } catch (err) {
-        alert("Camera access denied or not available.");
-      }
-    }
-
-    openCameraBtn.addEventListener("click", () => {
-      cameraBox.classList.toggle("hidden");
-      if (!cameraBox.classList.contains("hidden")) {
-        startCamera();
-      }
-    });
-
-    switchCameraBtn.addEventListener("click", () => {
-      usingFrontCamera = !usingFrontCamera;
+    if (!cameraBox.classList.contains("hidden")) {
       startCamera();
+      openCameraBtn.innerHTML = "❌ Close Camera";
+    } else {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      openCameraBtn.innerHTML = "📷 Open Camera / Webcam";
+    }
+  });
+
+  switchCameraBtn.addEventListener("click", () => {
+    usingFrontCamera = !usingFrontCamera;
+    startCamera();
+  });
+
+  /* ------------------------------
+       SINGLE SNAPSHOT
+  ------------------------------- */
+  captureBtn.addEventListener("click", () => {
+    captureSinglePhoto();
+    alert("📸 Snapshot added!");
+  });
+
+  function captureSinglePhoto() {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+
+    canvas.toBlob(blob => {
+      const file = new File([blob], `capture_${Date.now()}.jpg`, { type: "image/jpeg" });
+
+      const dt = new DataTransfer();
+      for (let f of fileInput.files) dt.items.add(f);
+      dt.items.add(file);
+      fileInput.files = dt.files;
+
+      updatePreviews(fileInput.files);
     });
+  }
 
-    captureBtn.addEventListener("click", () => {
-      const context = canvas.getContext("2d");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      canvas.toBlob(blob => {
-        const file = new File([blob], "captured_photo_" + Date.now() + ".jpg", { type: "image/jpeg" });
-        const dataTransfer = new DataTransfer();
-        const existingFiles = fileInput.files;
-        for (let i = 0; i < existingFiles.length; i++) {
-          dataTransfer.items.add(existingFiles[i]);
+  /* ------------------------------
+       🤖 AUTO CAPTURE 5 PHOTOS
+  ------------------------------- */
+  autoCaptureBtn.addEventListener("click", () => {
+    if (!stream) {
+        alert("Open the camera first!");
+        return;
+    }
+
+    autoCaptureBtn.disabled = true;
+    autoCaptureBtn.innerHTML = "🤖 Capturing...";
+
+    let count = 0;
+
+    const interval = setInterval(() => {
+        count++;
+
+        captureSinglePhoto();  // Take photo
+
+        if (count >= 5) {
+            clearInterval(interval);
+
+            autoCaptureBtn.disabled = false;
+            autoCaptureBtn.innerHTML = "🤖 Auto Capture 5 Photos";
+
+            // Auto submit after 1 second
+            setTimeout(() => {
+                document.querySelector("#uploadForm button[type='submit']").click();
+            }, 1000);
         }
-        dataTransfer.items.add(file);
-        fileInput.files = dataTransfer.files;
-        updatePreviews(fileInput.files);
-        alert("📸 Snapshot captured!");
-      }, "image/jpeg");
+
+    }, 3000); // 3 seconds gap
+  });
+
+
+  /* ------------------------------
+        ATTENDANCE SUBMIT
+  ------------------------------- */
+  const form = document.getElementById("uploadForm");
+  const resultBox = document.getElementById("result");
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData(form);
+    resultBox.innerHTML = `<div class='text-center p-6 text-yellow-300'>⚙️ Processing...</div>`;
+
+    const res = await fetch("/upload_photo", { method: "POST", body: formData });
+    const data = await res.json();
+
+    window.currentSessionAttendance = data.session_attendance || [];
+
+    let html = "";
+    data.images.forEach((img, idx) => {
+      html += `
+        <div class="dark-card p-8 rounded-xl">
+          <h2 class="text-2xl text-purple-300 mb-6">Scan Report: Image ${idx + 1}</h2>
+          <img src="${img.annotated}" class="rounded-lg mb-6 border-2 border-purple-500"/>
+          <div class="grid md:grid-cols-2 gap-4">
+      `;
+
+      img.results.forEach(r => {
+        html += `
+          <div class="result-status-card p-4 rounded-lg">
+            <p class="font-bold text-lg">${r.name}</p>
+            <p>Status: ${r.status}</p>
+            <p>Confidence: ${r.confidence}</p>
+            ${r.timestamp ? `<p>Time: ${r.timestamp}</p>` : ""}
+          </div>
+        `;
+      });
+
+      html += `</div></div>`;
     });
-  </script>
+
+    html += `
+      <div class="flex justify-center mt-8">
+        <button id="sendEmailBtn"
+            class="bg-purple-600 text-white px-6 py-3 rounded-lg font-bold neon-glow">
+            📧 Send Attendance Report to Email
+        </button>
+      </div>
+    `;
+
+    resultBox.innerHTML = html;
+  });
+
+
+  /* ------------------------------
+        SEND EMAIL
+  ------------------------------- */
+  document.addEventListener("click", async (e) => {
+    if (e.target.id === "sendEmailBtn") {
+
+      const gmail = document.getElementById("gmailInput").value.trim();
+      if (!gmail) return alert("Please enter Gmail.");
+
+      const tableData = window.currentSessionAttendance;
+      if (!tableData.length) return alert("No attendance to send for this session.");
+
+      const mailRes = await fetch("/send_attendance_email", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ email: gmail, data: tableData })
+      });
+
+      const result = await mailRes.json();
+      if (result.success) alert("📨 Email sent!");
+      else alert("❌ Error: " + result.message);
+    }
+  });
+
+</script>
+
 </body>
 </html>
 

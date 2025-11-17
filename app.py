@@ -16,7 +16,7 @@ ENCODE_FILE = 'EncodeFile_Insight.pkl'
 REATTENDANCE_INTERVAL_MINUTES = 2
 FACE_MATCH_THRESHOLD = 0.5
 EMAIL_USER = 'arnavp128@gmail.com'
-EMAIL_PASS = 'cyhy ppki rdny rjwc'
+EMAIL_PASS = 'pshk aoim hjde ydol'
 
 # --- Database utility functions ---
 def get_db_connection():
@@ -192,7 +192,7 @@ def submit_student():
 @app.route('/upload_photo', methods=['POST'])
 def upload_photo():
     if 'images' not in request.files:
-        return jsonify({"images": []})
+        return jsonify({"images": [], "session_attendance": []})
 
     lecture = request.form.get('lecture', '').strip()
     section = request.form.get('section', '').strip()
@@ -205,6 +205,8 @@ def upload_photo():
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
 
     all_outputs = []
+    session_attendance = []     # <---- COLLECT ONLY THIS SCAN’S ATTENDANCE
+
     conn = get_db_connection()
 
     for file in files:
@@ -265,6 +267,8 @@ def upload_photo():
                         remark = True
 
                 status = 'Re-Marked' if remark else 'Present'
+
+                # Insert attendance
                 conn.execute('''
                     INSERT INTO attendance (Student_ID, Name, Program, Branch, Mobile, Status, Timestamp, Lecture, Section)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -272,14 +276,29 @@ def upload_photo():
                       student['Mobile'], status, timestamp, lecture, section))
                 conn.commit()
 
-                results.append({
+                result_entry = {
                     "name": best_name,
                     "status": status,
                     "confidence": f"{best_score:.2f}",
                     "timestamp": timestamp
-                })
+                }
 
-        # Encode annotated image
+                results.append(result_entry)
+
+                # ---- SAVE ONLY THIS SESSION ATTENDANCE ----
+                session_attendance.append([
+                    student['ID'],
+                    student['Name'],
+                    student['Program'],
+                    student['Branch'],
+                    student['Mobile'],
+                    status,
+                    timestamp,
+                    lecture,
+                    section
+                ])
+
+        # Encode image
         _, buffer = cv2.imencode('.jpg', original)
         encoded_img = base64.b64encode(buffer).decode('utf-8')
         image_url = f"data:image/jpeg;base64,{encoded_img}"
@@ -287,7 +306,12 @@ def upload_photo():
         all_outputs.append({"results": results, "annotated": image_url})
 
     conn.close()
-    return jsonify({"images": all_outputs})
+
+    # RETURN SESSION ATTENDANCE!
+    return jsonify({
+        "images": all_outputs,
+        "session_attendance": session_attendance
+    })
 
 if __name__ == '__main__':
     app.run(debug=True)

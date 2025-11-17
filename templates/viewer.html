@@ -6,12 +6,10 @@
   <title>Attendance Records</title>
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- DataTables CSS -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
   <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
   <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.4.1/css/responsive.dataTables.min.css">
 
-  <!-- JS -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
   <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
@@ -21,53 +19,134 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+
+  <style>
+    /* Custom Creative Dark Theme Styles */
+    body {
+        background-color: #0d0d1a; /* Even darker base */
+        color: #e4e4e7;
+        background-image: radial-gradient(#2a2a3e 1px, transparent 0);
+        background-size: 40px 40px;
+    }
+    .neon-button {
+        transition: all 0.3s ease-in-out;
+    }
+    .neon-button:hover {
+        box-shadow: 0 0 8px #8b5cf6, 0 0 15px #c4b5fd;
+    }
+    .dark-card {
+        background-color: rgba(32, 32, 50, 0.7); /* Glassmorphism transparency */
+        backdrop-filter: blur(5px);
+        border: 1px solid rgba(168, 85, 247, 0.3); /* Purple border */
+    }
+    .input-dark {
+        background-color: rgba(13, 13, 26, 0.5);
+        border-color: #3b3b55;
+        color: #e4e4e7;
+    }
+    .input-dark:focus {
+        border-color: #a855f7;
+        box-shadow: 0 0 0 1px #a855f7;
+    }
+    .hover-scale:hover {
+        transform: scale(1.01);
+    }
+    /* DataTables Dark Mode Overrides */
+    .dataTables_wrapper .dataTables_filter input,
+    .dataTables_wrapper .dataTables_length select,
+    .dataTables_wrapper .dataTables_info,
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+        color: #e4e4e7 !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+        background: #3b3b55 !important;
+        border: 1px solid #3b3b55 !important;
+        color: #e4e4e7 !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+        background: #50506e !important;
+        border: 1px solid #50506e !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .current {
+        background: #a855f7 !important; /* Active purple */
+        border-color: #a855f7 !important;
+        color: white !important;
+    }
+    #attendanceTable {
+        background-color: #2a2a3e !important;
+    }
+    #attendanceTable thead {
+        background-color: #7b4397 !important;
+    }
+    #attendanceTable th {
+        color: white !important;
+        background-color: #4a285d !important;
+    }
+    #attendanceTable tbody tr {
+        background-color: #2a2a3e !important;
+    }
+    #attendanceTable tbody tr:nth-child(even) {
+        background-color: #3b3b55 !important;
+    }
+    #attendanceTable tbody tr:hover {
+        background-color: #50506e !important;
+    }
+  </style>
 </head>
 
-<body class="bg-gray-100 min-h-screen">
-  <h1 class="text-3xl font-bold text-center text-purple-600 py-6">📑 Attendance Records</h1>
+<body class="min-h-screen">
+  <h1 class="text-4xl font-extrabold text-center text-purple-400 py-8 bg-[#121223] shadow-xl transform transition duration-300 hover:shadow-2xl">📑 Centralized Attendance Records</h1>
 
-  <div class="max-w-7xl mx-auto bg-white shadow-lg p-6 rounded-lg overflow-x-auto">
-    <button onclick="window.location.href='/'" class="bg-purple-600 text-white px-4 py-2 rounded mb-4">
-      ⬅ Back
-    </button>
-
-    <!-- 📧 Email Export + Filter Controls -->
-    <div class="flex flex-col sm:flex-row gap-2 items-center mb-4">
-      <input id="emailInput" type="email" placeholder="Enter email" class="border px-3 py-2 rounded w-full sm:w-1/3">
-      <button id="sendEmailBtn" class="bg-green-600 text-white px-4 py-2 rounded">📧 Send Report</button>
-
-      <!-- Filter Dropdowns -->
-      <select id="statusFilter" class="border px-3 py-2 rounded">
-        <option value="">All Status</option>
-        <option value="Present">Present</option>
-        <option value="Re-Marked">Re-Marked</option>
-        <option value="Already Marked">Already Marked</option>
-      </select>
-
-      <select id="lectureFilter" class="border px-3 py-2 rounded">
-        <option value="">All Lectures</option>
-      </select>
-
-      <select id="sectionFilter" class="border px-3 py-2 rounded">
-        <option value="">All Sections</option>
-      </select>
-
-      <!-- Today's Attendance -->
-      <button id="todayBtn" class="bg-blue-600 text-white px-4 py-2 rounded">📅 Today Only</button>
+  <div class="max-w-7xl mx-auto dark-card shadow-xl p-8 rounded-lg mt-6 overflow-x-auto transform transition-all hover-scale">
+    <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+        <button onclick="window.location.href='/'" class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded-lg font-semibold transition shadow-md transform hover:scale-105 neon-button">
+          ⬅ Back to Home Console
+        </button>
+        <button id="todayBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg font-semibold transition shadow-md transform hover:scale-105 neon-button">
+            📅 View Today's Events Only
+        </button>
     </div>
 
+    <div class="bg-gray-900/50 p-4 rounded-lg mb-6 shadow-inner border border-gray-700 transform transition-all duration-300 hover:bg-gray-800/50">
+        <h2 class="text-xl font-bold text-purple-300 mb-4 flex items-center gap-2">
+            ⚙️ Real-time Data Filter & Reporting
+        </h2>
+        <div class="flex flex-col md:flex-row flex-wrap gap-3 items-stretch">
+          
+          <input id="emailInput" type="email" placeholder="Recipient email for filtered report" class="input-dark px-4 py-2 rounded-lg w-full md:flex-1 min-w-[200px] focus:ring-purple-500 transition duration-300">
+          <button id="sendEmailBtn" class="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg font-semibold transition w-full md:w-auto transform hover:scale-105 neon-button">📧 Send Report via Email</button>
+
+          <select id="statusFilter" class="input-dark px-4 py-2 rounded-lg focus:ring-purple-500 w-full md:w-auto transition duration-300">
+            <option value="">Filter by Status</option>
+            <option value="Present">Present</option>
+            <option value="Re-Marked">Re-Marked</option>
+            <option value="Already Marked">Already Marked</option>
+          </select>
+
+          <select id="lectureFilter" class="input-dark px-4 py-2 rounded-lg focus:ring-purple-500 w-full md:w-auto transition duration-300">
+            <option value="">Filter by Lecture</option>
+          </select>
+
+          <select id="sectionFilter" class="input-dark px-4 py-2 rounded-lg focus:ring-purple-500 w-full md:w-auto transition duration-300">
+            <option value="">Filter by Section</option>
+          </select>
+
+        </div>
+    </div>
+
+
     <table id="attendanceTable" class="display nowrap w-full text-sm">
-      <thead>
+      <thead class="bg-purple-500 text-white">
         <tr>
-          <th>Student ID</th>
-          <th>Name</th>
-          <th>Program</th>
-          <th>Branch</th>
-          <th>Mobile</th>
-          <th>Status</th>
-          <th>Timestamp</th>
-          <th>Lecture</th>
-          <th>Section</th>
+          <th class="py-3 px-4 text-left">Student ID</th>
+          <th class="py-3 px-4 text-left">Name</th>
+          <th class="py-3 px-4 text-left">Program</th>
+          <th class="py-3 px-4 text-left">Branch</th>
+          <th class="py-3 px-4 text-left">Mobile</th>
+          <th class="py-3 px-4 text-left">Status</th>
+          <th class="py-3 px-4 text-left">Timestamp</th>
+          <th class="py-3 px-4 text-left">Lecture</th>
+          <th class="py-3 px-4 text-left">Section</th>
         </tr>
       </thead>
     </table>
@@ -89,7 +168,22 @@
         { data: 2 },
         { data: 3 },
         { data: 4 },
-        { data: 5 },
+        { data: 5, 
+          "render": function (data, type, row) {
+                if (type === 'display') {
+                    let className = 'font-semibold px-2 py-0.5 rounded-full text-xs';
+                    if (data === 'Present' || data === 'Re-Marked') {
+                        className += ' bg-green-900 text-green-300';
+                    } else if (data === 'Already Marked') {
+                        className += ' bg-yellow-900 text-yellow-300';
+                    } else {
+                        className += ' bg-gray-600 text-gray-300';
+                    }
+                    return `<span class="${className}">${data}</span>`;
+                }
+                return data;
+            }
+        },
         { data: 6 },
         { data: 7 },
         { data: 8 }
@@ -100,13 +194,12 @@
       buttons: [
         {
           extend: 'collection',
-          text: 'Export ⬇',
+          text: 'Export Data ⬇',
           buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],
-          className: 'bg-purple-600 text-white px-3 py-1 rounded'
+          className: 'bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg font-semibold transition duration-300 transform hover:shadow-lg neon-button'
         }
       ],
       initComplete: function () {
-        // Populate Lecture & Section filters dynamically
         let lectureSet = new Set();
         let sectionSet = new Set();
 
@@ -121,13 +214,14 @@
       }
     });
 
-    // 📧 Send Email
     $("#sendEmailBtn").click(function () {
       const email = $("#emailInput").val().trim();
       if (!email) {
         alert("Please enter an email address.");
         return;
       }
+      $(this).addClass('animate-pulse-once');
+      setTimeout(() => $(this).removeClass('animate-pulse-once'), 1000);
 
       const data = attendanceTable.rows({ search: 'applied' }).data().toArray();
 
@@ -144,12 +238,16 @@
           }
         },
         error: function () {
-          alert("❌ Failed to send email.");
+          alert("❌ Failed to send email. Check console for details.");
         }
       });
     });
 
-    // 🔎 Filters
+    $("#statusFilter, #lectureFilter, #sectionFilter").on("change", function () {
+        $(this).addClass('border-4 border-yellow-300');
+        setTimeout(() => $(this).removeClass('border-4 border-yellow-300'), 500);
+    });
+
     $("#statusFilter").on("change", function () {
       attendanceTable.column(5).search(this.value).draw();
     });
@@ -162,19 +260,18 @@
       attendanceTable.column(8).search(this.value).draw();
     });
 
-    // 📅 Today Only (Toggle)
     $("#todayBtn").on("click", function () {
-      const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      const today = new Date().toISOString().split("T")[0];
 
       if (!todayFilterActive) {
-        // Apply filter
         attendanceTable.column(6).search(today).draw();
-        $(this).text("📅 Show All"); // change button label
+        $(this).text("✅ Showing Today (Clear Filter)");
+        $(this).removeClass("bg-indigo-600 hover:bg-indigo-700").addClass("bg-red-600 hover:bg-red-700");
         todayFilterActive = true;
       } else {
-        // Clear filter
         attendanceTable.column(6).search("").draw();
-        $(this).text("📅 Today Only");
+        $(this).text("📅 View Today's Events Only");
+        $(this).removeClass("bg-red-600 hover:bg-red-700").addClass("bg-indigo-600 hover:bg-indigo-700");
         todayFilterActive = false;
       }
     });
@@ -183,4 +280,3 @@
 
 </body>
 </html>
-
