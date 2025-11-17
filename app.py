@@ -1,7 +1,7 @@
-# app.py (full updated file)
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+# app.py (merged + admin dashboard + context for templates)
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
 import cv2, numpy as np, os, pickle, sqlite3, base64
-from datetime import datetime
+from datetime import datetime, timedelta
 import insightface, smtplib
 from email.message import EmailMessage
 from io import BytesIO
@@ -18,7 +18,7 @@ app = Flask(__name__)
 # -------------------------
 DB_FILE = 'database.db'
 ENCODE_FILE = 'EncodeFile_Insight.pkl'
-REATTENDANCE_INTERVAL_MINUTES = 2
+REATTENDANCE_INTERVAL_MINUTES = 10
 FACE_MATCH_THRESHOLD = 0.5
 EMAIL_USER = 'arnavp128@gmail.com'
 EMAIL_PASS = 'pshk aoim hjde ydol'
@@ -92,12 +92,8 @@ def is_current_user_admin():
         return False
     return bool(user['is_admin'])
 
-
-# -------------------------
-# Ensure users table and admin exist at startup
-# -------------------------
+# ensure users table and admin exist at startup
 init_users_table_and_admin()
-
 
 # -------------------------
 # Face recognition setup (unchanged logic)
@@ -176,6 +172,15 @@ def save_encodings_to_file():
 # Load encodings at startup
 load_encodings_from_file()
 
+# -------------------------
+# Inject admin flag into templates
+# -------------------------
+@app.context_processor
+def inject_user_info():
+    return {
+        'session_username': session.get('username'),
+        'session_is_admin': is_current_user_admin() if 'username' in session else False
+    }
 
 # -------------------------
 # Authentication enforcement
@@ -187,10 +192,10 @@ def require_login():
     /register is admin-only — so it is NOT publicly accessible.
     """
     allowed_paths = [
-    '/login',
-    '/forgot_password',
-    '/favicon.ico'
-]
+        '/login',
+        '/forgot_password',
+        '/favicon.ico'
+    ]
 
     # allow static files (css/js/img served from /static/…)
     if request.path.startswith('/static/') or request.path in allowed_paths:
@@ -467,6 +472,7 @@ def submit_student():
             with open(ENCODE_FILE, 'rb') as f:
                 disk_data = pickle.load(f)
             # convert legacy formats if needed
+                # ... (kept same as before)
             if isinstance(disk_data, list):
                 tmp = {}
                 for item in disk_data:
@@ -656,6 +662,118 @@ def upload_photo():
         "images": all_outputs,
         "session_attendance": session_attendance
     })
+
+# -------------------------
+# ADMIN: Dashboard, students, manual mark
+# -------------------------
+@app.route('/admin')
+def admin_dashboard():
+    if not is_current_user_admin():
+        return render_template('login.html', error="Admin access required")
+    conn = get_db_connection()
+    total_students = conn.execute("SELECT COUNT(*) AS cnt FROM students").fetchone()['cnt'] or 0
+    total_attendance = conn.execute("SELECT COUNT(*) AS cnt FROM attendance").fetchone()['cnt'] or 0
+    total_users = conn.execute("SELECT COUNT(*) AS cnt FROM users").fetchone()['cnt'] or 0
+
+    # Today's attendance count
+    today_date = datetime.now().strftime("%Y-%m-%d")
+    cur = conn.execute("SELECT COUNT(*) AS cnt FROM attendance WHERE date(Timestamp)=?", (today_date,))
+    today_att = cur.fetchone()['cnt'] or 0
+
+    conn.close()
+    return render_template('admin_dashboard.html',
+                           total_students=total_students,
+                           total_attendance=total_attendance,
+                           total_users=total_users,
+                           today_attendance=today_att)
+
+@app.route('/admin/stats')
+def admin_stats():
+    if not is_current_user_admin():
+        return jsonify({'error': 'admin required'}), 403
+    conn = get_db_connection()
+    # 7-day trend
+    trend = []
+    for d in range(6, -1, -1):
+        day = (datetime.now() - timedelta(days=d)).strftime("%Y-%m-%d")
+        cnt = conn.execute("SELECT COUNT(*) AS cnt FROM attendance WHERE date(Timestamp)=?", (day,)).fetchone()['cnt'] or 0
+        trend.append({'date': day, 'count': cnt})
+    # today present vs absent
+    today = datetime.now().strftime("%Y-%m-%d")
+    present = conn.execute("SELECT COUNT(*) AS cnt FROM attendance WHERE date(Timestamp)=? AND Status LIKE '%Present%'", (today,)).fetchone()['cnt'] or 0
+    total_today = conn.execute("SELECT COUNT(*) AS cnt FROM attendance WHERE date(Timestamp)=?", (today,)).fetchone()['cnt'] or 0
+    absent = max(total_today - present, 0)
+    conn.close()
+    return jsonify({'trend': trend, 'present': present, 'absent': absent})
+
+@app.route('/admin/students')
+def admin_students():
+    if not is_current_user_admin():
+        return render_template('login.html', error="Admin access required")
+    conn = get_db_connection()
+    students = conn.execute("SELECT * FROM students ORDER BY Name COLLATE NOCASE").fetchall()
+    conn.close()
+    return render_template('admin_students.html', students=students)
+
+@app.route('/admin/student/edit/<student_id>', methods=['GET', 'POST'])
+def admin_edit_student(student_id):
+    if not is_current_user_admin():
+        return render_template('login.html', error="Admin access required")
+    conn = get_db_connection()
+    student = conn.execute("SELECT * FROM students WHERE ID=?", (student_id,)).fetchone()
+    if not student:
+        conn.close()
+        return redirect(url_for('admin_students'))
+    if request.method == 'POST':
+        name = request.form['name'].strip()
+        program = request.form['program'].strip()
+        branch = request.form['branch'].strip()
+        mobile = request.form['mobile'].strip()
+        gmail = request.form['gmail'].strip()
+        conn.execute('UPDATE students SET Name=?, Program=?, Branch=?, Mobile=?, Gmail=? WHERE ID=?',
+                     (name, program, branch, mobile, gmail, student_id))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('admin_students'))
+    conn.close()
+    return render_template('edit_student.html', student=student)
+
+@app.route('/admin/student/delete/<student_id>', methods=['POST'])
+def admin_delete_student(student_id):
+    if not is_current_user_admin():
+        return render_template('login.html', error="Admin access required")
+    conn = get_db_connection()
+    conn.execute("DELETE FROM students WHERE ID=?", (student_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('admin_students'))
+
+@app.route('/admin/mark', methods=['GET', 'POST'])
+def admin_mark_attendance():
+    if not is_current_user_admin():
+        return render_template('login.html', error="Admin access required")
+    conn = get_db_connection()
+    students = conn.execute("SELECT ID, Name FROM students ORDER BY Name COLLATE NOCASE").fetchall()
+    if request.method == 'POST':
+        student_id = request.form.get('student_id')
+        status = request.form.get('status', 'Present')
+        lecture = request.form.get('lecture','').strip()
+        section = request.form.get('section','').strip()
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        student = conn.execute("SELECT * FROM students WHERE ID=?", (student_id,)).fetchone()
+        if not student:
+            conn.close()
+            return render_template('admin_mark.html', students=students, error="Student not found")
+        conn.execute('''
+            INSERT INTO attendance (Student_ID, Name, Program, Branch, Mobile, Status, Timestamp, Lecture, Section)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (student['ID'], student['Name'], student['Program'], student['Branch'],
+              student['Mobile'], status, timestamp, lecture, section))
+        conn.commit()
+        conn.close()
+        return redirect(url_for('admin_dashboard'))
+    conn.close()
+    return render_template('admin_mark.html', students=students)
 
 if __name__ == '__main__':
     app.run(debug=True)

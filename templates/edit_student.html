@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Edit Student</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background:#0d0d1a; color:#e4e4e7; }
+    .dark-card { background-color: rgba(32,32,50,0.7); border:1px solid rgba(168,85,247,0.3); border-top:4px solid #a855f7; }
+  </style>
+</head>
+<body>
+  <div class="max-w-md mx-auto p-6">
+    <h1 class="text-xl mb-4">Edit Student</h1>
+    <div class="dark-card p-6 rounded-lg">
+      <form method="POST">
+        <label class="block mb-1">Name</label>
+        <input name="name" value="{{ student['Name'] }}" class="w-full mb-3 p-2 input-dark rounded" />
+
+        <label class="block mb-1">Program</label>
+        <input name="program" value="{{ student['Program'] }}" class="w-full mb-3 p-2 input-dark rounded" />
+
+        <label class="block mb-1">Branch</label>
+        <input name="branch" value="{{ student['Branch'] }}" class="w-full mb-3 p-2 input-dark rounded" />
+
+        <label class="block mb-1">Mobile</label>
+        <input name="mobile" value="{{ student['Mobile'] }}" class="w-full mb-3 p-2 input-dark rounded" />
+
+        <label class="block mb-1">Gmail</label>
+        <input name="gmail" value="{{ student['Gmail'] }}" class="w-full mb-3 p-2 input-dark rounded" />
+
+        <div class="flex gap-3">
+          <button type="submit" class="bg-purple-600 text-white px-4 py-2 rounded">Save</button>
+          <a href="/admin/students" class="px-4 py-2 border rounded">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
+

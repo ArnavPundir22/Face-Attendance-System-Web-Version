@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Manual Mark Attendance</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style> body { background:#0d0d1a; color:#e4e4e7; } .dark-card { background-color: rgba(32,32,50,0.7); border:1px solid rgba(168,85,247,0.3); border-top:4px solid #a855f7; } </style>
+</head>
+<body>
+  <header class="p-4 flex justify-between items-center border-b border-purple-800">
+    <h1 class="text-xl text-indigo-200">Manual Attendance</h1>
+    <div>
+      <a href="/admin" class="text-indigo-300 mr-4">Dashboard</a>
+      <a href="/logout" class="text-red-400">Logout</a>
+    </div>
+  </header>
+
+  <main class="p-6 max-w-3xl mx-auto">
+    {% if error %}
+      <p class="text-red-400 mb-3">{{ error }}</p>
+    {% endif %}
+    <div class="dark-card p-6 rounded-lg">
+      <form method="POST">
+        <label class="block mb-2">Select Student</label>
+        <select name="student_id" required class="w-full mb-4 p-2 rounded input-dark">
+          <option value="">-- choose student --</option>
+          {% for s in students %}
+            <option value="{{ s['ID'] }}">{{ s['Name'] }} ({{ s['ID'] }})</option>
+          {% endfor %}
+        </select>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block mb-2">Status</label>
+            <select name="status" class="w-full p-2 rounded input-dark">
+              <option>Present</option>
+              <option>Absent</option>
+              <option>Re-Marked</option>
+            </select>
+          </div>
+          <div>
+            <label class="block mb-2">Lecture</label>
+            <input name="lecture" class="w-full p-2 rounded input-dark" placeholder="Lecture name"/>
+          </div>
+        </div>
+
+        <label class="block mt-3 mb-2">Section</label>
+        <input name="section" class="w-full p-2 rounded input-dark" placeholder="Section"/>
+
+        <div class="mt-4">
+          <button class="bg-purple-600 px-4 py-2 rounded text-white">Mark Attendance</button>
+        </div>
+      </form>
+    </div>
+  </main>
+</body>
+</html>
+

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin Dashboard • Face Attendance</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    /* reuse your theme CSS quickly */
+    body { background-color:#0d0d1a; color:#e4e4e7; background-image:radial-gradient(#2a2a3e 1px,transparent 0); background-size:40px 40px; }
+    .dark-card { background-color: rgba(32,32,50,0.7); border:1px solid rgba(168,85,247,0.3); border-top:4px solid #a855f7; backdrop-filter: blur(6px); }
+    .neon { box-shadow:0 0 6px #a855f7; }
+  </style>
+</head>
+<body class="min-h-screen">
+  <header class="bg-[#121223] p-4 flex items-center justify-between border-b border-purple-800">
+    <div class="flex items-center gap-3">
+      <span class="text-3xl">🤖</span>
+      <h1 class="text-xl font-bold text-indigo-200">Admin Dashboard</h1>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="/" class="text-indigo-300 hover:text-white">Home</a>
+      <a href="/admin/students" class="text-indigo-300 hover:text-white">Manage Students</a>
+      <a href="/admin/mark" class="text-indigo-300 hover:text-white">Manual Mark</a>
+      <a href="/logout" class="text-red-400">Logout</a>
+    </div>
+  </header>
+
+  <main class="p-8 max-w-6xl mx-auto">
+    <div class="grid md:grid-cols-4 gap-6">
+      <div class="dark-card p-6 rounded-lg neon">
+        <h3 class="text-sm text-gray-300">Total Students</h3>
+        <p class="text-3xl font-bold text-purple-200">{{ total_students }}</p>
+      </div>
+      <div class="dark-card p-6 rounded-lg neon">
+        <h3 class="text-sm text-gray-300">Today's Attendance</h3>
+        <p class="text-3xl font-bold text-purple-200">{{ today_attendance }}</p>
+      </div>
+      <div class="dark-card p-6 rounded-lg neon">
+        <h3 class="text-sm text-gray-300">Total Attendance Records</h3>
+        <p class="text-3xl font-bold text-purple-200">{{ total_attendance }}</p>
+      </div>
+      <div class="dark-card p-6 rounded-lg neon">
+        <h3 class="text-sm text-gray-300">Total Users</h3>
+        <p class="text-3xl font-bold text-purple-200">{{ total_users }}</p>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6 mt-8">
+      <div class="dark-card p-6 rounded-lg">
+        <h3 class="text-lg text-purple-300 mb-4">Attendance Trend (7 days)</h3>
+        <canvas id="trendChart" height="160"></canvas>
+      </div>
+
+      <div class="dark-card p-6 rounded-lg">
+        <h3 class="text-lg text-purple-300 mb-4">Today: Present vs Others</h3>
+        <canvas id="pieChart" height="160"></canvas>
+      </div>
+    </div>
+
+    <div class="mt-8">
+      <a href="/admin/students" class="bg-purple-600 text-white px-4 py-2 rounded-lg">Open Student Management</a>
+      <a href="/admin/mark" class="ml-3 bg-indigo-600 text-white px-4 py-2 rounded-lg">Manual Mark Attendance</a>
+    </div>
+  </main>
+
+<script>
+async function fetchStats(){
+  const res = await fetch('/admin/stats');
+  const data = await res.json();
+  return data;
+}
+
+(async()=>{
+  const stats = await fetchStats();
+  // trend chart
+  const labels = stats.trend.map(t => t.date);
+  const counts = stats.trend.map(t => t.count);
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels, datasets: [{ label: 'Attendance', data: counts, fill:true, tension:0.3, borderColor: '#a855f7', backgroundColor:'rgba(168,85,247,0.12)', pointRadius:3 }]
+    }, options: { plugins: { legend:{display:false} } }
+  });
+
+  // pie chart
+  const ctx2 = document.getElementById('pieChart').getContext('2d');
+  new Chart(ctx2, {
+    type:'doughnut',
+    data: { labels: ['Present','Others'], datasets:[{ data: [stats.present, stats.absent], backgroundColor:['#10b981','#ef4444'] }] },
+    options: { plugins: { legend:{position:'bottom'} } }
+  });
+})();
+</script>
+
+</body>
+</html>
+

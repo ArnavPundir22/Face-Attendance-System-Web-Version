@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Manage Students</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background:#0d0d1a; color:#e4e4e7; }
+    .dark-card { background-color: rgba(32,32,50,0.7); border:1px solid rgba(168,85,247,0.3); border-top:4px solid #a855f7; }
+  </style>
+</head>
+<body>
+  <header class="p-4 flex justify-between items-center border-b border-purple-800">
+    <h1 class="text-xl text-indigo-200">Manage Students</h1>
+    <div>
+      <a href="/admin" class="text-indigo-300 mr-4">Dashboard</a>
+      <a href="/logout" class="text-red-400">Logout</a>
+    </div>
+  </header>
+
+  <main class="p-6 max-w-6xl mx-auto">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg">Students ({{ students|length }})</h2>
+      <a href="/add_student" class="bg-purple-600 text-white px-3 py-2 rounded-lg">Add Student</a>
+    </div>
+
+    <div class="dark-card p-4 rounded-lg">
+      <table class="w-full table-auto">
+        <thead>
+          <tr class="text-left">
+            <th class="p-2">ID</th>
+            <th class="p-2">Name</th>
+            <th class="p-2">Program</th>
+            <th class="p-2">Branch</th>
+            <th class="p-2">Mobile</th>
+            <th class="p-2">Gmail</th>
+            <th class="p-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in students %}
+          <tr class="border-t border-gray-700">
+            <td class="p-2">{{ s['ID'] }}</td>
+            <td class="p-2">{{ s['Name'] }}</td>
+            <td class="p-2">{{ s['Program'] }}</td>
+            <td class="p-2">{{ s['Branch'] }}</td>
+            <td class="p-2">{{ s['Mobile'] }}</td>
+            <td class="p-2">{{ s['Gmail'] }}</td>
+            <td class="p-2">
+              <a href="/admin/student/edit/{{ s['ID'] }}" class="text-indigo-300 mr-3">Edit</a>
+              <form method="POST" action="/admin/student/delete/{{ s['ID'] }}" style="display:inline" onsubmit="return confirm('Delete student? This will remove the student record but keep attendance history.');">
+                <button class="text-red-400">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </main>
+</body>
+</html>
+
