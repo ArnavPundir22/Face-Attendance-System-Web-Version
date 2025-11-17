@@ -24,13 +24,82 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-# Load InsightFace model
+# ensure directories exist
+os.makedirs('known_faces', exist_ok=True)
+
+# Load InsightFace model once
 model = insightface.app.FaceAnalysis(name='buffalo_l')
 model.prepare(ctx_id=0)
 
-# Load known encodings
-with open(ENCODE_FILE, 'rb') as f:
-    known_embeddings = pickle.load(f)
+# Internal encoding store:
+# - on disk we keep a dict: { name: np.ndarray_embedding }
+# - in memory we keep known_embeddings_list: list of (embedding, name) for fast iteration
+known_encoding_dict = {}         # name -> np.ndarray
+known_embeddings = []            # list of (embedding, name) used by recognition loops
+
+def load_encodings_from_file():
+    """Load encodings from ENCODE_FILE, normalize, and populate both dict and list."""
+    global known_encoding_dict, known_embeddings
+    if not os.path.exists(ENCODE_FILE):
+        known_encoding_dict = {}
+        known_embeddings = []
+        return
+
+    try:
+        with open(ENCODE_FILE, 'rb') as f:
+            data = pickle.load(f)
+    except Exception:
+        # if file exists but corrupted, reset
+        known_encoding_dict = {}
+        known_embeddings = []
+        return
+
+    # support both legacy formats: list of (embedding, name) or dict{name: embedding}
+    enc_dict = {}
+    if isinstance(data, dict):
+        enc_dict = data
+    elif isinstance(data, list):
+        # list of (embedding, name) -> convert to dict by keeping latest/last embedding per name
+        for item in data:
+            if isinstance(item, (list, tuple)) and len(item) == 2:
+                emb, name = item
+                try:
+                    emb_arr = np.array(emb, dtype=np.float32)
+                    enc_dict[name] = emb_arr
+                except Exception:
+                    continue
+    else:
+        enc_dict = {}
+
+    # normalize embeddings and ensure numpy arrays
+    cleaned = {}
+    for name, emb in enc_dict.items():
+        try:
+            arr = np.array(emb, dtype=np.float32)
+            norm = np.linalg.norm(arr)
+            if norm == 0:
+                continue
+            arr = arr / norm
+            cleaned[name] = arr
+        except Exception:
+            continue
+
+    known_encoding_dict = cleaned
+    known_embeddings = [(emb, name) for name, emb in known_encoding_dict.items()]
+
+
+def save_encodings_to_file():
+    """Save the current known_encoding_dict to disk (pickle)."""
+    try:
+        with open(ENCODE_FILE, 'wb') as f:
+            pickle.dump(known_encoding_dict, f)
+    except Exception as e:
+        app.logger.exception("Failed to save encodings: %s", e)
+
+
+# Load encodings at startup
+load_encodings_from_file()
+
 
 @app.route('/')
 def index():
@@ -137,6 +206,15 @@ def add_student():
 
 @app.route('/submit_student', methods=['POST'])
 def submit_student():
+    """
+    Adds a student:
+     - saves photo as NameWithoutSpaces.jpg (no underscores)
+     - computes embedding for the newly uploaded image
+     - updates (or creates) a single normalized embedding per student in ENCODE_FILE
+     - updates in-memory known_embeddings for instant recognition
+    """
+    global known_encoding_dict, known_embeddings
+
     name = request.form['name'].strip()
     student_id = request.form['id'].strip()
     program = request.form['program'].strip()
@@ -154,8 +232,9 @@ def submit_student():
         conn.close()
         return redirect(url_for('add_student', status='error', message='Duplicate Name or ID found'))
 
-    # Save photo to known_faces folder
-    filename = f"{name.replace(' ', '_')}.jpg"
+    # Save photo to known_faces folder WITHOUT underscore
+    clean_name = name.replace(" ", " ")   # AvanyaPundir.jpg (no underscore)
+    filename = f"{clean_name}.jpg"
     filepath = os.path.join('known_faces', filename)
     photo.save(filepath)
 
@@ -165,29 +244,83 @@ def submit_student():
     conn.commit()
     conn.close()
 
-    # --- Face Encoding Part ---
+    # --- Encode ONLY this new image (fast) ---
     image = cv2.imread(filepath)
+    if image is None:
+        return redirect(url_for('add_student', status='error', message='Saved image could not be read'))
+
     faces = model.get(image)
     if not faces:
         return redirect(url_for('add_student', status='error', message='No face detected in uploaded image'))
 
-    # Load existing encodings
-    if os.path.exists(ENCODE_FILE):
-        with open(ENCODE_FILE, 'rb') as f:
-            known_embeddings = pickle.load(f)
-    else:
-        known_embeddings = []
+    # We will use the first face detected for the student's ID (if multiple faces exist in the photo)
+    face = faces[0]
+    emb = np.array(face.embedding, dtype=np.float32)
+    norm = np.linalg.norm(emb)
+    if norm == 0:
+        return redirect(url_for('add_student', status='error', message='Embedding extraction failed'))
+    emb = emb / norm
 
-    # Add all detected faces' embeddings for this student
-    for face in faces:
-        embedding = face.embedding
-        known_embeddings.append((embedding, name))
+    # Update stored encoding: average with existing if present (then renormalize)
+    try:
+        # load current dict (already loaded at startup, but re-read current file to be safe)
+        if os.path.exists(ENCODE_FILE):
+            with open(ENCODE_FILE, 'rb') as f:
+                disk_data = pickle.load(f)
+            # convert legacy formats if needed
+            if isinstance(disk_data, list):
+                tmp = {}
+                for item in disk_data:
+                    if isinstance(item, (list, tuple)) and len(item) == 2:
+                        e, n = item
+                        try:
+                            arr = np.array(e, dtype=np.float32)
+                            arr_norm = np.linalg.norm(arr)
+                            if arr_norm > 0:
+                                tmp[n] = arr / arr_norm
+                        except Exception:
+                            pass
+                disk_data = tmp
+            elif not isinstance(disk_data, dict):
+                disk_data = {}
+        else:
+            disk_data = {}
 
-    # Save updated encodings
-    with open(ENCODE_FILE, 'wb') as f:
-        pickle.dump(known_embeddings, f)
+        # If existing embedding exists for this name, average them
+        if name in disk_data:
+            existing_emb = np.array(disk_data[name], dtype=np.float32)
+            # normalize just in case
+            if np.linalg.norm(existing_emb) > 0:
+                existing_emb = existing_emb / np.linalg.norm(existing_emb)
+            combined = existing_emb + emb
+            if np.linalg.norm(combined) > 0:
+                combined = combined / np.linalg.norm(combined)
+            final_emb = combined
+        else:
+            final_emb = emb
 
-    return redirect(url_for('add_student', status='success', message=f'{name} added successfully with {len(faces)} encodings'))
+        # write back to disk dictionary (single embedding per name)
+        disk_data[name] = final_emb
+        with open(ENCODE_FILE, 'wb') as f:
+            pickle.dump(disk_data, f)
+
+        # update in-memory structures for recognition (fast)
+        known_encoding_dict = {k: np.array(v, dtype=np.float32) for k, v in disk_data.items()}
+        # ensure normalization
+        for k in list(known_encoding_dict.keys()):
+            v = known_encoding_dict[k]
+            normv = np.linalg.norm(v)
+            if normv > 0:
+                known_encoding_dict[k] = v / normv
+        known_embeddings = [(emb, n) for n, emb in known_encoding_dict.items()]
+
+    except Exception as e:
+        app.logger.exception("Failed to update encoding for new student: %s", e)
+        # still continue - we don't want to block student addition entirely
+        return redirect(url_for('add_student', status='error', message='Student added but encoding failed'))
+
+    return redirect(url_for('add_student', status='success', message=f'{name} added successfully with 1 encoding'))
+
 
 @app.route('/upload_photo', methods=['POST'])
 def upload_photo():
@@ -199,7 +332,7 @@ def upload_photo():
     files = request.files.getlist('images')
 
     def cosine_sim(a, b):
-        return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+        return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
     now = datetime.now()
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
@@ -208,6 +341,9 @@ def upload_photo():
     session_attendance = []     # <---- COLLECT ONLY THIS SCAN’S ATTENDANCE
 
     conn = get_db_connection()
+
+    # small optimization: copy known_embeddings to local var
+    embeddings_for_search = known_embeddings.copy()
 
     for file in files:
         npimg = np.frombuffer(file.read(), np.uint8)
@@ -219,12 +355,21 @@ def upload_photo():
         if faces:
             for face in faces:
                 bbox = [int(v) for v in face.bbox]
-                embedding = face.embedding
-                best_score = -1
+                embedding = np.array(face.embedding, dtype=np.float32)
+                # normalize embedding
+                if np.linalg.norm(embedding) == 0:
+                    continue
+                embedding = embedding / np.linalg.norm(embedding)
+
+                best_score = -1.0
                 best_name = None
 
-                for known_embedding, name in known_embeddings:
-                    score = cosine_sim(embedding, known_embedding)
+                for known_emb, name in embeddings_for_search:
+                    # known_emb should be numpy array already
+                    try:
+                        score = cosine_sim(embedding, known_emb)
+                    except Exception:
+                        continue
                     if score > best_score:
                         best_score = score
                         best_name = name
