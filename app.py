@@ -19,7 +19,7 @@ app = Flask(__name__)
 DB_FILE = 'database.db'
 ENCODE_FILE = 'EncodeFile_Insight.pkl'
 REATTENDANCE_INTERVAL_MINUTES = 10
-FACE_MATCH_THRESHOLD = 0.5
+FACE_MATCH_THRESHOLD = 0.4
 EMAIL_USER = 'arnavp128@gmail.com'
 EMAIL_PASS = 'pshk aoim hjde ydol'
 

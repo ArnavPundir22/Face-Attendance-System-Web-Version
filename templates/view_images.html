@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Attendance Image Viewer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    body {
+      background-color: #0d0d1a;
+      color: #e4e4e7;
+    }
+
+    .card {
+      background: rgba(32,32,50,0.7);
+      border: 1px solid rgba(168,85,247,0.3);
+      border-top: 4px solid #a855f7;
+    }
+  </style>
+</head>
+
+<body class="p-6">
+
+  <!-- HEADER -->
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold text-purple-300">📸 Attendance Image Viewer</h1>
+
+    <a href="/admin" class="text-indigo-300 hover:text-white">
+      ⬅ Back to Dashboard
+    </a>
+  </div>
+
+  <!-- FILTER SECTION -->
+  <div class="card p-4 rounded-lg mb-6 flex flex-wrap gap-4 items-end">
+
+    <div>
+      <label class="text-sm">Date</label><br>
+      <input type="date" id="date" class="p-2 rounded text-black">
+    </div>
+
+    <div>
+      <label class="text-sm">Lecture</label><br>
+      <input type="text" id="lecture" placeholder="e.g. DBMS" class="p-2 rounded text-black">
+    </div>
+
+    <div>
+      <label class="text-sm">Section</label><br>
+      <input type="text" id="section" placeholder="e.g. A" class="p-2 rounded text-black">
+    </div>
+
+    <button onclick="loadImages()"
+            class="bg-purple-600 px-5 py-2 rounded-lg hover:bg-purple-700">
+      🔍 Search
+    </button>
+
+  </div>
+
+  <!-- GALLERY -->
+  <div id="gallery" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
+
+  <!-- SCRIPT -->
+  <script>
+    async function loadImages() {
+
+      const date = document.getElementById('date').value;
+      const lecture = document.getElementById('lecture').value;
+      const section = document.getElementById('section').value;
+
+      const url = `/admin/get_images?date=${date}&lecture=${lecture}&section=${section}`;
+      const res = await fetch(url);
+      const images = await res.json();
+
+      const gallery = document.getElementById('gallery');
+      gallery.innerHTML = "";
+
+      if(images.length === 0){
+        gallery.innerHTML = "<p class='text-gray-400'>No images found</p>";
+        return;
+      }
+
+      images.forEach(img => {
+
+        const div = document.createElement("div");
+        div.className = "card p-3 rounded-lg";
+
+        const image = document.createElement("img");
+        image.src = img;
+        image.className = "rounded-lg w-full cursor-pointer hover:scale-105 transition";
+
+        // click to open full image
+        image.onclick = () => window.open(img, "_blank");
+
+        div.appendChild(image);
+        gallery.appendChild(div);
+      });
+    }
+  </script>
+
+</body>
+</html>
