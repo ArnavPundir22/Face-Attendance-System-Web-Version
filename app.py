@@ -240,16 +240,43 @@ model.prepare(ctx_id=0)
 
 # Internal encoding store:
 # - on disk we keep a dict: { name: np.ndarray_embedding }
-# - in memory we keep known_embeddings_list: list of (embedding, name) for fast iteration
-known_encoding_dict = {}         # name -> np.ndarray
-known_embeddings = []            # list of (embedding, name) used by recognition loops
+# - in memory we keep:
+#     known_embeddings        – list of (embedding, name) kept for backward compat
+#     known_embedding_matrix  – (N, D) float32 array of all L2-normalised embeddings
+#     known_embedding_names   – list[str] of names in the same row order as the matrix
+#
+# The matrix lets us replace the O(N) Python for-loop with a single BLAS matrix-vector
+# multiply:  scores = known_embedding_matrix @ query   →  argmax gives the best match.
+# Because every embedding is L2-normalised, dot-product == cosine similarity.
+known_encoding_dict    = {}          # name -> np.ndarray
+known_embeddings       = []          # list of (embedding, name) — kept for compatibility
+known_embedding_matrix = None        # np.ndarray shape (N, D), or None when empty
+known_embedding_names  = []          # list[str] parallel to matrix rows
+
+def _rebuild_embedding_matrix():
+    """Rebuild the fast-search matrix from known_encoding_dict.
+
+    Called after any change to known_encoding_dict so the matrix stays in sync.
+    """
+    global known_embedding_matrix, known_embedding_names, known_embeddings
+    if not known_encoding_dict:
+        known_embedding_matrix = None
+        known_embedding_names  = []
+        known_embeddings       = []
+        return
+
+    names = list(known_encoding_dict.keys())
+    matrix = np.stack([known_encoding_dict[n] for n in names]).astype(np.float32)
+    known_embedding_names  = names
+    known_embedding_matrix = matrix
+    known_embeddings       = [(known_encoding_dict[n], n) for n in names]
 
 def load_encodings_from_file():
-    """Load encodings from ENCODE_FILE, normalize, and populate both dict and list."""
-    global known_encoding_dict, known_embeddings
+    """Load encodings from ENCODE_FILE, normalize, and populate in-memory structures."""
+    global known_encoding_dict
     if not os.path.exists(ENCODE_FILE):
         known_encoding_dict = {}
-        known_embeddings = []
+        _rebuild_embedding_matrix()
         return
 
     try:
@@ -258,7 +285,7 @@ def load_encodings_from_file():
     except Exception:
         # if file exists but corrupted, reset
         known_encoding_dict = {}
-        known_embeddings = []
+        _rebuild_embedding_matrix()
         return
 
     # support both legacy formats: list of (embedding, name) or dict{name: embedding}
@@ -292,7 +319,7 @@ def load_encodings_from_file():
             continue
 
     known_encoding_dict = cleaned
-    known_embeddings = [(emb, name) for name, emb in known_encoding_dict.items()]
+    _rebuild_embedding_matrix()
 
 def save_encodings_to_file():
     """Save the current known_encoding_dict to disk (pickle)."""
@@ -744,7 +771,7 @@ def submit_student():
             normv = np.linalg.norm(v)
             if normv > 0:
                 known_encoding_dict[k] = v / normv
-        known_embeddings = [(emb, n) for n, emb in known_encoding_dict.items()]
+        _rebuild_embedding_matrix()
 
     except Exception as e:
         app.logger.exception("Failed to update encoding for new student: %s", e)
@@ -763,19 +790,20 @@ def upload_photo():
     section = request.form.get('section', '').strip()
     files = request.files.getlist('images')
 
-    def cosine_sim(a, b):
-        return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
-
     now = datetime.now()
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
 
     all_outputs = []
-    session_attendance = []     # <---- COLLECT ONLY THIS SCAN’S ATTENDANCE
+    session_attendance = []     # <---- COLLECT ONLY THIS SCAN'S ATTENDANCE
 
     conn = get_db_connection()
 
-    # small optimization: copy known_embeddings to local var
-    embeddings_for_search = known_embeddings.copy()
+    # Snapshot matrix + names once per request so mid-request updates don't race.
+    # All embeddings are L2-normalised, so dot-product == cosine similarity.
+    # A single BLAS matrix-vector multiply (matrix @ query) replaces the Python
+    # for-loop and is typically 10-100x faster due to SIMD / multi-core BLAS.
+    search_matrix = known_embedding_matrix   # shape (N, D) float32, or None
+    search_names  = known_embedding_names    # list[str], len N
 
     for file in files:
         npimg = np.frombuffer(file.read(), np.uint8)
@@ -796,15 +824,14 @@ def upload_photo():
                 best_score = -1.0
                 best_name = None
 
-                for known_emb, name in embeddings_for_search:
-                    # known_emb should be numpy array already
-                    try:
-                        score = cosine_sim(embedding, known_emb)
-                    except Exception:
-                        continue
-                    if score > best_score:
-                        best_score = score
-                        best_name = name
+                if search_matrix is not None and search_matrix.shape[0] > 0:
+                    # Vectorised nearest-neighbour: one BLAS matrix-vector multiply
+                    # replaces the O(N) Python loop. Embeddings are L2-normalised so
+                    # dot-product equals cosine similarity.
+                    scores    = search_matrix @ embedding   # shape (N,)
+                    best_idx  = int(np.argmax(scores))
+                    best_score = float(scores[best_idx])
+                    best_name  = search_names[best_idx]
 
                 color = (0, 255, 0) if best_score >= FACE_MATCH_THRESHOLD else (0, 0, 255)
                 label = best_name if best_score >= FACE_MATCH_THRESHOLD else "Unknown"
