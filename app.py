@@ -1,6 +1,6 @@
 # app.py (merged + admin dashboard + context for templates)
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
-import cv2, numpy as np, os, pickle, sqlite3, base64
+import cv2, numpy as np, os, pickle, sqlite3, base64, secrets
 from datetime import datetime, timedelta
 import insightface, smtplib
 from email.message import EmailMessage
@@ -26,6 +26,17 @@ EMAIL_PASS = 'pshk aoim hjde ydol'
 # Secret key for sessions — change in production or load from env
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'CHANGE_ME_TO_SOMETHING_SECRET')
 
+# -------------------------
+# Security / Auth settings
+# -------------------------
+LOGIN_MAX_ATTEMPTS = 5          # failed attempts before lockout
+LOGIN_LOCKOUT_MINUTES = 15      # how long to lock the account
+OTP_EXPIRY_MINUTES = 10         # how long a password-reset OTP stays valid
+MIN_PASSWORD_LENGTH = 8         # minimum password length
+
+# In-memory login-attempt tracker  { username: {'count': int, 'locked_until': datetime|None} }
+_login_attempts: dict = {}
+
 # --- Database utility functions ---
 def get_db_connection():
     conn = sqlite3.connect(DB_FILE)
@@ -45,7 +56,24 @@ def init_users_table_and_admin():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
             password BLOB,
-            is_admin INTEGER DEFAULT 0
+            is_admin INTEGER DEFAULT 0,
+            gmail TEXT
+        )
+    """)
+    # Add gmail column to existing databases that were created before this column existed
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN gmail TEXT")
+    except sqlite3.OperationalError:
+        pass  # column already exists
+
+    # Table for email-OTP-based password reset
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            otp TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            used INTEGER DEFAULT 0
         )
     """)
     conn.commit()
@@ -66,19 +94,103 @@ def init_users_table_and_admin():
         app.logger.info("Auto-created default admin -> username: 'admin', password: 'admin123' (please change immediately)")
     conn.close()
 
-def create_user(username: str, password: str, is_admin: int = 0):
+def create_user(username: str, password: str, is_admin: int = 0, gmail: str = ''):
     """Create a user with hashed password. Returns True on success, False if username exists."""
     conn = get_db_connection()
     try:
         hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
-        conn.execute("INSERT INTO users (username, password, is_admin) VALUES (?, ?, ?)",
-                     (username, hashed, is_admin))
+        conn.execute("INSERT INTO users (username, password, is_admin, gmail) VALUES (?, ?, ?, ?)",
+                     (username, hashed, is_admin, gmail.strip()))
         conn.commit()
         return True
     except sqlite3.IntegrityError:
         return False
     finally:
         conn.close()
+
+# -------------------------
+# Login rate-limit helpers
+# -------------------------
+def _get_attempts(username: str) -> dict:
+    return _login_attempts.setdefault(username, {'count': 0, 'locked_until': None})
+
+def is_account_locked(username: str):
+    """Return (locked: bool, seconds_remaining: int)."""
+    entry = _get_attempts(username)
+    if entry['locked_until'] and datetime.now() < entry['locked_until']:
+        remaining = int((entry['locked_until'] - datetime.now()).total_seconds())
+        return True, remaining
+    # reset lock if it has expired
+    if entry['locked_until'] and datetime.now() >= entry['locked_until']:
+        entry['count'] = 0
+        entry['locked_until'] = None
+    return False, 0
+
+def record_failed_login(username: str):
+    """Increment failure counter; lock the account once threshold is reached."""
+    entry = _get_attempts(username)
+    entry['count'] += 1
+    if entry['count'] >= LOGIN_MAX_ATTEMPTS:
+        entry['locked_until'] = datetime.now() + timedelta(minutes=LOGIN_LOCKOUT_MINUTES)
+
+def clear_failed_logins(username: str):
+    """Clear failure counter on successful login."""
+    _login_attempts.pop(username, None)
+
+# -------------------------
+# Password-reset OTP helpers
+# -------------------------
+def generate_and_store_otp(username: str) -> str:
+    """Generate a 6-digit OTP, store it in the DB, return it."""
+    otp = f"{secrets.randbelow(1_000_000):06d}"
+    expires_at = (datetime.now() + timedelta(minutes=OTP_EXPIRY_MINUTES)).strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_db_connection()
+    # Invalidate any existing unused tokens for this user
+    conn.execute("UPDATE password_reset_tokens SET used=1 WHERE username=? AND used=0", (username,))
+    conn.execute("INSERT INTO password_reset_tokens (username, otp, expires_at) VALUES (?, ?, ?)",
+                 (username, otp, expires_at))
+    conn.commit()
+    conn.close()
+    return otp
+
+def send_password_reset_otp(recipient_email: str, otp: str, username: str):
+    """Send the 6-digit OTP to the user's registered email."""
+    msg = EmailMessage()
+    msg['Subject'] = '🔐 Password Reset OTP – Face Attendance System'
+    msg['From'] = EMAIL_USER
+    msg['To'] = recipient_email
+    msg.set_content(
+        f"Hello {username},\n\n"
+        f"Your password reset OTP is: {otp}\n\n"
+        f"This code is valid for {OTP_EXPIRY_MINUTES} minutes.\n"
+        f"If you did not request a password reset, please ignore this email.\n\n"
+        f"— Face Attendance System"
+    )
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+        smtp.login(EMAIL_USER, EMAIL_PASS)
+        smtp.send_message(msg)
+
+def verify_and_consume_otp(username: str, otp: str) -> bool:
+    """Return True and mark OTP used if it matches and has not expired."""
+    conn = get_db_connection()
+    row = conn.execute(
+        "SELECT id, otp, expires_at FROM password_reset_tokens "
+        "WHERE username=? AND used=0 ORDER BY id DESC LIMIT 1",
+        (username,)
+    ).fetchone()
+    if not row:
+        conn.close()
+        return False
+    if datetime.now() > datetime.strptime(row['expires_at'], "%Y-%m-%d %H:%M:%S"):
+        conn.close()
+        return False
+    if not secrets.compare_digest(row['otp'], otp):
+        conn.close()
+        return False
+    conn.execute("UPDATE password_reset_tokens SET used=1 WHERE id=?", (row['id'],))
+    conn.commit()
+    conn.close()
+    return True
 
 def is_current_user_admin():
     """Return True if current logged in user is admin."""
@@ -222,11 +334,22 @@ def login():
         if not username or not password:
             return render_template('login.html', error="Username and password required")
 
+        # Check rate limit before hitting the database
+        locked, secs = is_account_locked(username)
+        if locked:
+            mins = secs // 60
+            secsrem = secs % 60
+            return render_template('login.html',
+                                   error=f"Account locked after {LOGIN_MAX_ATTEMPTS} failed attempts. "
+                                         f"Try again in {mins}m {secsrem}s.")
+
         conn = get_db_connection()
         user = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
         conn.close()
 
         if not user:
+            # Don't reveal whether the username exists
+            record_failed_login(username)
             return render_template('login.html', error="Invalid username or password")
 
         stored_hash = user['password']  # this is bytes (BLOB)
@@ -237,11 +360,23 @@ def login():
 
         try:
             if bcrypt.checkpw(password.encode(), stored_hash):
+                clear_failed_logins(username)
                 session['logged_in'] = True
                 session['username'] = username
                 return redirect(url_for('index'))
             else:
-                return render_template('login.html', error="Invalid username or password")
+                record_failed_login(username)
+                locked, secs = is_account_locked(username)
+                remaining_attempts = max(LOGIN_MAX_ATTEMPTS - _get_attempts(username)['count'], 0)
+                if locked:
+                    mins = secs // 60
+                    secsrem = secs % 60
+                    return render_template('login.html',
+                                           error=f"Account locked after too many failed attempts. "
+                                                 f"Try again in {mins}m {secsrem}s.")
+                return render_template('login.html',
+                                       error=f"Invalid username or password. "
+                                             f"{remaining_attempts} attempt(s) remaining before lockout.")
         except Exception:
             return render_template('login.html', error="Invalid username or password")
 
@@ -266,11 +401,19 @@ def register():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
+        gmail = request.form.get('gmail', '').strip()
 
-        if not username or not password:
-            return render_template('register.html', error="All fields required")
+        if not username or not password or not gmail:
+            return render_template('register.html', error="All fields are required")
 
-        success = create_user(username, password, is_admin=0)
+        if len(password) < MIN_PASSWORD_LENGTH:
+            return render_template('register.html',
+                                   error=f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
+
+        if '@' not in gmail:
+            return render_template('register.html', error="Enter a valid Gmail address")
+
+        success = create_user(username, password, is_admin=0, gmail=gmail)
         if not success:
             return render_template('register.html', error="Username already exists")
         return render_template('register.html', success="User created successfully!")
@@ -384,27 +527,89 @@ def add_student():
 
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
-    if request.method == 'POST':
-        username = request.form['username'].strip()
-        new_password = request.form['new_password'].strip()
+    """
+    Two-step email-OTP password reset:
+      Step 1 (GET or step=request): User enters their username.
+              System looks up their registered gmail, sends a 6-digit OTP,
+              and renders the verify form.
+      Step 2 (step=verify): User enters the OTP + new password.
+              System verifies the OTP, updates the password.
+    """
+    if request.method == 'GET':
+        return render_template('forgot_password.html', step='request')
+
+    step = request.form.get('step', 'request')
+
+    # ------------------------------------------------------------------
+    # STEP 1 – receive username, send OTP email
+    # ------------------------------------------------------------------
+    if step == 'request':
+        username = request.form.get('username', '').strip()
+        if not username:
+            return render_template('forgot_password.html', step='request',
+                                   error="Please enter your username.")
 
         conn = get_db_connection()
-        user = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+        user = conn.execute("SELECT username, gmail FROM users WHERE username=?", (username,)).fetchone()
+        conn.close()
 
-        if not user:
-            conn.close()
-            return render_template('forgot_password.html', error="User does not exist.")
+        # Always show the same message to prevent username enumeration
+        generic_sent_msg = ("If that username exists and has a registered email, "
+                            "an OTP has been sent. Check your inbox.")
 
-        # 🔐 Hash new password before saving
+        if not user or not user['gmail']:
+            # Don't reveal that the username is missing or has no email
+            return render_template('forgot_password.html', step='request',
+                                   info=generic_sent_msg)
+
+        try:
+            otp = generate_and_store_otp(username)
+            send_password_reset_otp(user['gmail'], otp, username)
+        except Exception as e:
+            app.logger.exception("Failed to send OTP email: %s", e)
+            return render_template('forgot_password.html', step='request',
+                                   error="Could not send OTP email. Please contact the admin.")
+
+        return render_template('forgot_password.html', step='verify',
+                               username=username,
+                               info=f"OTP sent to the email registered for '{username}'. "
+                                    f"It expires in {OTP_EXPIRY_MINUTES} minutes.")
+
+    # ------------------------------------------------------------------
+    # STEP 2 – verify OTP and set new password
+    # ------------------------------------------------------------------
+    if step == 'verify':
+        username = request.form.get('username', '').strip()
+        otp = request.form.get('otp', '').strip()
+        new_password = request.form.get('new_password', '').strip()
+
+        if not username or not otp or not new_password:
+            return render_template('forgot_password.html', step='verify',
+                                   username=username, error="All fields are required.")
+
+        if len(new_password) < MIN_PASSWORD_LENGTH:
+            return render_template('forgot_password.html', step='verify',
+                                   username=username,
+                                   error=f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
+
+        if not verify_and_consume_otp(username, otp):
+            return render_template('forgot_password.html', step='verify',
+                                   username=username,
+                                   error="Invalid or expired OTP. Please request a new one.")
+
         hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt())
-
+        conn = get_db_connection()
         conn.execute("UPDATE users SET password=? WHERE username=?", (hashed, username))
         conn.commit()
         conn.close()
 
+        # Clear any login lockout for this user after successful reset
+        clear_failed_logins(username)
+
         return redirect(url_for('login'))
 
-    return render_template('forgot_password.html')
+    # Fallback
+    return render_template('forgot_password.html', step='request')
     
 
 
