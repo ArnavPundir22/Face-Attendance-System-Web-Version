@@ -51,11 +51,15 @@
     </h1>
 
     {% if error %}
-    <p class="text-red-400 text-center mb-4 font-semibold">{{ error }}</p>
+    <p class="bg-red-900/40 border border-red-600/50 text-red-300 rounded-lg px-4 py-3 mb-4 text-sm text-center font-semibold">
+      ❌ {{ error }}
+    </p>
     {% endif %}
 
     {% if success %}
-    <p class="text-green-400 text-center mb-4 font-semibold">{{ success }}</p>
+    <p class="bg-green-900/40 border border-green-600/50 text-green-300 rounded-lg px-4 py-3 mb-4 text-sm text-center font-semibold">
+      ✅ {{ success }}
+    </p>
     {% endif %}
 
     <form action="/register" method="POST" class="space-y-5">
@@ -67,9 +71,17 @@
       </div>
 
       <div>
-        <label class="text-gray-300 mb-1 block">Password</label>
-        <input name="password" type="password" required
+        <label class="text-gray-300 mb-1 block">Email <span class="text-purple-400 text-xs">(used for password reset OTP)</span></label>
+        <input name="email" type="email" required placeholder="user@example.com"
           class="input-dark w-full rounded-lg px-4 py-2">
+      </div>
+
+      <div>
+        <label class="text-gray-300 mb-1 block">Password</label>
+        <input name="password" type="password" required minlength="8"
+          placeholder="Minimum 8 characters"
+          class="input-dark w-full rounded-lg px-4 py-2">
+        <p class="text-gray-500 text-xs mt-1">Must be at least 8 characters.</p>
       </div>
 
       <button type="submit"

@@ -1,7 +1,8 @@
 # app.py (merged + admin dashboard + context for templates)
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
-import cv2, numpy as np, os, pickle, sqlite3, base64
+import cv2, numpy as np, os, pickle, sqlite3, base64, secrets, hashlib
 from datetime import datetime, timedelta
+from email.utils import parseaddr
 import insightface, smtplib
 from email.message import EmailMessage
 from io import BytesIO
@@ -26,6 +27,19 @@ EMAIL_PASS = 'pshk aoim hjde ydol'
 # Secret key for sessions — change in production or load from env
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'CHANGE_ME_TO_SOMETHING_SECRET')
 
+# -------------------------
+# Security / Auth settings
+# -------------------------
+LOGIN_MAX_ATTEMPTS = 5          # failed attempts before lockout
+LOGIN_LOCKOUT_MINUTES = 15      # how long to lock the account
+OTP_EXPIRY_MINUTES = 10         # how long a password-reset OTP stays valid
+MIN_PASSWORD_LENGTH = 8         # minimum password length
+OTP_RANGE_START = 100_000       # minimum 6-digit OTP value (no leading zeros)
+OTP_RANGE_SIZE  = 900_000       # range size → codes from 100000 to 999999
+
+# In-memory login-attempt tracker  { username: {'count': int, 'locked_until': datetime|None} }
+_login_attempts: dict = {}
+
 # --- Database utility functions ---
 def get_db_connection():
     conn = sqlite3.connect(DB_FILE)
@@ -45,7 +59,24 @@ def init_users_table_and_admin():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
             password BLOB,
-            is_admin INTEGER DEFAULT 0
+            is_admin INTEGER DEFAULT 0,
+            gmail TEXT
+        )
+    """)
+    # Add gmail column to existing databases that were created before this column existed
+    try:
+        conn.execute("ALTER TABLE users ADD COLUMN gmail TEXT")
+    except sqlite3.OperationalError:
+        pass  # column already exists
+
+    # Table for email-OTP-based password reset
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL,
+            otp TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            used INTEGER DEFAULT 0
         )
     """)
     conn.commit()
@@ -66,19 +97,121 @@ def init_users_table_and_admin():
         app.logger.info("Auto-created default admin -> username: 'admin', password: 'admin123' (please change immediately)")
     conn.close()
 
-def create_user(username: str, password: str, is_admin: int = 0):
+def create_user(username: str, password: str, is_admin: int = 0, gmail: str = ''):
     """Create a user with hashed password. Returns True on success, False if username exists."""
     conn = get_db_connection()
     try:
         hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
-        conn.execute("INSERT INTO users (username, password, is_admin) VALUES (?, ?, ?)",
-                     (username, hashed, is_admin))
+        conn.execute("INSERT INTO users (username, password, is_admin, gmail) VALUES (?, ?, ?, ?)",
+                     (username, hashed, is_admin, gmail.strip()))
         conn.commit()
         return True
     except sqlite3.IntegrityError:
         return False
     finally:
         conn.close()
+
+def is_valid_email(email: str) -> bool:
+    """Return True only if email parses to a non-empty local-part and domain."""
+    _, addr = parseaddr(email)
+    if not addr or '@' not in addr:
+        return False
+    local, domain = addr.rsplit('@', 1)
+    return bool(local) and bool(domain)
+
+# -------------------------
+# Login rate-limit helpers
+# NOTE: this tracker is in-memory; it resets on server restart and is not shared
+# across multiple worker processes. For production use, persist to the database or Redis.
+# -------------------------
+def _get_attempts(username: str) -> dict:
+    return _login_attempts.setdefault(username, {'count': 0, 'locked_until': None})
+
+def is_account_locked(username: str):
+    """Return (locked: bool, seconds_remaining: int)."""
+    entry = _get_attempts(username)
+    if entry['locked_until'] and datetime.now() < entry['locked_until']:
+        remaining = int((entry['locked_until'] - datetime.now()).total_seconds())
+        return True, remaining
+    # reset lock if it has expired
+    if entry['locked_until'] and datetime.now() >= entry['locked_until']:
+        entry['count'] = 0
+        entry['locked_until'] = None
+    return False, 0
+
+def record_failed_login(username: str):
+    """Increment failure counter; lock the account once threshold is reached."""
+    entry = _get_attempts(username)
+    entry['count'] += 1
+    if entry['count'] >= LOGIN_MAX_ATTEMPTS:
+        entry['locked_until'] = datetime.now() + timedelta(minutes=LOGIN_LOCKOUT_MINUTES)
+
+def clear_failed_logins(username: str):
+    """Clear failure counter on successful login."""
+    _login_attempts.pop(username, None)
+
+# -------------------------
+# Password-reset OTP helpers
+# -------------------------
+def _hash_otp(otp: str) -> str:
+    """Return a SHA-256 hex digest of the OTP for safe storage."""
+    return hashlib.sha256(otp.encode()).hexdigest()
+
+def generate_and_store_otp(username: str) -> str:
+    """Generate a 6-digit OTP (100000–999999), hash and store it, return the plain OTP."""
+    # Use 100_000–999_999 to guarantee no leading zeros
+    otp = str(secrets.randbelow(OTP_RANGE_SIZE) + OTP_RANGE_START)
+    otp_hash = _hash_otp(otp)
+    expires_at = (datetime.now() + timedelta(minutes=OTP_EXPIRY_MINUTES)).strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_db_connection()
+    # Invalidate any existing unused tokens for this user
+    conn.execute("UPDATE password_reset_tokens SET used=1 WHERE username=? AND used=0", (username,))
+    conn.execute("INSERT INTO password_reset_tokens (username, otp, expires_at) VALUES (?, ?, ?)",
+                 (username, otp_hash, expires_at))
+    conn.commit()
+    conn.close()
+    return otp
+
+def send_password_reset_otp(recipient_email: str, otp: str, username: str):
+    """Send the 6-digit OTP to the user's registered email."""
+    msg = EmailMessage()
+    msg['Subject'] = '🔐 Password Reset OTP – Face Attendance System'
+    msg['From'] = EMAIL_USER
+    msg['To'] = recipient_email
+    msg.set_content(
+        f"Hello {username},\n\n"
+        f"Your password reset OTP is: {otp}\n\n"
+        f"This code is valid for {OTP_EXPIRY_MINUTES} minutes.\n"
+        f"If you did not request a password reset, please ignore this email.\n\n"
+        f"— Face Attendance System"
+    )
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+        smtp.login(EMAIL_USER, EMAIL_PASS)
+        smtp.send_message(msg)
+
+def verify_and_consume_otp(username: str, otp: str) -> bool:
+    """Return True and mark OTP used if it matches (hash comparison) and has not expired."""
+    conn = get_db_connection()
+    row = conn.execute(
+        "SELECT id, otp, expires_at FROM password_reset_tokens "
+        "WHERE username=? AND used=0 ORDER BY id DESC LIMIT 1",
+        (username,)
+    ).fetchone()
+    if not row:
+        conn.close()
+        return False
+    if datetime.now() > datetime.strptime(row['expires_at'], "%Y-%m-%d %H:%M:%S"):
+        conn.close()
+        return False
+    stored_hash = row['otp']
+    supplied_hash = _hash_otp(otp)
+    if not secrets.compare_digest(stored_hash, supplied_hash):
+        conn.close()
+        return False
+    conn.execute("UPDATE password_reset_tokens SET used=1 WHERE id=?", (row['id'],))
+    conn.commit()
+    conn.close()
+    return True
 
 def is_current_user_admin():
     """Return True if current logged in user is admin."""
@@ -107,16 +240,43 @@ model.prepare(ctx_id=0)
 
 # Internal encoding store:
 # - on disk we keep a dict: { name: np.ndarray_embedding }
-# - in memory we keep known_embeddings_list: list of (embedding, name) for fast iteration
-known_encoding_dict = {}         # name -> np.ndarray
-known_embeddings = []            # list of (embedding, name) used by recognition loops
+# - in memory we keep:
+#     known_embeddings        – list of (embedding, name) kept for backward compat
+#     known_embedding_matrix  – (N, D) float32 array of all L2-normalised embeddings
+#     known_embedding_names   – list[str] of names in the same row order as the matrix
+#
+# The matrix lets us replace the O(N) Python for-loop with a single BLAS matrix-vector
+# multiply:  scores = known_embedding_matrix @ query   →  argmax gives the best match.
+# Because every embedding is L2-normalised, dot-product == cosine similarity.
+known_encoding_dict    = {}          # name -> np.ndarray
+known_embeddings       = []          # list of (embedding, name) — kept for compatibility
+known_embedding_matrix = None        # np.ndarray shape (N, D), or None when empty
+known_embedding_names  = []          # list[str] parallel to matrix rows
+
+def _rebuild_embedding_matrix():
+    """Rebuild the fast-search matrix from known_encoding_dict.
+
+    Called after any change to known_encoding_dict so the matrix stays in sync.
+    """
+    global known_embedding_matrix, known_embedding_names, known_embeddings
+    if not known_encoding_dict:
+        known_embedding_matrix = None
+        known_embedding_names  = []
+        known_embeddings       = []
+        return
+
+    names = list(known_encoding_dict.keys())
+    matrix = np.array([known_encoding_dict[n] for n in names], dtype=np.float32)
+    known_embedding_names  = names
+    known_embedding_matrix = matrix
+    known_embeddings       = [(known_encoding_dict[n], n) for n in names]
 
 def load_encodings_from_file():
-    """Load encodings from ENCODE_FILE, normalize, and populate both dict and list."""
-    global known_encoding_dict, known_embeddings
+    """Load encodings from ENCODE_FILE, normalize, and populate in-memory structures."""
+    global known_encoding_dict
     if not os.path.exists(ENCODE_FILE):
         known_encoding_dict = {}
-        known_embeddings = []
+        _rebuild_embedding_matrix()
         return
 
     try:
@@ -125,7 +285,7 @@ def load_encodings_from_file():
     except Exception:
         # if file exists but corrupted, reset
         known_encoding_dict = {}
-        known_embeddings = []
+        _rebuild_embedding_matrix()
         return
 
     # support both legacy formats: list of (embedding, name) or dict{name: embedding}
@@ -159,7 +319,7 @@ def load_encodings_from_file():
             continue
 
     known_encoding_dict = cleaned
-    known_embeddings = [(emb, name) for name, emb in known_encoding_dict.items()]
+    _rebuild_embedding_matrix()
 
 def save_encodings_to_file():
     """Save the current known_encoding_dict to disk (pickle)."""
@@ -222,11 +382,22 @@ def login():
         if not username or not password:
             return render_template('login.html', error="Username and password required")
 
+        # Check rate limit before hitting the database
+        locked, secs = is_account_locked(username)
+        if locked:
+            mins = secs // 60
+            secsrem = secs % 60
+            return render_template('login.html',
+                                   error=f"Account locked after {LOGIN_MAX_ATTEMPTS} failed attempts. "
+                                         f"Try again in {mins}m {secsrem}s.")
+
         conn = get_db_connection()
         user = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
         conn.close()
 
         if not user:
+            # Don't reveal whether the username exists
+            record_failed_login(username)
             return render_template('login.html', error="Invalid username or password")
 
         stored_hash = user['password']  # this is bytes (BLOB)
@@ -237,11 +408,23 @@ def login():
 
         try:
             if bcrypt.checkpw(password.encode(), stored_hash):
+                clear_failed_logins(username)
                 session['logged_in'] = True
                 session['username'] = username
                 return redirect(url_for('index'))
             else:
-                return render_template('login.html', error="Invalid username or password")
+                record_failed_login(username)
+                locked, secs = is_account_locked(username)
+                remaining_attempts = max(LOGIN_MAX_ATTEMPTS - _get_attempts(username)['count'], 0)
+                if locked:
+                    mins = secs // 60
+                    secsrem = secs % 60
+                    return render_template('login.html',
+                                           error=f"Account locked after too many failed attempts. "
+                                                 f"Try again in {mins}m {secsrem}s.")
+                return render_template('login.html',
+                                       error=f"Invalid username or password. "
+                                             f"{remaining_attempts} attempt(s) remaining before lockout.")
         except Exception:
             return render_template('login.html', error="Invalid username or password")
 
@@ -266,11 +449,19 @@ def register():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
+        email = request.form.get('email', '').strip()
 
-        if not username or not password:
-            return render_template('register.html', error="All fields required")
+        if not username or not password or not email:
+            return render_template('register.html', error="All fields are required")
 
-        success = create_user(username, password, is_admin=0)
+        if len(password) < MIN_PASSWORD_LENGTH:
+            return render_template('register.html',
+                                   error=f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
+
+        if not is_valid_email(email):
+            return render_template('register.html', error="Enter a valid email address")
+
+        success = create_user(username, password, is_admin=0, gmail=email)
         if not success:
             return render_template('register.html', error="Username already exists")
         return render_template('register.html', success="User created successfully!")
@@ -384,27 +575,90 @@ def add_student():
 
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
-    if request.method == 'POST':
-        username = request.form['username'].strip()
-        new_password = request.form['new_password'].strip()
+    """
+    Two-step email-OTP password reset:
+      Step 1 (GET or step=request): User enters their username.
+              System looks up their registered gmail, sends a 6-digit OTP,
+              and renders the verify form.
+      Step 2 (step=verify): User enters the OTP + new password.
+              System verifies the OTP, updates the password.
+    """
+    if request.method == 'GET':
+        return render_template('forgot_password.html', step='request')
+
+    step = request.form.get('step', 'request')
+
+    # ------------------------------------------------------------------
+    # STEP 1 – receive username, send OTP email
+    # ------------------------------------------------------------------
+    if step == 'request':
+        username = request.form.get('username', '').strip()
+        if not username:
+            return render_template('forgot_password.html', step='request',
+                                   error="Please enter your username.")
 
         conn = get_db_connection()
-        user = conn.execute("SELECT * FROM users WHERE username=?", (username,)).fetchone()
+        user = conn.execute("SELECT username, gmail FROM users WHERE username=?", (username,)).fetchone()
+        conn.close()
 
-        if not user:
-            conn.close()
-            return render_template('forgot_password.html', error="User does not exist.")
+        # Always show the same message to prevent username enumeration.
+        # Also send the OTP (or silently skip) so the response time is consistent.
+        generic_sent_msg = ("If that username exists and has a registered email, "
+                            "an OTP has been sent. Check your inbox.")
 
-        # 🔐 Hash new password before saving
+        if not user or not user['gmail']:
+            # No user / no email — return the same message but don't proceed further
+            return render_template('forgot_password.html', step='request',
+                                   info=generic_sent_msg)
+
+        try:
+            otp = generate_and_store_otp(username)
+            send_password_reset_otp(user['gmail'], otp, username)
+        except Exception as e:
+            app.logger.exception("Failed to send OTP email: %s", e)
+            return render_template('forgot_password.html', step='request',
+                                   error="Could not send OTP email. Please contact the admin.")
+
+        # Use the same generic message to avoid revealing that the user exists and has an email
+        return render_template('forgot_password.html', step='verify',
+                               username=username,
+                               info=generic_sent_msg)
+
+    # ------------------------------------------------------------------
+    # STEP 2 – verify OTP and set new password
+    # ------------------------------------------------------------------
+    if step == 'verify':
+        username = request.form.get('username', '').strip()
+        otp = request.form.get('otp', '').strip()
+        new_password = request.form.get('new_password', '').strip()
+
+        if not username or not otp or not new_password:
+            return render_template('forgot_password.html', step='verify',
+                                   username=username, error="All fields are required.")
+
+        if len(new_password) < MIN_PASSWORD_LENGTH:
+            return render_template('forgot_password.html', step='verify',
+                                   username=username,
+                                   error=f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
+
+        if not verify_and_consume_otp(username, otp):
+            return render_template('forgot_password.html', step='verify',
+                                   username=username,
+                                   error="Invalid or expired OTP. Please request a new one.")
+
         hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt())
-
+        conn = get_db_connection()
         conn.execute("UPDATE users SET password=? WHERE username=?", (hashed, username))
         conn.commit()
         conn.close()
 
+        # Clear any login lockout for this user after successful reset
+        clear_failed_logins(username)
+
         return redirect(url_for('login'))
 
-    return render_template('forgot_password.html')
+    # Fallback
+    return render_template('forgot_password.html', step='request')
     
 
 
@@ -517,7 +771,7 @@ def submit_student():
             normv = np.linalg.norm(v)
             if normv > 0:
                 known_encoding_dict[k] = v / normv
-        known_embeddings = [(emb, n) for n, emb in known_encoding_dict.items()]
+        _rebuild_embedding_matrix()
 
     except Exception as e:
         app.logger.exception("Failed to update encoding for new student: %s", e)
@@ -536,19 +790,20 @@ def upload_photo():
     section = request.form.get('section', '').strip()
     files = request.files.getlist('images')
 
-    def cosine_sim(a, b):
-        return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
-
     now = datetime.now()
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
 
     all_outputs = []
-    session_attendance = []     # <---- COLLECT ONLY THIS SCAN’S ATTENDANCE
+    session_attendance = []     # <---- COLLECT ONLY THIS SCAN'S ATTENDANCE
 
     conn = get_db_connection()
 
-    # small optimization: copy known_embeddings to local var
-    embeddings_for_search = known_embeddings.copy()
+    # Snapshot matrix + names once per request so mid-request updates don't race.
+    # All embeddings are L2-normalised, so dot-product == cosine similarity.
+    # A single BLAS matrix-vector multiply (matrix @ query) replaces the Python
+    # for-loop and is typically 10-100x faster due to SIMD / multi-core BLAS.
+    search_matrix = known_embedding_matrix   # shape (N, D) float32, or None
+    search_names  = known_embedding_names    # list[str], len N
 
     for file in files:
         npimg = np.frombuffer(file.read(), np.uint8)
@@ -569,15 +824,15 @@ def upload_photo():
                 best_score = -1.0
                 best_name = None
 
-                for known_emb, name in embeddings_for_search:
-                    # known_emb should be numpy array already
-                    try:
-                        score = cosine_sim(embedding, known_emb)
-                    except Exception:
-                        continue
-                    if score > best_score:
-                        best_score = score
-                        best_name = name
+                if search_matrix is not None and search_matrix.shape[0] > 0:
+                    # Vectorised nearest-neighbour: one BLAS matrix-vector multiply
+                    # replaces the O(N) Python loop. Both the stored embeddings (in the
+                    # matrix) and the query embedding (normalised at line 822 above) are
+                    # L2-normalised, so dot-product equals cosine similarity.
+                    scores    = search_matrix @ embedding   # shape (N,)
+                    best_idx  = int(np.argmax(scores))
+                    best_score = float(scores[best_idx])
+                    best_name  = search_names[best_idx]
 
                 color = (0, 255, 0) if best_score >= FACE_MATCH_THRESHOLD else (0, 0, 255)
                 label = best_name if best_score >= FACE_MATCH_THRESHOLD else "Unknown"
