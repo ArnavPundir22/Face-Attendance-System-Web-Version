@@ -266,7 +266,7 @@ def _rebuild_embedding_matrix():
         return
 
     names = list(known_encoding_dict.keys())
-    matrix = np.stack([known_encoding_dict[n] for n in names]).astype(np.float32)
+    matrix = np.array([known_encoding_dict[n] for n in names], dtype=np.float32)
     known_embedding_names  = names
     known_embedding_matrix = matrix
     known_embeddings       = [(known_encoding_dict[n], n) for n in names]
@@ -826,8 +826,9 @@ def upload_photo():
 
                 if search_matrix is not None and search_matrix.shape[0] > 0:
                     # Vectorised nearest-neighbour: one BLAS matrix-vector multiply
-                    # replaces the O(N) Python loop. Embeddings are L2-normalised so
-                    # dot-product equals cosine similarity.
+                    # replaces the O(N) Python loop. Both the stored embeddings (in the
+                    # matrix) and the query embedding (normalised at line 822 above) are
+                    # L2-normalised, so dot-product equals cosine similarity.
                     scores    = search_matrix @ embedding   # shape (N,)
                     best_idx  = int(np.argmax(scores))
                     best_score = float(scores[best_idx])
