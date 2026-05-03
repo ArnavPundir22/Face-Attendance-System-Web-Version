@@ -69,8 +69,8 @@ def send_attendance_email():
     try:
         _send_email(email, table_data)
         return jsonify({'success': True})
-    except Exception as exc:
-        return jsonify({'success': False, 'message': str(exc)})
+    except Exception:
+        return jsonify({'success': False, 'message': 'Failed to send email. Please try again later.'})
 
 
 @attendance_bp.route('/upload_photo', methods=['POST'])

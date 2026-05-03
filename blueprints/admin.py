@@ -20,8 +20,6 @@ from utils.db import get_db_connection
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
-_ADMIN_REQUIRED_RESPONSE = lambda: render_template('login.html', error="Admin access required")
-
 
 def _require_admin():
     """Return a redirect/render when the current user is not admin, else None."""

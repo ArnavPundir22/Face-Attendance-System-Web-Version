@@ -88,7 +88,7 @@ def _load_legacy_pickle() -> dict[str, np.ndarray]:
     Only used during the one-time migration.  The pickle module is intentionally
     imported locally to make the security risk explicit and contained.
     """
-    import pickle  # noqa: S403 — only used for one-time migration of existing data
+    import pickle  # noqa: S403 -- only used for one-time migration of existing data
 
     try:
         with open(config.ENCODE_FILE_LEGACY, 'rb') as fh:

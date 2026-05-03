@@ -12,7 +12,8 @@ import sqlite3
 
 import cv2
 import numpy as np
-from flask import Blueprint, redirect, render_template, request, url_for
+from flask import Blueprint, abort, redirect, render_template, request, url_for
+from werkzeug.utils import secure_filename
 
 import config
 from utils.db import get_db_connection
@@ -30,8 +31,8 @@ def students():
         data = cursor.fetchall()
         conn.close()
         return render_template('students.html', students=data)
-    except Exception as exc:
-        return str(exc)
+    except Exception:
+        return render_template('students.html', students=[], error="Could not load students.")
 
 
 @students_bp.route('/add_student')
@@ -68,8 +69,14 @@ def submit_student():
             message='Duplicate Name or ID found',
         ))
 
-    # Save photo to known_faces/
-    filename = f"{name}.jpg"
+    # Save photo to known_faces/ — use secure_filename to prevent path traversal.
+    safe_name = secure_filename(name)
+    if not safe_name:
+        return redirect(url_for(
+            'students.add_student', status='error',
+            message='Student name contains invalid characters',
+        ))
+    filename = f"{safe_name}.jpg"
     filepath = os.path.join(config.KNOWN_FACES_DIR, filename)
     photo.save(filepath)
 
