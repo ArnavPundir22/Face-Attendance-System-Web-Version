@@ -1,7 +1,8 @@
 # app.py (merged + admin dashboard + context for templates)
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
-import cv2, numpy as np, os, pickle, sqlite3, base64, secrets
+import cv2, numpy as np, os, pickle, sqlite3, base64, secrets, hashlib
 from datetime import datetime, timedelta
+from email.utils import parseaddr
 import insightface, smtplib
 from email.message import EmailMessage
 from io import BytesIO
@@ -108,8 +109,18 @@ def create_user(username: str, password: str, is_admin: int = 0, gmail: str = ''
     finally:
         conn.close()
 
+def is_valid_email(email: str) -> bool:
+    """Return True only if email parses to a non-empty local-part and domain."""
+    _, addr = parseaddr(email)
+    if not addr or '@' not in addr:
+        return False
+    local, domain = addr.rsplit('@', 1)
+    return bool(local) and bool(domain)
+
 # -------------------------
 # Login rate-limit helpers
+# NOTE: this tracker is in-memory; it resets on server restart and is not shared
+# across multiple worker processes. For production use, persist to the database or Redis.
 # -------------------------
 def _get_attempts(username: str) -> dict:
     return _login_attempts.setdefault(username, {'count': 0, 'locked_until': None})
@@ -140,15 +151,21 @@ def clear_failed_logins(username: str):
 # -------------------------
 # Password-reset OTP helpers
 # -------------------------
+def _hash_otp(otp: str) -> str:
+    """Return a SHA-256 hex digest of the OTP for safe storage."""
+    return hashlib.sha256(otp.encode()).hexdigest()
+
 def generate_and_store_otp(username: str) -> str:
-    """Generate a 6-digit OTP, store it in the DB, return it."""
-    otp = f"{secrets.randbelow(1_000_000):06d}"
+    """Generate a 6-digit OTP (100000–999999), hash and store it, return the plain OTP."""
+    # Use 100_000–999_999 to guarantee no leading zeros
+    otp = str(secrets.randbelow(900_000) + 100_000)
+    otp_hash = _hash_otp(otp)
     expires_at = (datetime.now() + timedelta(minutes=OTP_EXPIRY_MINUTES)).strftime("%Y-%m-%d %H:%M:%S")
     conn = get_db_connection()
     # Invalidate any existing unused tokens for this user
     conn.execute("UPDATE password_reset_tokens SET used=1 WHERE username=? AND used=0", (username,))
     conn.execute("INSERT INTO password_reset_tokens (username, otp, expires_at) VALUES (?, ?, ?)",
-                 (username, otp, expires_at))
+                 (username, otp_hash, expires_at))
     conn.commit()
     conn.close()
     return otp
@@ -171,7 +188,7 @@ def send_password_reset_otp(recipient_email: str, otp: str, username: str):
         smtp.send_message(msg)
 
 def verify_and_consume_otp(username: str, otp: str) -> bool:
-    """Return True and mark OTP used if it matches and has not expired."""
+    """Return True and mark OTP used if it matches (hash comparison) and has not expired."""
     conn = get_db_connection()
     row = conn.execute(
         "SELECT id, otp, expires_at FROM password_reset_tokens "
@@ -184,7 +201,9 @@ def verify_and_consume_otp(username: str, otp: str) -> bool:
     if datetime.now() > datetime.strptime(row['expires_at'], "%Y-%m-%d %H:%M:%S"):
         conn.close()
         return False
-    if not secrets.compare_digest(row['otp'], otp):
+    stored_hash = row['otp']
+    supplied_hash = _hash_otp(otp)
+    if not secrets.compare_digest(stored_hash, supplied_hash):
         conn.close()
         return False
     conn.execute("UPDATE password_reset_tokens SET used=1 WHERE id=?", (row['id'],))
@@ -410,8 +429,8 @@ def register():
             return render_template('register.html',
                                    error=f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
 
-        if '@' not in gmail:
-            return render_template('register.html', error="Enter a valid Gmail address")
+        if not is_valid_email(gmail):
+            return render_template('register.html', error="Enter a valid email address")
 
         success = create_user(username, password, is_admin=0, gmail=gmail)
         if not success:
@@ -553,12 +572,13 @@ def forgot_password():
         user = conn.execute("SELECT username, gmail FROM users WHERE username=?", (username,)).fetchone()
         conn.close()
 
-        # Always show the same message to prevent username enumeration
+        # Always show the same message to prevent username enumeration.
+        # Also send the OTP (or silently skip) so the response time is consistent.
         generic_sent_msg = ("If that username exists and has a registered email, "
                             "an OTP has been sent. Check your inbox.")
 
         if not user or not user['gmail']:
-            # Don't reveal that the username is missing or has no email
+            # No user / no email — return the same message but don't proceed further
             return render_template('forgot_password.html', step='request',
                                    info=generic_sent_msg)
 
@@ -570,9 +590,10 @@ def forgot_password():
             return render_template('forgot_password.html', step='request',
                                    error="Could not send OTP email. Please contact the admin.")
 
+        # Use the same generic message to avoid revealing that the user exists and has an email
         return render_template('forgot_password.html', step='verify',
                                username=username,
-                               info=f"OTP sent to the email registered for '{username}'. "
+                               info=f"If that username exists, an OTP has been sent to its registered email. "
                                     f"It expires in {OTP_EXPIRY_MINUTES} minutes.")
 
     # ------------------------------------------------------------------
