@@ -1,0 +1,43 @@
+# Secrets & credentials
+.env
+
+# SQLite database (contains student PII)
+database.db
+
+# Face encoding files
+EncodeFile_Insight.npy
+EncodeFile_Insight_names.json
+EncodeFile_Insight.pkl
+
+# Student face photos (PII)
+known_faces/
+
+# Legacy data files
+data.csv
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
