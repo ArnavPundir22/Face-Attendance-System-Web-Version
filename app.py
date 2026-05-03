@@ -34,6 +34,8 @@ LOGIN_MAX_ATTEMPTS = 5          # failed attempts before lockout
 LOGIN_LOCKOUT_MINUTES = 15      # how long to lock the account
 OTP_EXPIRY_MINUTES = 10         # how long a password-reset OTP stays valid
 MIN_PASSWORD_LENGTH = 8         # minimum password length
+OTP_RANGE_START = 100_000       # minimum 6-digit OTP value (no leading zeros)
+OTP_RANGE_SIZE  = 900_000       # range size → codes from 100000 to 999999
 
 # In-memory login-attempt tracker  { username: {'count': int, 'locked_until': datetime|None} }
 _login_attempts: dict = {}
@@ -158,7 +160,7 @@ def _hash_otp(otp: str) -> str:
 def generate_and_store_otp(username: str) -> str:
     """Generate a 6-digit OTP (100000–999999), hash and store it, return the plain OTP."""
     # Use 100_000–999_999 to guarantee no leading zeros
-    otp = str(secrets.randbelow(900_000) + 100_000)
+    otp = str(secrets.randbelow(OTP_RANGE_SIZE) + OTP_RANGE_START)
     otp_hash = _hash_otp(otp)
     expires_at = (datetime.now() + timedelta(minutes=OTP_EXPIRY_MINUTES)).strftime("%Y-%m-%d %H:%M:%S")
     conn = get_db_connection()
@@ -420,19 +422,19 @@ def register():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
-        gmail = request.form.get('gmail', '').strip()
+        email = request.form.get('email', '').strip()
 
-        if not username or not password or not gmail:
+        if not username or not password or not email:
             return render_template('register.html', error="All fields are required")
 
         if len(password) < MIN_PASSWORD_LENGTH:
             return render_template('register.html',
                                    error=f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
 
-        if not is_valid_email(gmail):
+        if not is_valid_email(email):
             return render_template('register.html', error="Enter a valid email address")
 
-        success = create_user(username, password, is_admin=0, gmail=gmail)
+        success = create_user(username, password, is_admin=0, gmail=email)
         if not success:
             return render_template('register.html', error="Username already exists")
         return render_template('register.html', success="User created successfully!")
@@ -593,8 +595,7 @@ def forgot_password():
         # Use the same generic message to avoid revealing that the user exists and has an email
         return render_template('forgot_password.html', step='verify',
                                username=username,
-                               info=f"If that username exists, an OTP has been sent to its registered email. "
-                                    f"It expires in {OTP_EXPIRY_MINUTES} minutes.")
+                               info=generic_sent_msg)
 
     # ------------------------------------------------------------------
     # STEP 2 – verify OTP and set new password
