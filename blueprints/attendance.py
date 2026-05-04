@@ -156,28 +156,26 @@ def upload_photo():
                     })
                     continue
 
-                last_mark = conn.execute(
-                    "SELECT Timestamp FROM attendance WHERE Student_ID=? "
+                last_record = conn.execute(
+                    "SELECT Timestamp FROM attendance "
+                    "WHERE Student_ID=? AND Lecture=? "
                     "ORDER BY Timestamp DESC LIMIT 1",
-                    (student['ID'],),
+                    (student['ID'], lecture),
                 ).fetchone()
 
-                remark = False
-                if last_mark:
-                    last_time = datetime.strptime(last_mark['Timestamp'], "%Y-%m-%d %H:%M:%S")
+                if last_record:
+                    last_time = datetime.strptime(last_record['Timestamp'], "%Y-%m-%d %H:%M:%S")
                     elapsed   = (now - last_time).total_seconds() / 60
                     if elapsed < config.REATTENDANCE_INTERVAL_MINUTES:
                         results.append({
                             "name":       best_name,
                             "status":     "Already Marked",
                             "confidence": f"{best_score:.2f}",
-                            "timestamp":  last_time.strftime("%Y-%m-%d %H:%M:%S"),
+                            "timestamp":  last_record['Timestamp'],
                         })
                         continue
-                    else:
-                        remark = True
 
-                status = 'Re-Marked' if remark else 'Present'
+                status = 'Present'
 
                 conn.execute(
                     "INSERT INTO attendance "
