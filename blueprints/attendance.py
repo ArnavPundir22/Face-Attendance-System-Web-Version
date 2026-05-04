@@ -156,25 +156,24 @@ def upload_photo():
                     })
                     continue
 
-                today_str = now.strftime("%Y-%m-%d")
-                last_mark = conn.execute(
+                day_start = now.strftime("%Y-%m-%d 00:00:00")
+                day_end   = now.strftime("%Y-%m-%d 23:59:59")
+                already   = conn.execute(
                     "SELECT Timestamp FROM attendance "
-                    "WHERE Student_ID=? AND Lecture=? AND Timestamp LIKE ? "
-                    "ORDER BY Timestamp DESC LIMIT 1",
-                    (student['ID'], lecture, today_str + '%'),
+                    "WHERE Student_ID=? AND Lecture=? "
+                    "AND Timestamp >= ? AND Timestamp <= ? "
+                    "LIMIT 1",
+                    (student['ID'], lecture, day_start, day_end),
                 ).fetchone()
 
-                if last_mark:
-                    last_time = datetime.strptime(last_mark['Timestamp'], "%Y-%m-%d %H:%M:%S")
-                    elapsed   = (now - last_time).total_seconds() / 60
-                    if elapsed < config.REATTENDANCE_INTERVAL_MINUTES:
-                        results.append({
-                            "name":       best_name,
-                            "status":     "Already Marked",
-                            "confidence": f"{best_score:.2f}",
-                            "timestamp":  last_time.strftime("%Y-%m-%d %H:%M:%S"),
-                        })
-                        continue
+                if already:
+                    results.append({
+                        "name":       best_name,
+                        "status":     "Already Marked",
+                        "confidence": f"{best_score:.2f}",
+                        "timestamp":  already['Timestamp'],
+                    })
+                    continue
 
                 status = 'Present'
 
