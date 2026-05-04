@@ -12,6 +12,7 @@ Routes:
   GET        /admin/users                    — user list
   GET/POST   /admin/user/edit/<id>           — edit user
   POST       /admin/user/delete/<id>         — delete user
+  POST       /admin/reset                        — reset users, attendance, tokens (students preserved)
 """
 
 import bcrypt
@@ -325,3 +326,36 @@ def admin_delete_user(user_id):
     conn.commit()
     conn.close()
     return redirect(url_for('admin.admin_users'))
+
+
+@admin_bp.route('/reset', methods=['POST'])
+def admin_reset():
+    denied = _require_admin()
+    if denied:
+        return denied
+
+    conn = get_db_connection()
+    try:
+        # Delete all attendance records
+        conn.execute("DELETE FROM attendance")
+
+        # Delete all users (including the current admin)
+        conn.execute("DELETE FROM users")
+
+        # Clear password reset tokens
+        conn.execute("DELETE FROM password_reset_tokens")
+
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+    # Re-seed the default admin account so the system remains accessible
+    from utils.db import init_users_table_and_admin
+    init_users_table_and_admin()
+
+    # Log out the current admin
+    session.clear()
+    return redirect(url_for('auth.login'))
