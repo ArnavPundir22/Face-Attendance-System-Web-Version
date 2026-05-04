@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Manage Users • Face Attendance</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background:#0d0d1a; color:#e4e4e7; }
+    .dark-card { background-color: rgba(32,32,50,0.7); border:1px solid rgba(168,85,247,0.3); border-top:4px solid #a855f7; }
+  </style>
+</head>
+<body>
+  <header class="p-4 flex justify-between items-center border-b border-purple-800 bg-[#121223]">
+    <div class="flex items-center gap-3">
+      <span class="text-2xl">👤</span>
+      <h1 class="text-xl text-indigo-200">Manage Users</h1>
+    </div>
+    <div class="flex items-center gap-4">
+      <a href="/register" class="bg-purple-600 px-3 py-2 rounded-md text-white font-semibold hover:bg-purple-700">➕ Create User</a>
+      <a href="/admin" class="text-indigo-300 hover:text-white">Dashboard</a>
+      <a href="/admin/students" class="text-indigo-300 hover:text-white">Students</a>
+      <a href="/logout" class="text-red-400">Logout</a>
+    </div>
+  </header>
+
+  <main class="p-6 max-w-5xl mx-auto">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg">Users ({{ users|length }})</h2>
+    </div>
+
+    {% set err = request.args.get('error') %}
+    {% if err == 'last_admin' %}
+    <div class="mb-4 p-3 bg-red-900 border border-red-600 rounded text-red-200 text-sm">
+      Cannot delete the last admin account. At least one admin must remain.
+    </div>
+    {% elif err == 'self_delete' %}
+    <div class="mb-4 p-3 bg-red-900 border border-red-600 rounded text-red-200 text-sm">
+      You cannot delete your own account.
+    </div>
+    {% endif %}
+
+    <div class="dark-card p-4 rounded-lg">
+      <table class="w-full table-auto">
+        <thead>
+          <tr class="text-left text-purple-300">
+            <th class="p-2">ID</th>
+            <th class="p-2">Username</th>
+            <th class="p-2">Email</th>
+            <th class="p-2">Role</th>
+            <th class="p-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr class="border-t border-gray-700">
+            <td class="p-2 text-gray-400">{{ u['id'] }}</td>
+            <td class="p-2 font-medium">
+              {{ u['username'] }}
+              {% if u['username'] == current_user %}
+                <span class="ml-1 text-xs bg-purple-700 text-purple-100 px-1 rounded">you</span>
+              {% endif %}
+            </td>
+            <td class="p-2 text-gray-300">{{ u['gmail'] or '—' }}</td>
+            <td class="p-2">
+              {% if u['is_admin'] %}
+                <span class="text-xs bg-indigo-700 text-indigo-100 px-2 py-0.5 rounded">Admin</span>
+              {% else %}
+                <span class="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">User</span>
+              {% endif %}
+            </td>
+            <td class="p-2 flex items-center gap-3">
+              <a href="/admin/user/edit/{{ u['id'] }}" class="text-indigo-300 hover:text-white">Edit</a>
+              {% if u['username'] != current_user %}
+              <form method="POST" action="/admin/user/delete/{{ u['id'] }}" style="display:inline"
+                    onsubmit="return confirm('Delete user {{ u['username'] }}? This cannot be undone.');">
+                <button class="text-red-400 hover:text-red-300">Delete</button>
+              </form>
+              {% else %}
+              <span class="text-gray-600 text-sm">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </main>
+</body>
+</html>

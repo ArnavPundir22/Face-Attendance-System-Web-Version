@@ -9,14 +9,19 @@ Routes:
   POST       /admin/student/delete/<id>      — delete student
   GET/POST   /admin/mark                     — manual attendance marking
   GET        /admin/view_images              — attendance image viewer
+  GET        /admin/users                    — user list
+  GET/POST   /admin/user/edit/<id>           — edit user
+  POST       /admin/user/delete/<id>         — delete user
 """
 
+import bcrypt
 from datetime import datetime, timedelta
 
-from flask import Blueprint, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
 
 from utils.auth_helpers import is_current_user_admin
-from utils.db import get_db_connection
+from utils.db import get_db_connection, is_valid_email
+import config
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -194,3 +199,129 @@ def view_images():
     if denied:
         return denied
     return render_template('view_images.html')
+
+
+@admin_bp.route('/users')
+def admin_users():
+    denied = _require_admin()
+    if denied:
+        return denied
+
+    conn  = get_db_connection()
+    users = conn.execute("SELECT id, username, gmail, is_admin FROM users ORDER BY username COLLATE NOCASE").fetchall()
+    conn.close()
+    return render_template('admin_users.html', users=users, current_user=session.get('username'))
+
+
+@admin_bp.route('/user/edit/<int:user_id>', methods=['GET', 'POST'])
+def admin_edit_user(user_id):
+    denied = _require_admin()
+    if denied:
+        return denied
+
+    conn = get_db_connection()
+    user = conn.execute("SELECT id, username, gmail, is_admin FROM users WHERE id=?", (user_id,)).fetchone()
+    if not user:
+        conn.close()
+        return redirect(url_for('admin.admin_users'))
+
+    if request.method == 'POST':
+        new_username = request.form.get('username', '').strip()
+        new_email    = request.form.get('email', '').strip()
+        new_is_admin = 1 if request.form.get('is_admin') else 0
+        new_password = request.form.get('password', '').strip()
+
+        if not new_username:
+            conn.close()
+            return render_template('admin_edit_user.html', user=user,
+                                   error="Username is required.",
+                                   current_user=session.get('username'))
+
+        if new_email and not is_valid_email(new_email):
+            conn.close()
+            return render_template('admin_edit_user.html', user=user,
+                                   error="Enter a valid email address.",
+                                   current_user=session.get('username'))
+
+        # Prevent removing admin rights from the last admin
+        if user['is_admin'] and not new_is_admin:
+            admin_count = conn.execute(
+                "SELECT COUNT(*) AS cnt FROM users WHERE is_admin=1"
+            ).fetchone()['cnt']
+            if admin_count <= 1:
+                conn.close()
+                return render_template('admin_edit_user.html', user=user,
+                                       error="Cannot remove admin rights: at least one admin must remain.",
+                                       current_user=session.get('username'))
+
+        # Check username uniqueness (exclude current user)
+        existing = conn.execute(
+            "SELECT id FROM users WHERE username=? AND id!=?", (new_username, user_id)
+        ).fetchone()
+        if existing:
+            conn.close()
+            return render_template('admin_edit_user.html', user=user,
+                                   error="That username is already taken.",
+                                   current_user=session.get('username'))
+
+        if new_password:
+            if len(new_password) < config.MIN_PASSWORD_LENGTH:
+                conn.close()
+                return render_template('admin_edit_user.html', user=user,
+                                       error=f"Password must be at least {config.MIN_PASSWORD_LENGTH} characters.",
+                                       current_user=session.get('username'))
+            hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt())
+            conn.execute(
+                "UPDATE users SET username=?, gmail=?, is_admin=?, password=? WHERE id=?",
+                (new_username, new_email, new_is_admin, hashed, user_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE users SET username=?, gmail=?, is_admin=? WHERE id=?",
+                (new_username, new_email, new_is_admin, user_id),
+            )
+
+        conn.commit()
+        conn.close()
+
+        # Keep session consistent if admin edited their own username
+        if session.get('username') == user['username'] and new_username != user['username']:
+            session['username'] = new_username
+
+        return redirect(url_for('admin.admin_users'))
+
+    conn.close()
+    return render_template('admin_edit_user.html', user=user, current_user=session.get('username'))
+
+
+@admin_bp.route('/user/delete/<int:user_id>', methods=['POST'])
+def admin_delete_user(user_id):
+    denied = _require_admin()
+    if denied:
+        return denied
+
+    conn = get_db_connection()
+    user = conn.execute("SELECT id, username, is_admin FROM users WHERE id=?", (user_id,)).fetchone()
+
+    if not user:
+        conn.close()
+        return redirect(url_for('admin.admin_users'))
+
+    # Prevent deleting the last admin
+    if user['is_admin']:
+        admin_count = conn.execute(
+            "SELECT COUNT(*) AS cnt FROM users WHERE is_admin=1"
+        ).fetchone()['cnt']
+        if admin_count <= 1:
+            conn.close()
+            return redirect(url_for('admin.admin_users', error='last_admin'))
+
+    # Prevent admin from deleting their own account
+    if user['username'] == session.get('username'):
+        conn.close()
+        return redirect(url_for('admin.admin_users', error='self_delete'))
+
+    conn.execute("DELETE FROM users WHERE id=?", (user_id,))
+    conn.commit()
+    conn.close()
+    return redirect(url_for('admin.admin_users'))
