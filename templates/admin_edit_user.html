@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Edit User • Face Attendance</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background:#0d0d1a; color:#e4e4e7; }
+    .dark-card { background-color: rgba(32,32,50,0.7); border:1px solid rgba(168,85,247,0.3); border-top:4px solid #a855f7; }
+    .input-dark { background:#1a1a2e; border:1px solid rgba(168,85,247,0.4); color:#e4e4e7; }
+    .input-dark:focus { outline:none; border-color:#a855f7; }
+  </style>
+</head>
+<body>
+  <header class="p-4 flex justify-between items-center border-b border-purple-800 bg-[#121223]">
+    <div class="flex items-center gap-3">
+      <span class="text-2xl">✏️</span>
+      <h1 class="text-xl text-indigo-200">Edit User</h1>
+    </div>
+    <div class="flex items-center gap-4">
+      <a href="/admin/users" class="text-indigo-300 hover:text-white">Manage Users</a>
+      <a href="/admin" class="text-indigo-300 hover:text-white">Dashboard</a>
+      <a href="/logout" class="text-red-400">Logout</a>
+    </div>
+  </header>
+
+  <main class="p-6 max-w-lg mx-auto">
+    <div class="dark-card p-6 rounded-lg">
+
+      {% if error %}
+      <div class="mb-4 p-3 bg-red-900 border border-red-600 rounded text-red-200 text-sm">{{ error }}</div>
+      {% endif %}
+
+      <div class="mb-4 text-sm text-gray-400">
+        Editing user <span class="text-purple-300 font-semibold">{{ user['username'] }}</span>
+        {% if user['username'] == current_user %}
+          <span class="ml-1 text-xs bg-purple-700 text-purple-100 px-1 rounded">you</span>
+        {% endif %}
+      </div>
+
+      <form method="POST">
+        <label class="block mb-1 text-sm text-gray-300">Username</label>
+        <input name="username" value="{{ user['username'] }}"
+               class="input-dark w-full mb-4 p-2 rounded" required />
+
+        <label class="block mb-1 text-sm text-gray-300">Email</label>
+        <input name="email" type="email" value="{{ user['gmail'] or '' }}"
+               class="input-dark w-full mb-4 p-2 rounded"
+               placeholder="(optional)" />
+
+        <label class="block mb-1 text-sm text-gray-300">
+          New Password <span class="text-gray-500">(leave blank to keep current)</span>
+        </label>
+        <input name="password" type="password"
+               class="input-dark w-full mb-4 p-2 rounded"
+               placeholder="••••••••" autocomplete="new-password" />
+
+        <label class="flex items-center gap-2 mb-6 cursor-pointer select-none">
+          <input type="checkbox" name="is_admin" value="1"
+                 {% if user['is_admin'] %}checked{% endif %}
+                 class="w-4 h-4 accent-purple-500" />
+          <span class="text-sm text-gray-300">Admin privileges</span>
+        </label>
+
+        <div class="flex gap-3">
+          <button type="submit"
+                  class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded font-semibold">
+            Save Changes
+          </button>
+          <a href="/admin/users"
+             class="px-5 py-2 border border-gray-600 rounded text-gray-300 hover:text-white">
+            Cancel
+          </a>
+        </div>
+      </form>
+    </div>
+  </main>
+</body>
+</html>
