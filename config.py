@@ -23,7 +23,7 @@ KNOWN_FACES_DIR = os.environ.get('KNOWN_FACES_DIR', 'known_faces')
 # -------------------------
 # Face recognition
 # -------------------------
-FACE_MATCH_THRESHOLD = float(os.environ.get('FACE_MATCH_THRESHOLD', '0.4'))
+FACE_MATCH_THRESHOLD = float(os.environ.get('FACE_MATCH_THRESHOLD', '0.6'))
 REATTENDANCE_INTERVAL_MINUTES = int(os.environ.get('REATTENDANCE_INTERVAL_MINUTES', '10'))
 
 # InsightFace model: ctx_id=0 → GPU, ctx_id=-1 → CPU
