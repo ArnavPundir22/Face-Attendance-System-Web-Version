@@ -156,13 +156,14 @@ def upload_photo():
                     })
                     continue
 
+                today_str = now.strftime("%Y-%m-%d")
                 last_mark = conn.execute(
-                    "SELECT Timestamp FROM attendance WHERE Student_ID=? "
+                    "SELECT Timestamp FROM attendance "
+                    "WHERE Student_ID=? AND Lecture=? AND Timestamp LIKE ? "
                     "ORDER BY Timestamp DESC LIMIT 1",
-                    (student['ID'],),
+                    (student['ID'], lecture, today_str + '%'),
                 ).fetchone()
 
-                remark = False
                 if last_mark:
                     last_time = datetime.strptime(last_mark['Timestamp'], "%Y-%m-%d %H:%M:%S")
                     elapsed   = (now - last_time).total_seconds() / 60
@@ -174,10 +175,8 @@ def upload_photo():
                             "timestamp":  last_time.strftime("%Y-%m-%d %H:%M:%S"),
                         })
                         continue
-                    else:
-                        remark = True
 
-                status = 'Re-Marked' if remark else 'Present'
+                status = 'Present'
 
                 conn.execute(
                     "INSERT INTO attendance "
