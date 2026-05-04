@@ -335,18 +335,25 @@ def admin_reset():
         return denied
 
     current_username = session.get('username')
+    if not current_username:
+        return render_template('login.html', error="Session expired. Please log in again.")
+
     conn = get_db_connection()
+    try:
+        # Delete all attendance records
+        conn.execute("DELETE FROM attendance")
 
-    # Delete all attendance records
-    conn.execute("DELETE FROM attendance")
+        # Delete all users except the currently logged-in admin
+        conn.execute("DELETE FROM users WHERE username != ?", (current_username,))
 
-    # Delete all users except the currently logged-in admin
-    conn.execute("DELETE FROM users WHERE username != ?", (current_username,))
+        # Clear password reset tokens
+        conn.execute("DELETE FROM password_reset_tokens")
 
-    # Clear password reset tokens
-    conn.execute("DELETE FROM password_reset_tokens")
-
-    conn.commit()
-    conn.close()
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
     return redirect(url_for('admin.admin_dashboard', reset='success'))
