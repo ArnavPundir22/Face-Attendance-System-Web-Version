@@ -6,6 +6,14 @@ variables or a .env file without touching application code.
 """
 
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load .env from the same directory as this file, so it is found regardless
+# of the working directory the app is launched from.
+_env_path = Path(__file__).resolve().parent / '.env'
+load_dotenv(_env_path)
 
 # -------------------------
 # Paths / Files
@@ -23,7 +31,9 @@ KNOWN_FACES_DIR = os.environ.get('KNOWN_FACES_DIR', 'known_faces')
 # -------------------------
 # Face recognition
 # -------------------------
-FACE_MATCH_THRESHOLD = float(os.environ.get('FACE_MATCH_THRESHOLD', '0.6'))
+
+FACE_MATCH_THRESHOLD = float(os.environ.get('FACE_MATCH_THRESHOLD', '0.3'))
+
 REATTENDANCE_INTERVAL_MINUTES = int(os.environ.get('REATTENDANCE_INTERVAL_MINUTES', '10'))
 
 # InsightFace model: ctx_id=0 → GPU, ctx_id=-1 → CPU
@@ -34,6 +44,13 @@ INSIGHTFACE_CTX_ID = int(os.environ.get('INSIGHTFACE_CTX_ID', '-1'))
 # -------------------------
 EMAIL_USER = os.environ.get('EMAIL_USER', '')
 EMAIL_PASS = os.environ.get('EMAIL_PASS', '')
+
+if not EMAIL_USER or not EMAIL_PASS:
+    raise RuntimeError(
+        "EMAIL_USER and EMAIL_PASS must be set via environment variables or a .env file. "
+        "See .env.example for setup instructions."
+    )
+
 
 # -------------------------
 # Authentication / Security
