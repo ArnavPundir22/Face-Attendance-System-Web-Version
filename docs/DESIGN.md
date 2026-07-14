@@ -1,4 +1,4 @@
-# Onyx Minimal Design System
+# BioSecure AI Minimal Design System
 
 ## Brand & Style
 A professional, attractive, and minimalist dark mode user interface designed for administrative clarity, speed, and visual appeal. It uses soft glassmorphic containers, subtle borders, and vivid neon-indigo and emerald accents to establish a premium aesthetic.

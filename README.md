@@ -47,7 +47,7 @@ To keep this repository clean and easy to navigate, we have split our documentat
 | 👨‍💼 **Admin & User Control** | Full user management interface to list, edit roles (`is_admin`), delete accounts, or reset passwords. |
 | 📈 **Live Trend Metrics** | Visual 7-day attendance trend widgets and status counts queried dynamically from the database. |
 | 🖼️ **Image Capture Inspector** | Dedicated view page to inspect processed and bounding-box annotated attendance photos. |
-| 🎨 **Premium Onyx UI/UX** | Stunning dark glassmorphism aesthetic built with TailwindCSS, custom canvas particles, and Lucide Icons. |
+| 🎨 **Premium BioSecure AI UI/UX** | Stunning dark glassmorphism aesthetic built with TailwindCSS, custom canvas particles, and Lucide Icons. |
 | 🔐 **Secure Supabase Auth** | Fully integrated user authentication backed by Supabase Auth and role-based route protection. |
 | 🧩 **Modular Blueprint Layout** | Refactored into clean Python Flask blueprints (`auth`, `attendance`, `students`, `admin`) for maximum maintainability. |
 

@@ -1,50 +1,148 @@
 # 🌍 BioSecure AI Production Deployment
 
-Because **BioSecure AI** relies on Supabase `pgvector` for its data storage, it is entirely **stateless**. This means you do not have to worry about managing complex Docker volumes or persistent storage drives just to save student photos! 
-
-You can host this application practically anywhere that supports Python.
+**BioSecure AI** is entirely **stateless** — face embeddings live in Supabase, not on disk. This means you can deploy anywhere that supports Python without worrying about persistent volumes.
 
 ## 1. Hardware Requirements
-Machine learning inference requires memory. Regardless of where you deploy this application, ensure your environment has at least:
-- **2GB of RAM** (1GB will crash with Out Of Memory errors when InsightFace attempts to load the model).
-- **1 vCPU** (2+ recommended for faster photo processing).
 
-## 2. Virtual Private Server (VPS)
-Hosting on a standard VPS (like DigitalOcean, AWS EC2, Linode, or Hetzner) is the most traditional approach.
+- **Minimum RAM**: 2 GB (InsightFace requires ~1 GB to load)
+- **Recommended RAM**: 4 GB (for 2 workers + headroom)
+- **CPU**: 1 vCPU minimum; 2+ recommended for photo processing throughput
+- **GPU**: Optional — set `INSIGHTFACE_CTX_ID=0` and use `onnxruntime-gpu`
 
-1. Provision an Ubuntu 22.04+ server.
-2. Clone your repository onto the server.
-3. Set up your Python virtual environment and `.env` file just like in the [Local Setup Guide](./SETUP.md).
-4. Run the application using **Gunicorn**:
+---
+
+## 2. Option A — Virtual Private Server (VPS)
+
+Best for: DigitalOcean, AWS EC2, Hetzner, Linode, Google Cloud VM.
+
+### Steps
 
 ```bash
-# -w defines the number of worker processes. 
-# Since we have migrated to Supabase (PostgreSQL), we no longer have SQLite write-lock limitations 
-# and can safely increase workers (e.g., 2-4 workers depending on RAM/CPU cores) to support parallel processing.
-# -t 120 gives the model plenty of time to process large group photos
-gunicorn -w 2 -t 120 -b 127.0.0.1:5000 app:app
+# 1. Provision Ubuntu 22.04+ server
+# 2. Clone repository
+git clone https://github.com/ArnavPundir22/Face-Attendance-System-Web-Version.git
+cd Face-Attendance-System-Web-Version
+
+# 3. Create virtual environment
+python3 -m venv .venv && source .venv/bin/activate
+
+# 4. Install dependencies
+pip install -r requirements.txt
+
+# 5. Set up environment variables
+cp .env.example .env
+# Edit .env with your Supabase and Flask credentials
+
+# 6. Start with Gunicorn
+gunicorn app:app --config gunicorn.conf.py
 ```
 
-5. Set up **Nginx** as a reverse proxy to route port 80/443 traffic securely to `127.0.0.1:5000`. An example Nginx configuration is provided in the `nginx/` folder of this repository.
+### Nginx Reverse Proxy
 
-## 3. Platform as a Service (PaaS)
-Because the app is stateless, deploying to modern platforms like **Render.com** or **Railway** is incredibly straightforward.
+An example Nginx configuration is at `nginx/nginx.conf`. Copy it to `/etc/nginx/sites-available/`:
 
-### Render.com Instructions
-1. Connect your GitHub repository to Render.
-2. Create a new **Web Service**.
-3. Set the Environment to **Python**.
-4. **Build Command**: 
-   ```bash
-   pip install -r requirements.txt
+```bash
+sudo cp nginx/nginx.conf /etc/nginx/sites-available/biosecure-ai-attendance
+sudo ln -s /etc/nginx/sites-available/biosecure-ai-attendance /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### HTTPS with Let's Encrypt
+
+```bash
+sudo certbot --nginx -d your.domain.com
+```
+
+### Systemd Service (Auto-restart)
+
+Create `/etc/systemd/system/biosecure-ai-attendance.service`:
+
+```ini
+[Unit]
+Description=BioSecure AI Face Attendance System
+After=network.target
+
+[Service]
+User=www-data
+WorkingDirectory=/var/www/biosecure-ai-attendance
+EnvironmentFile=/var/www/biosecure-ai-attendance/.env
+ExecStart=/var/www/biosecure-ai-attendance/.venv/bin/gunicorn app:app --config gunicorn.conf.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl enable biosecure-ai-attendance
+sudo systemctl start biosecure-ai-attendance
+```
+
+---
+
+## 3. Option B — Platform as a Service (PaaS)
+
+Best for: zero-ops deployments. The `Procfile` handles the startup command.
+
+### Render.com
+
+1. Connect your GitHub repository to Render
+2. Create a new **Web Service**
+3. Set **Environment**: Python 3
+4. **Build Command**: `pip install -r requirements.txt`
+5. **Start Command** is read automatically from `Procfile`:
    ```
-5. **Start Command**:
-   ```bash
-   gunicorn -w 2 -t 120 -b 0.0.0.0:$PORT app:app
+   gunicorn app:app --config gunicorn.conf.py
    ```
-6. Add your Supabase and Flask environment variables to Render's **Environment Variables** settings.
-7. Deploy!
+6. Add all variables from `.env.example` to Render's **Environment Variables** panel
+7. Set **Instance Type** to at least **Standard** (1 GB RAM minimum)
 
-> [!WARNING]  
-> If you deploy to Vercel (using serverless functions), ensure the function timeout is set high enough (e.g., 60 seconds) to allow the InsightFace model to download and load into memory on a cold start. However, a dedicated container (Render/Railway) is highly recommended over Serverless.
+> [!CAUTION]
+> Render **Free tier** has only 512 MB RAM. InsightFace requires ~1 GB minimum. Use at least the **Starter** paid plan.
 
+### Railway
+
+1. Connect your GitHub repository
+2. Railway auto-detects Python and runs the `Procfile`
+3. Add environment variables in the Railway dashboard
+4. Railway auto-assigns `$PORT` — `gunicorn.conf.py` reads it automatically
+
+### Fly.io
+
+```bash
+fly launch
+fly secrets import < .env
+fly deploy
+```
+
+---
+
+## 4. Environment Variables Checklist
+
+Before deploying, ensure these are set in your platform's environment:
+
+| Variable | Where to Find |
+|---|---|
+| `FLASK_SECRET_KEY` | Generate: `python -c "import secrets; print(secrets.token_hex(32))"` |
+| `SUPABASE_URL` | Supabase Dashboard → Project Settings → API |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase Dashboard → Project Settings → API |
+| `SUPABASE_ANON_KEY` | Supabase Dashboard → Project Settings → API |
+| `EMAIL_USER` | Your Gmail address (optional) |
+| `EMAIL_PASS` | Gmail App Password (optional) |
+
+---
+
+## 5. Health Check
+
+After deployment, verify the application is running:
+
+```bash
+curl https://your.domain.com/healthz
+# Expected: {"status": "ok", "service": "biosecure-ai-face-attendance"}
+```
+
+Configure your platform to use `/healthz` as the health check endpoint.
+
+> [!WARNING]
+> If you deploy to a **Serverless** platform (Vercel, AWS Lambda), the InsightFace model cannot be loaded — it requires a persistent container process. Use a dedicated container platform (Render, Railway, Fly.io, VPS).
