@@ -1,4 +1,4 @@
-# 🗄️ Database Setup (Supabase)
+# 🗄️ Onyx Face Attendance System Database Setup
 
 This project relies on **Supabase** (a PostgreSQL database) combined with the **`pgvector`** extension to handle all data persistence and facial similarity math.
 
@@ -37,14 +37,7 @@ CREATE TABLE attendance (
   section text
 );
 
--- 4. Create the users table (for Admin Dashboard Access)
-CREATE TABLE users (
-  id uuid PRIMARY KEY, -- Maps to Supabase Auth UUID
-  email text NOT NULL,
-  is_admin boolean DEFAULT false
-);
-
--- 5. Create the pgvector matching function
+-- 4. Create the pgvector matching function
 CREATE OR REPLACE FUNCTION match_face (
   query_embedding vector(512),
   match_threshold float
@@ -67,7 +60,15 @@ AS $$
 $$;
 ```
 
+## User Accounts and Admin Roles
+Because this application integrates directly with **Supabase Auth** (email/password), we do not need to create or query a custom `users` database table. All user credentials and authentication policies are managed securely inside Supabase's identity provider. 
+
+Admin roles are defined using custom user metadata:
+- If a user has `"is_admin": true` inside their Supabase Auth user metadata, the application will grant them access to the Admin Panel.
+- Modifying roles or creating initial users can be done directly from the Supabase Authentication dashboard, or through the web application's user management page if you are already logged in as an admin.
+
 ## How the Database Replaces Local Storage
-In older versions of this application, face embeddings were stored in local `.npy` numpy array files. This created "stateful" dependencies that made hosting on platforms like Vercel impossible without losing data.
+In older versions of this application, face embeddings were stored in local `.pkl` or `.npy` files. This created "stateful" dependencies that made hosting on platforms like Vercel impossible without losing data.
 
 By utilizing `pgvector` and the `match_face` RPC function, the Flask server simply passes the 512-dimensional array of a webcam photo to the database. The database then rapidly computes the cosine similarity against all stored students and returns the exact match in milliseconds.
+

@@ -9,10 +9,11 @@
 #
 # Environment variables (set in a .env file or export before running):
 #   FLASK_SECRET_KEY      — random secret key for session signing (required in prod)
-#   EMAIL_USER            — Gmail address for sending OTPs and reports
+#   SUPABASE_URL          — Supabase database URL
+#   SUPABASE_SERVICE_ROLE_KEY — Supabase service role API key
+#   EMAIL_USER            — Gmail address for SMTP configurations
 #   EMAIL_PASS            — Gmail App Password
 #   INSIGHTFACE_CTX_ID    — 0 for GPU, -1 for CPU (default: -1)
-#   DB_FILE               — path to SQLite database (default: database.db)
 #   ENCODE_FILE_BASE      — base name for encoding files (default: EncodeFile_Insight)
 
 set -euo pipefail
@@ -32,10 +33,9 @@ if [ -f ".env" ]; then
     set +o allexport
 fi
 
-# Run with a single worker to avoid SQLite write-lock contention.
-# Increase --workers only after migrating to PostgreSQL.
+# Run with multiple workers since the system has migrated to PostgreSQL.
 exec gunicorn app:app \
-    --workers 1 \
+    --workers 2 \
     --bind 0.0.0.0:8000 \
     --timeout 120 \
     --access-logfile - \
