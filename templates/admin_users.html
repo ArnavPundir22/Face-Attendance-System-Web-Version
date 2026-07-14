@@ -3,82 +3,137 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Manage Users • Face Attendance</title>
+  <title>Manage Users — BioSecure AI</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body { background:#0d0d1a; color:#e4e4e7; }
-    .dark-card { background-color: rgba(32,32,50,0.7); border:1px solid rgba(168,85,247,0.3); border-top:4px solid #a855f7; }
-  </style>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
-  <header class="p-4 flex justify-between items-center border-b border-purple-800 bg-[#121223]">
+<body class="pb-24 md:pb-8">
+
+  <!-- TopAppBar -->
+  <header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-3 bg-[#0b1326]/70 backdrop-blur-xl border-b border-white/10 shadow-lg">
     <div class="flex items-center gap-3">
-      <span class="text-2xl">👤</span>
-      <h1 class="text-xl text-indigo-200">Manage Users</h1>
+      <i data-lucide="scan-face" class="w-8 h-8 text-blue-500"></i>
+      <h1 class="font-geist text-xl font-bold text-blue-400 tracking-tight">BioSecure AI</h1>
     </div>
+    
+    <!-- Desktop Navigation Links -->
+    <nav class="hidden md:flex items-center gap-6">
+      <a href="/" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">Home</a>
+      <a href="/viewer" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">View Records</a>
+      <a href="/students" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">All Students</a>
+      <a href="/add_student" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">Add Student</a>
+      {% if session_is_admin %}
+      <a href="/admin" class="text-sm font-medium transition-colors hover:text-blue-400 text-blue-400">Admin Portal</a>
+      {% endif %}
+    </nav>
+
     <div class="flex items-center gap-4">
-      <a href="/register" class="bg-purple-600 px-3 py-2 rounded-md text-white font-semibold hover:bg-purple-700">➕ Create User</a>
-      <a href="/admin" class="text-indigo-300 hover:text-white">Dashboard</a>
-      <a href="/admin/students" class="text-indigo-300 hover:text-white">Students</a>
-      <a href="/logout" class="text-red-400">Logout</a>
+      <div class="hidden sm:flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="font-geist text-xs font-semibold text-emerald-400 uppercase tracking-wider">SYSTEM LIVE</span>
+      </div>
+      <span class="hidden lg:inline text-xs text-gray-400">Welcome, <strong class="text-gray-200">{{ session_username }}</strong></span>
+      <a href="/logout" class="btn-danger-glass px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2">
+        <i data-lucide="log-out" class="w-4 h-4"></i> Logout
+      </a>
     </div>
   </header>
 
-  <main class="p-6 max-w-5xl mx-auto">
-    <div class="flex justify-between items-center mb-4">
-      <h2 class="text-lg">Users ({{ users|length }})</h2>
+  <!-- BottomNavBar (Mobile Only) -->
+  <nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe md:hidden h-16 bg-[#131b2e]/85 backdrop-blur-lg border-t border-white/10 shadow-2xl">
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/">
+      <i data-lucide="home" class="w-5 h-5 mb-0.5"></i>
+      <span>Home</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/viewer">
+      <i data-lucide="bar-chart-2" class="w-5 h-5 mb-0.5"></i>
+      <span>Records</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/students">
+      <i data-lucide="users" class="w-5 h-5 mb-0.5"></i>
+      <span>Students</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/add_student">
+      <i data-lucide="user-plus" class="w-5 h-5 mb-0.5"></i>
+      <span>Add</span>
+    </a>
+  </nav>
+
+  <main class="p-6 max-w-5xl mx-auto mt-20 space-y-6">
+    
+    <!-- Secondary Admin Sub-Navigation -->
+    <div class="glass-panel p-4 rounded-xl flex flex-wrap items-center justify-between gap-4 inner-glow">
+      <div class="flex items-center gap-2">
+        <i data-lucide="users-2" class="w-6 h-6 text-blue-500"></i>
+        <h2 class="text-lg font-bold font-geist text-white">System Users List ({{ users|length }})</h2>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <a href="/register" class="btn-primary-glass px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2">
+          <i data-lucide="user-plus" class="w-4 h-4"></i> Create System User
+        </a>
+        <a href="/admin" class="btn-secondary-glass px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
+        </a>
+      </div>
     </div>
 
     {% set err = request.args.get('error') %}
     {% if err == 'last_admin' %}
-    <div class="mb-4 p-3 bg-red-900 border border-red-600 rounded text-red-200 text-sm">
+    <div class="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-sm flex items-center gap-2">
+      <i data-lucide="alert-triangle" class="w-5 h-5"></i>
       Cannot delete the last admin account. At least one admin must remain.
     </div>
     {% elif err == 'self_delete' %}
-    <div class="mb-4 p-3 bg-red-900 border border-red-600 rounded text-red-200 text-sm">
+    <div class="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-sm flex items-center gap-2">
+      <i data-lucide="alert-triangle" class="w-5 h-5"></i>
       You cannot delete your own account.
     </div>
     {% endif %}
 
-    <div class="dark-card p-4 rounded-lg">
-      <table class="w-full table-auto">
+    <div class="glass-panel p-6 rounded-2xl inner-glow overflow-x-auto shadow-2xl">
+      <table class="w-full text-sm text-left">
         <thead>
-          <tr class="text-left text-purple-300">
-            <th class="p-2">ID</th>
-            <th class="p-2">Username</th>
-            <th class="p-2">Email</th>
-            <th class="p-2">Role</th>
-            <th class="p-2">Actions</th>
+          <tr class="text-gray-400 border-b border-white/10 uppercase tracking-wider text-xs font-semibold font-geist">
+            <th class="p-4">Username</th>
+            <th class="p-4">Email</th>
+            <th class="p-4">Role</th>
+            <th class="p-4">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for u in users %}
-          <tr class="border-t border-gray-700">
-            <td class="p-2 text-gray-400">{{ u['id'] }}</td>
-            <td class="p-2 font-medium">
+          <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+            <td class="p-4 font-medium text-white flex items-center gap-2">
               {{ u['username'] }}
               {% if u['username'] == current_user %}
-                <span class="ml-1 text-xs bg-purple-700 text-purple-100 px-1 rounded">you</span>
+                <span class="text-[10px] bg-blue-500/20 text-blue-400 border border-blue-500/35 px-1.5 py-0.5 rounded-full font-semibold">You</span>
               {% endif %}
             </td>
-            <td class="p-2 text-gray-300">{{ u['gmail'] or '—' }}</td>
-            <td class="p-2">
+            <td class="p-4 text-gray-300 font-geist">{{ u['email'] or '—' }}</td>
+            <td class="p-4">
               {% if u['is_admin'] %}
-                <span class="text-xs bg-indigo-700 text-indigo-100 px-2 py-0.5 rounded">Admin</span>
+                <span class="text-xs bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2.5 py-1 rounded-full font-semibold">Admin</span>
               {% else %}
-                <span class="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded">User</span>
+                <span class="text-xs bg-white/5 text-gray-300 border border-white/10 px-2.5 py-1 rounded-full font-semibold">User</span>
               {% endif %}
             </td>
-            <td class="p-2 flex items-center gap-3">
-              <a href="/admin/user/edit/{{ u['id'] }}" class="text-indigo-300 hover:text-white">Edit</a>
-              {% if u['username'] != current_user %}
-              <form method="POST" action="/admin/user/delete/{{ u['id'] }}" style="display:inline"
-                    onsubmit="return confirm('Delete user {{ u['username'] }}? This cannot be undone.');">
-                <button class="text-red-400 hover:text-red-300">Delete</button>
-              </form>
-              {% else %}
-              <span class="text-gray-600 text-sm">—</span>
-              {% endif %}
+            <td class="p-4">
+              <div class="flex items-center gap-3">
+                <a href="/admin/user/edit/{{ u['id'] }}" class="text-blue-400 hover:text-blue-300 text-sm font-semibold transition-colors flex items-center gap-1">
+                  <i data-lucide="edit-2" class="w-4 h-4"></i> Edit
+                </a>
+                {% if u['username'] != current_user %}
+                <form method="POST" action="/admin/user/delete/{{ u['id'] }}" class="inline"
+                      onsubmit="return confirm('Delete user {{ u['username'] }}? This cannot be undone.');">
+                  <button class="text-rose-400 hover:text-rose-350 text-sm font-semibold transition-colors flex items-center gap-1">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i> Delete
+                  </button>
+                </form>
+                {% else %}
+                <span class="text-gray-600 text-sm font-geist">—</span>
+                {% endif %}
+              </div>
             </td>
           </tr>
           {% endfor %}
@@ -86,5 +141,9 @@
       </table>
     </div>
   </main>
+
+  <script>
+    lucide.createIcons();
+  </script>
 </body>
 </html>

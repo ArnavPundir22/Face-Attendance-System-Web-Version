@@ -10,7 +10,6 @@ Routes:
 """
 
 import base64
-import sqlite3
 from datetime import datetime
 
 import cv2
@@ -18,13 +17,8 @@ import numpy as np
 from flask import Blueprint, jsonify, render_template, request
 
 import config
-from utils.db import get_db_connection
-from utils.face import (
-    known_embedding_matrix,
-    known_embedding_names,
-    model,
-)
-from utils.mail import send_attendance_email as _send_email
+from utils.db import supabase
+from utils.face import model, normalize_embedding
 
 attendance_bp = Blueprint('attendance', __name__)
 
@@ -42,35 +36,32 @@ def viewer():
 @attendance_bp.route('/get_attendance_data')
 def get_attendance_data():
     try:
-        conn = sqlite3.connect(config.DB_FILE)
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT Student_ID, Name, Program, Branch, Mobile, Status, Timestamp, Lecture, Section "
-            "FROM attendance"
-        )
-        data = cursor.fetchall()
-        conn.close()
+        # Fetch all attendance records from Supabase
+        response = supabase.table('attendance').select('student_id, name, program, branch, mobile, status, timestamp, lecture, section').execute()
+        # Convert list of dicts to list of tuples if frontend expects tuples
+        # The existing frontend expects tuples since it used cursor.fetchall()
+        # Looking at original code: it returned data = cursor.fetchall(), which was serialized to JSON
+        # A list of dictionaries might break frontend JS if it expects arrays: row[0], row[1]
+        # Let's format it as list of lists/tuples to be safe
+        data = []
+        for row in response.data:
+            data.append([
+                row.get('student_id', ''),
+                row.get('name', ''),
+                row.get('program', ''),
+                row.get('branch', ''),
+                row.get('mobile', ''),
+                row.get('status', ''),
+                row.get('timestamp', ''),
+                row.get('lecture', ''),
+                row.get('section', '')
+            ])
         return jsonify(data)
-    except Exception:
+    except Exception as e:
+        print("Error fetching attendance:", e)
         return jsonify([])
 
 
-@attendance_bp.route('/send_attendance_email', methods=['POST'])
-def send_attendance_email():
-    payload    = request.get_json()
-    email      = payload.get('email', '').strip()
-    table_data = payload.get('data', [])
-
-    if not email or '@' not in email:
-        return jsonify({'success': False, 'message': 'Invalid email address'})
-    if not table_data or not isinstance(table_data, list):
-        return jsonify({'success': False, 'message': 'No data received for email'})
-
-    try:
-        _send_email(email, table_data)
-        return jsonify({'success': True})
-    except Exception:
-        return jsonify({'success': False, 'message': 'Failed to send email. Please try again later.'})
 
 
 @attendance_bp.route('/upload_photo', methods=['POST'])
@@ -88,14 +79,6 @@ def upload_photo():
     all_outputs      = []
     session_attend   = []
 
-    # Import module-level globals lazily so we always get the current state.
-    import utils.face as face_module
-
-    conn = get_db_connection()
-
-    # Snapshot the matrix and names once per request to avoid mid-request races.
-    search_matrix = face_module.known_embedding_matrix
-    search_names  = face_module.known_embedding_names
 
     for file in files:
         npimg  = np.frombuffer(file.read(), np.uint8)
@@ -111,23 +94,39 @@ def upload_photo():
         if faces:
             for face in faces:
                 bbox      = [int(v) for v in face.bbox]
-                embedding = np.array(face.embedding, dtype=np.float32)
-                emb_norm  = np.linalg.norm(embedding)
-                if emb_norm == 0:
+                new_emb = np.array(face.embedding, dtype=np.float32)
+                embedding = normalize_embedding(new_emb)
+                
+                if embedding is None:
                     continue
-                embedding = embedding / emb_norm
 
                 best_score = -1.0
                 best_name  = None
+                student_data = []
 
-                if search_matrix is not None and search_matrix.shape[0] > 0:
-                    scores     = search_matrix @ embedding
-                    best_idx   = int(np.argmax(scores))
-                    best_score = float(scores[best_idx])
-                    best_name  = search_names[best_idx]
+                try:
+                    match_resp = supabase.rpc('match_face', {
+                        'query_embedding': embedding.tolist(),
+                        'match_threshold': config.FACE_MATCH_THRESHOLD
+                    }).execute()
+                    match_data = match_resp.data
+                except Exception as e:
+                    print(f"Error matching face via pgvector: {e}")
+                    match_data = []
 
+                if match_data and len(match_data) > 0:
+                    best_match = match_data[0]
+                    best_score = float(best_match['similarity'])
+                    best_name = best_match['name']
+                    # We also need the full student data for the attendance log
+                    try:
+                        student_resp = supabase.table('students').select('*').eq('id', best_match['id']).execute()
+                        student_data = student_resp.data
+                    except Exception:
+                        student_data = []
+                
                 color = (0, 255, 0) if best_score >= config.FACE_MATCH_THRESHOLD else (0, 0, 255)
-                label = best_name   if best_score >= config.FACE_MATCH_THRESHOLD else "Unknown"
+                label = best_name if best_name else "Unknown"
 
                 cv2.rectangle(original, (bbox[0], bbox[1]), (bbox[2], bbox[3]), color, 2)
                 cv2.putText(
@@ -137,57 +136,64 @@ def upload_photo():
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2,
                 )
 
-                if best_score < config.FACE_MATCH_THRESHOLD:
+                if not best_name or best_score < config.FACE_MATCH_THRESHOLD:
                     results.append({
                         "name": "Unknown",
                         "status": "Unknown",
-                        "confidence": f"{best_score:.2f}",
+                        "confidence": f"{best_score:.2f}" if best_score > 0 else "0.00",
                     })
                     continue
 
-                student = conn.execute(
-                    'SELECT * FROM students WHERE Name=?', (best_name,)
-                ).fetchone()
-                if not student:
+                if not student_data:
                     results.append({
                         "name": best_name,
                         "status": "Not Found",
                         "confidence": f"{best_score:.2f}",
                     })
                     continue
+                
+                student = student_data[0]
 
-                last_record = conn.execute(
-                    "SELECT Timestamp FROM attendance "
-                    "WHERE Student_ID=? AND Lecture=? "
-                    "ORDER BY Timestamp DESC LIMIT 1",
-                    (student['ID'], lecture),
-                ).fetchone()
+                # Check last attendance record for this student and lecture
+                try:
+                    last_record_resp = supabase.table('attendance').select('timestamp').eq('student_id', student['id']).eq('lecture', lecture).order('timestamp', desc=True).limit(1).execute()
+                    last_record_data = last_record_resp.data
+                except Exception:
+                    last_record_data = []
 
-                if last_record:
-                    last_time = datetime.strptime(last_record['Timestamp'], "%Y-%m-%d %H:%M:%S")
-                    elapsed   = (now - last_time).total_seconds() / 60
-                    if elapsed < config.REATTENDANCE_INTERVAL_MINUTES:
-                        results.append({
-                            "name":       best_name,
-                            "status":     "Already Marked",
-                            "confidence": f"{best_score:.2f}",
-                            "timestamp":  last_record['Timestamp'],
-                        })
-                        continue
+                if last_record_data:
+                    last_time_str = last_record_data[0]['timestamp']
+                    try:
+                        last_time = datetime.strptime(last_time_str, "%Y-%m-%d %H:%M:%S")
+                        elapsed   = (now - last_time).total_seconds() / 60
+                        if elapsed < config.REATTENDANCE_INTERVAL_MINUTES:
+                            results.append({
+                                "name":       best_name,
+                                "status":     "Already Marked",
+                                "confidence": f"{best_score:.2f}",
+                                "timestamp":  last_time_str,
+                            })
+                            continue
+                    except ValueError:
+                        pass # Ignore parsing errors for timestamp format mismatches
 
                 status = 'Present'
 
-                conn.execute(
-                    "INSERT INTO attendance "
-                    "(Student_ID, Name, Program, Branch, Mobile, Status, Timestamp, Lecture, Section) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (
-                        student['ID'], student['Name'], student['Program'],
-                        student['Branch'], student['Mobile'],
-                        status, timestamp, lecture, section,
-                    ),
-                )
-                conn.commit()
+                # Insert attendance record into Supabase
+                try:
+                    supabase.table('attendance').insert({
+                        "student_id": student.get('id'),
+                        "name": student.get('name'),
+                        "program": student.get('program'),
+                        "branch": student.get('branch'),
+                        "mobile": student.get('mobile'),
+                        "status": status,
+                        "timestamp": timestamp,
+                        "lecture": lecture,
+                        "section": section
+                    }).execute()
+                except Exception as e:
+                    print(f"Failed to insert attendance for {best_name}: {e}")
 
                 results.append({
                     "name":       best_name,
@@ -196,8 +202,8 @@ def upload_photo():
                     "timestamp":  timestamp,
                 })
                 session_attend.append([
-                    student['ID'], student['Name'], student['Program'],
-                    student['Branch'], student['Mobile'],
+                    student.get('id'), student.get('name'), student.get('program'),
+                    student.get('branch'), student.get('mobile'),
                     status, timestamp, lecture, section,
                 ])
 
@@ -208,5 +214,4 @@ def upload_photo():
             "annotated": f"data:image/jpeg;base64,{encoded_img}",
         })
 
-    conn.close()
     return jsonify({"images": all_outputs, "session_attendance": session_attend})
