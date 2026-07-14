@@ -1,6 +1,6 @@
-# 🌍 Production Deployment
+# 🌍 Onyx Face Attendance System Production Deployment
 
-Because this application relies on Supabase `pgvector` for its data storage, it is entirely **stateless**. This means you do not have to worry about managing complex Docker volumes or persistent storage drives just to save student photos! 
+Because the **Onyx Face Attendance System** relies on Supabase `pgvector` for its data storage, it is entirely **stateless**. This means you do not have to worry about managing complex Docker volumes or persistent storage drives just to save student photos! 
 
 You can host this application practically anywhere that supports Python.
 
@@ -18,10 +18,11 @@ Hosting on a standard VPS (like DigitalOcean, AWS EC2, Linode, or Hetzner) is th
 4. Run the application using **Gunicorn**:
 
 ```bash
-# -w 1 ensures only one worker is created to conserve RAM
+# -w defines the number of worker processes. 
+# Since we have migrated to Supabase (PostgreSQL), we no longer have SQLite write-lock limitations 
+# and can safely increase workers (e.g., 2-4 workers depending on RAM/CPU cores) to support parallel processing.
 # -t 120 gives the model plenty of time to process large group photos
-# -b binds it to a local port
-gunicorn -w 1 -t 120 -b 127.0.0.1:5000 app:app
+gunicorn -w 2 -t 120 -b 127.0.0.1:5000 app:app
 ```
 
 5. Set up **Nginx** as a reverse proxy to route port 80/443 traffic securely to `127.0.0.1:5000`. An example Nginx configuration is provided in the `nginx/` folder of this repository.
@@ -39,10 +40,11 @@ Because the app is stateless, deploying to modern platforms like **Render.com** 
    ```
 5. **Start Command**:
    ```bash
-   gunicorn -w 1 -t 120 -b 0.0.0.0:$PORT app:app
+   gunicorn -w 2 -t 120 -b 0.0.0.0:$PORT app:app
    ```
-6. Add your Supabase credentials to Render's **Environment Variables** settings.
+6. Add your Supabase and Flask environment variables to Render's **Environment Variables** settings.
 7. Deploy!
 
 > [!WARNING]  
 > If you deploy to Vercel (using serverless functions), ensure the function timeout is set high enough (e.g., 60 seconds) to allow the InsightFace model to download and load into memory on a cold start. However, a dedicated container (Render/Railway) is highly recommended over Serverless.
+

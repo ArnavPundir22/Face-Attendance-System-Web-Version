@@ -1,6 +1,6 @@
-# 🏗️ Architecture
+# 🏗️ Onyx Face Attendance System Architecture
 
-The Face Attendance System has been entirely rebuilt to be a **stateless** application. Heavy machine learning inference is handled locally by the Flask application via ONNX Runtime, but the complex mathematical task of matching faces is offloaded entirely to a PostgreSQL database powered by Supabase.
+The **Onyx Face Attendance System** has been entirely rebuilt to be a **stateless** web application. Heavy machine learning inference is handled locally by the Flask application via ONNX Runtime, but the complex mathematical task of matching faces is offloaded entirely to a PostgreSQL database powered by Supabase.
 
 ## System Flow
 The diagram below illustrates the exact path an image takes from the user's browser, through the AI inference layer, and finally to the database for matching.
@@ -41,6 +41,15 @@ sequenceDiagram
     Flask-->>Admin: Registration Complete
 ```
 
+## Modular Code Architecture (Flask Blueprints)
+
+To maintain code readability and clean separation of concerns, the Onyx Face Attendance System's backend is modularized into four distinct Flask Blueprints:
+
+1. **`auth` Blueprint (`blueprints/auth.py`)**: Integrates with Supabase Auth to handle user logins, logouts, registration of new user accounts, and credentials validation.
+2. **`attendance` Blueprint (`blueprints/attendance.py`)**: Manages webcam/file uploads, processes uploaded images, calculates embeddings, matches faces via Supabase RPC, and serves the main dashboard.
+3. **`students` Blueprint (`blueprints/students.py`)**: Handles showing registered students list and submitting new student data (saving local files to `known_faces/` and writing vectors to Supabase).
+4. **`admin` Blueprint (`blueprints/admin.py`)**: Powers the admin area, including real-time user management (list, edit roles, delete accounts), dashboard stats generation, and the capture image viewer.
+
 ## The Tech Stack
 
 ### 1. Flask (Backend)
@@ -54,3 +63,4 @@ Supabase provides a powerful managed PostgreSQL database. By enabling the `pgvec
 
 ### 4. TailwindCSS & Vanilla JS (Frontend)
 The frontend utilizes a modern "dark glassmorphism" aesthetic built with TailwindCSS. It relies heavily on vanilla JavaScript to interact with the webcam (`navigator.mediaDevices.getUserMedia`) and to submit images to the Flask API.
+

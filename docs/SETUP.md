@@ -1,6 +1,6 @@
-# ⚙️ Local Setup Guide
+# ⚙️ Onyx Face Attendance System Local Setup Guide
 
-This guide covers everything you need to know to get the Face Attendance System running locally on your machine for development or testing.
+This guide covers everything you need to know to get the **Onyx Face Attendance System** running locally on your machine for development or testing.
 
 Because the facial recognition relies on compiled C++ libraries (ONNX/OpenCV), a standard Linux/macOS environment is highly recommended.
 
@@ -38,24 +38,35 @@ pip install -r requirements.txt
 ```
 
 ## 5. Configure Environment Variables
-The application relies heavily on environment variables to connect to Supabase.
+The application relies heavily on environment variables to connect to Supabase and configure application properties.
 
 1. Copy the example configuration file:
    ```bash
    cp .env.example .env
    ```
 2. Open the `.env` file in your code editor.
-3. Replace the placeholder values with your actual Supabase credentials. You can find these in your Supabase Project Dashboard under **Project Settings > API**.
+3. Generate a secure random string for your `FLASK_SECRET_KEY`:
+   ```bash
+   python3 -c "import secrets; print(secrets.token_hex(32))"
+   ```
+4. Replace the placeholder values with your actual credentials:
 
 ```ini
-# Found under "Project URL"
+# Flask Secret Key
+FLASK_SECRET_KEY="your-generated-secret-key"
+
+# Supabase Credentials (found in Project Settings > API)
 SUPABASE_URL="https://your-project.supabase.co"
-
-# Found under "Project API Keys" -> "anon public"
-SUPABASE_KEY="your-anon-public-key"
-
-# Found under "Project API Keys" -> "service_role"
 SUPABASE_SERVICE_ROLE_KEY="your-service-role-key"
+
+# Email Configuration (SMTP)
+EMAIL_USER="your_email_address@gmail.com"
+EMAIL_PASS="your_app_password"
+
+# Face Recognition Settings (optional, default values provided)
+INSIGHTFACE_CTX_ID=-1                  # -1 for CPU, 0 for first GPU
+FACE_MATCH_THRESHOLD=0.3               # Cosine similarity threshold (0.3 is optimal)
+REATTENDANCE_INTERVAL_MINUTES=10       # Cooldown period between consecutive logs for a student
 ```
 
 > [!WARNING]  
@@ -76,3 +87,4 @@ python3 app.py
 
 Once the models are loaded, the application will be accessible in your web browser at:
 `http://127.0.0.1:5000`
+
