@@ -1,12 +1,10 @@
 # 🗄️ BioSecure AI Database Setup
 
-This project relies on **Supabase** (a PostgreSQL database) combined with the **`pgvector`** extension to handle all data persistence and facial similarity math.
+This project uses **Supabase** (managed PostgreSQL) with the **`pgvector`** extension for both data storage and facial similarity matching.
 
 ## Required Setup
 
-To run this application, you must create a Supabase project and execute the following SQL script in your Supabase **SQL Editor**. 
-
-This script will set up the necessary tables, enable the vector extension, and create the highly-optimized `match_face` RPC function used by the Flask backend.
+Execute the following SQL in your Supabase **SQL Editor** (Dashboard → SQL Editor → New query):
 
 ```sql
 -- 1. Enable the pgvector extension
@@ -14,61 +12,92 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 -- 2. Create the students table with the vector column
 CREATE TABLE students (
-  id text PRIMARY KEY,
-  name text NOT NULL,
-  program text,
-  branch text,
-  mobile text,
-  gmail text,
-  embedding vector(512) -- InsightFace buffalo_l uses 512 dimensions
+    id        text PRIMARY KEY,
+    name      text NOT NULL,
+    program   text,
+    branch    text,
+    mobile    text,
+    gmail     text,
+    embedding vector(512)  -- InsightFace buffalo_l produces 512-dimensional embeddings
 );
 
 -- 3. Create the attendance table
 CREATE TABLE attendance (
-  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  student_id text REFERENCES students(id),
-  name text,
-  program text,
-  branch text,
-  mobile text,
-  status text,
-  timestamp text,
-  lecture text,
-  section text
+    id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    student_id text REFERENCES students(id),
+    name       text,
+    program    text,
+    branch     text,
+    mobile     text,
+    status     text,     -- 'Present' or 'Absent'
+    timestamp  text,     -- 'YYYY-MM-DD HH:MM:SS'
+    lecture    text,
+    section    text
 );
 
--- 4. Create the pgvector matching function
-CREATE OR REPLACE FUNCTION match_face (
-  query_embedding vector(512),
-  match_threshold float
+-- 4. Create the face-matching RPC function
+CREATE OR REPLACE FUNCTION match_face(
+    query_embedding vector(512),
+    match_threshold float
 )
-RETURNS TABLE (
-  id text,
-  name text,
-  similarity float
-)
-LANGUAGE sql STABLE
-AS $$
-  SELECT
-    id,
-    name,
-    1 - (embedding <=> query_embedding) AS similarity
-  FROM students
-  WHERE embedding IS NOT NULL AND 1 - (embedding <=> query_embedding) >= match_threshold
-  ORDER BY embedding <=> query_embedding
-  LIMIT 1;
+RETURNS TABLE (id text, name text, similarity float)
+LANGUAGE sql STABLE AS $$
+    SELECT
+        id,
+        name,
+        1 - (embedding <=> query_embedding) AS similarity
+    FROM students
+    WHERE embedding IS NOT NULL
+    AND   1 - (embedding <=> query_embedding) >= match_threshold
+    ORDER BY embedding <=> query_embedding
+    LIMIT 1;
 $$;
 ```
 
+> [!IMPORTANT]
+> If `pgvector` is not available in your Supabase plan, enable it from:  
+> **Dashboard → Database → Extensions → vector**
+
+---
+
 ## User Accounts and Admin Roles
-Because this application integrates directly with **Supabase Auth** (email/password), we do not need to create or query a custom `users` database table. All user credentials and authentication policies are managed securely inside Supabase's identity provider. 
 
-Admin roles are defined using custom user metadata:
-- If a user has `"is_admin": true` inside their Supabase Auth user metadata, the application will grant them access to the Admin Panel.
-- Modifying roles or creating initial users can be done directly from the Supabase Authentication dashboard, or through the web application's user management page if you are already logged in as an admin.
+All user credentials are managed by **Supabase Auth** — there is no custom `users` table. Admin roles are stored in Supabase user metadata.
 
-## How the Database Replaces Local Storage
-In older versions of this application, face embeddings were stored in local `.pkl` or `.npy` files. This created "stateful" dependencies that made hosting on platforms like Vercel impossible without losing data.
+### Bootstrap First Admin
 
-By utilizing `pgvector` and the `match_face` RPC function, the Flask server simply passes the 512-dimensional array of a webcam photo to the database. The database then rapidly computes the cosine similarity against all stored students and returns the exact match in milliseconds.
+After creating a user in Supabase Auth, run this SQL to grant admin access:
 
+```sql
+UPDATE auth.users
+SET raw_user_meta_data = jsonb_build_object(
+    'is_admin', true,
+    'username', 'admin'
+)
+WHERE email = 'your-admin-email@example.com';
+```
+
+---
+
+## Row Level Security (RLS)
+
+The application uses the **service-role key** (which bypasses RLS) for all database operations. If you enable RLS on the `students` or `attendance` tables, ensure that the service-role key is used for all Flask backend operations.
+
+For least-privilege compliance, consider adding RLS policies that allow:
+- `SELECT` on `students` for authenticated users
+- `INSERT`/`SELECT` on `attendance` for authenticated users
+- Full access for the service role
+
+---
+
+## How Vector Matching Works
+
+When a face is detected in an uploaded photo:
+1. InsightFace generates a **512-dimensional float array** (embedding)
+2. The embedding is **L2-normalised** (divided by its Euclidean norm)
+3. The normalised embedding is sent to Supabase via the `match_face` RPC
+4. PostgreSQL computes **cosine similarity** (`1 - cosine_distance`) against all stored embeddings using pgvector's `<=>` operator
+5. The closest match above `FACE_MATCH_THRESHOLD` (default: 0.3) is returned
+
+> [!NOTE]
+> Cosine similarity of **1.0** = identical faces. Threshold of **0.3** means the system requires at least 30% similarity — this is intentionally permissive to handle varying lighting and angles. Increase it (e.g., 0.5) for stricter matching.

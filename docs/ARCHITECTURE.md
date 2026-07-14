@@ -1,9 +1,13 @@
-# 🏗️ BioSecure AI Architecture
+# 🏗️ BioSecure AI System Architecture
 
-The **BioSecure AI** application has been entirely rebuilt to be a **stateless** web application. Heavy machine learning inference is handled locally by the Flask application via ONNX Runtime, but the complex mathematical task of matching faces is offloaded entirely to a PostgreSQL database powered by Supabase.
+> **Note**: This is the legacy architecture overview, preserved for reference.
+> See [Architecture.md](./Architecture.md) for the current canonical architecture document with Mermaid diagrams.
+> See [SAD.md](./SAD.md) for the full System Architecture Document.
+> See [TAD.md](./TAD.md) for the Technical Architecture Document with module-level detail.
+
+The **BioSecure AI** application is a **stateless** web application. Heavy machine learning inference is handled locally by the Flask application via ONNX Runtime, but the complex mathematical task of matching faces is offloaded entirely to a PostgreSQL database powered by Supabase.
 
 ## System Flow
-The diagram below illustrates the exact path an image takes from the user's browser, through the AI inference layer, and finally to the database for matching.
 
 ```mermaid
 graph TD
@@ -11,7 +15,7 @@ graph TD
     
     subgraph AI Inference Layer
         Flask -->|Extract Image| IFace[InsightFace buffalo_l]
-        IFace -->|Generate 512d array| Embedding([512D Float Embedding])
+        IFace -->|Generate 512D array| Embedding([512D Float Embedding])
     end
     
     subgraph Supabase Database
@@ -24,7 +28,6 @@ graph TD
 ```
 
 ## Student Registration Flow
-When an administrator registers a new student, the system bypasses local storage and writes the facial signature directly to the database.
 
 ```mermaid
 sequenceDiagram
@@ -43,8 +46,6 @@ sequenceDiagram
 
 ## Modular Code Architecture (Flask Blueprints)
 
-To maintain code readability and clean separation of concerns, the BioSecure AI backend is modularized into four distinct Flask Blueprints:
-
 1. **`auth` Blueprint (`blueprints/auth.py`)**: Integrates with Supabase Auth to handle user logins, logouts, registration of new user accounts, and credentials validation.
 2. **`attendance` Blueprint (`blueprints/attendance.py`)**: Manages webcam/file uploads, processes uploaded images, calculates embeddings, matches faces via Supabase RPC, and serves the main dashboard.
 3. **`students` Blueprint (`blueprints/students.py`)**: Handles showing registered students list and submitting new student data (saving local files to `known_faces/` and writing vectors to Supabase).
@@ -53,14 +54,13 @@ To maintain code readability and clean separation of concerns, the BioSecure AI 
 ## The Tech Stack
 
 ### 1. Flask (Backend)
-Flask handles all routing, session management, and HTML template rendering. We use Flask because it seamlessly integrates with Python's rich data science and machine learning ecosystem.
+Flask handles all routing, session management, and HTML template rendering via the application factory pattern (`create_app()`).
 
 ### 2. InsightFace (AI Inference)
-We use the `buffalo_l` model from the InsightFace library. It is widely considered one of the most accurate open-source facial recognition models available. It generates a 512-dimensional array (vector) for every face it detects.
+The `buffalo_l` model generates a 512-dimensional array (vector) for every face it detects, using ArcFace R100 architecture.
 
 ### 3. Supabase `pgvector` (Database)
-Supabase provides a powerful managed PostgreSQL database. By enabling the `pgvector` extension, we can store the 512-dimensional arrays directly in our database rows. When we need to recognize a face, we send the new array to Supabase, which uses **Cosine Similarity** (`<=>`) to instantly find the closest matching student.
+The `match_face` RPC function computes cosine similarity (`<=>`) against all stored student embeddings and returns the closest match in milliseconds.
 
 ### 4. TailwindCSS & Vanilla JS (Frontend)
-The frontend utilizes a modern "dark glassmorphism" aesthetic built with TailwindCSS. It relies heavily on vanilla JavaScript to interact with the webcam (`navigator.mediaDevices.getUserMedia`) and to submit images to the Flask API.
-
+The frontend uses the BioSecure AI dark glassmorphism design system. See [design.md](./design.md) for the complete design system specification.
