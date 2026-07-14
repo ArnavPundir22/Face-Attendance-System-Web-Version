@@ -1,6 +1,6 @@
-# ⚙️ Onyx Face Attendance System Local Setup Guide
+# ⚙️ BioSecure AI Local Setup Guide
 
-This guide covers everything you need to know to get the **Onyx Face Attendance System** running locally on your machine for development or testing.
+This guide covers everything you need to know to get **BioSecure AI** running locally on your machine for development or testing.
 
 Because the facial recognition relies on compiled C++ libraries (ONNX/OpenCV), a standard Linux/macOS environment is highly recommended.
 

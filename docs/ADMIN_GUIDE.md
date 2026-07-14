@@ -1,6 +1,6 @@
-# 👨‍💼 Onyx Face Attendance System Administrator Guide
+# 👨‍💼 BioSecure AI Administrator Guide
 
-This guide covers how to manage the system, register students, and accurately capture daily attendance using the **Onyx Face Attendance System**.
+This guide covers how to manage the system, register students, and accurately capture daily attendance using **BioSecure AI**.
 
 ## 1. Accessing the Dashboard & First Admin Setup
 

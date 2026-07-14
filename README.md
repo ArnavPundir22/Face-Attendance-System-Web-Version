@@ -1,6 +1,6 @@
 <div align="center">
 
-<h1>🤖 Onyx Face Attendance System</h1>
+<h1>🤖 BioSecure AI</h1>
 <p><strong>Automated, stateless classroom attendance powered by InsightFace AI and Supabase <code>pgvector</code></strong></p>
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
@@ -16,7 +16,7 @@
 
 ## 📖 What Is This?
 
-**Onyx Face Attendance System** is a modern, state-of-the-art web application that completely eliminates manual roll-calls using advanced facial recognition. A teacher uploads a classroom photo (or captures one with a webcam), and the system instantly identifies every student in the image, marking them present in a secure PostgreSQL database.
+**BioSecure AI** is a modern, state-of-the-art web application that completely eliminates manual roll-calls using advanced facial recognition. A teacher uploads a classroom photo (or captures one with a webcam), and the system instantly identifies every student in the image, marking them present in a secure PostgreSQL database.
 
 Built for the modern web, this application is **100% stateless**. By leveraging **Supabase `pgvector`**, facial embeddings are stored and queried directly inside the database, meaning the application can be hosted anywhere (Vercel, Render, VPS) without worrying about ephemeral file systems wiping out your AI data.
 
