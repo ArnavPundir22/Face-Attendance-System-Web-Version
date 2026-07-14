@@ -1,327 +1,331 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Face Attendance System</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mark Attendance — BioSecure AI</title>
   <script src="https://cdn.tailwindcss.com"></script>
-
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <style>
-    body {
-        background-color: #0d0d1a;
-        color: #e4e4e7;
-        background-image: radial-gradient(#2a2a3e 1px, transparent 0);
-        background-size: 40px 40px;
-    }
-    .neon-glow {
-        box-shadow: 0 0 5px #a855f7, 0 0 10px #a855f7, 0 0 15px #c084fc;
-        transition: all 0.3s ease-in-out;
-    }
-    .neon-glow:hover {
-        box-shadow: 0 0 10px #a855f7, 0 0 20px #a855f7, 0 0 30px #c084fc;
-    }
-    .dark-card {
-        background-color: rgba(32, 32, 50, 0.7);
-        backdrop-filter: blur(5px);
-        border: 1px solid rgba(168, 85, 247, 0.3);
-        border-top: 4px solid #a855f7;
-    }
-    .input-dark {
-        background-color: rgba(13, 13, 26, 0.5);
-        border-color: #3b3b55;
-        color: #e4e4e7;
-    }
-    .input-dark:focus {
-        border-color: #a855f7;
-        box-shadow: 0 0 0 1px #a855f7;
-    }
-    .result-status-card {
-        background-color: rgba(42, 42, 62, 0.7);
-        border-left: 4px solid;
-    }
-
-    nav {
-        box-shadow: 0 0 10px rgba(168, 85, 247, 0.3);
-    }
-    .nav-link {
-        position: relative;
-        padding: 8px 14px;
-        border-radius: 8px;
-        font-weight: 600;
-        color: #c3c3d9;
-        transition: all 0.3s ease;
-    }
-    .nav-link:hover {
-        color: #ffffff;
-        text-shadow: 0 0 6px #a855f7, 0 0 10px #c084fc;
-    }
-    .nav-link::after {
-        content: "";
-        position: absolute;
-        left: 50%;
-        bottom: -2px;
-        width: 0%;
-        height: 2px;
-        background: linear-gradient(to right, #a855f7, #6366f1);
-        border-radius: 4px;
-        transition: all 0.3s ease;
-        transform: translateX(-50%);
-    }
-    .nav-link:hover::after {
-        width: 80%;
+    /* Hide the default file input entirely */
+    #nativeCameraInput, #galleryInput {
+        display: none;
     }
   </style>
-
 </head>
+<body class="pb-24 md:pb-8">
 
-<body class="min-h-screen font-sans flex flex-col">
-
-  <!-- HEADER -->
-  <header class="bg-[#121223] shadow-2xl sticky top-0 z-10 border-b border-purple-800">
-    <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-      <h1 class="text-2xl font-extrabold text-white flex items-center gap-2">
-        <span class="text-3xl text-purple-400 neon-glow p-1 leading-none">🤖</span> 
-        <span class="text-indigo-300">Face Attendance Marker</span>
-      </h1>
+  <!-- TopAppBar -->
+  <header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-3 bg-[#0b1326]/70 backdrop-blur-xl border-b border-white/10 shadow-lg">
+    <div class="flex items-center gap-3">
+      <i data-lucide="scan-face" class="w-8 h-8 text-blue-500"></i>
+      <h1 class="font-geist text-xl font-bold text-blue-400 tracking-tight">BioSecure AI</h1>
     </div>
-
-    <!-- UPDATED NAVIGATION BAR -->
-    <nav class="flex gap-6 px-6 py-3 bg-[#0d0d1a]/80 backdrop-blur-md border-t border-purple-800 justify-center">
-      <a href="/" class="nav-link">Home</a>
-      <a href="/viewer" class="nav-link">View Attendance</a>
-      <a href="/students" class="nav-link">All Students</a>
-      <a href="/add_student" class="nav-link">Add Student</a>
-
-      <!-- ⭐ SHOW ADMIN PANEL ONLY IF USER IS ADMIN ⭐ -->
+    
+    <!-- Desktop Navigation Links -->
+    <nav class="hidden md:flex items-center gap-6">
+      <a href="/" class="text-sm font-medium transition-colors hover:text-blue-400 text-blue-400">Home</a>
+      <a href="/viewer" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">View Records</a>
+      <a href="/students" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">All Students</a>
+      <a href="/add_student" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">Add Student</a>
       {% if session_is_admin %}
-        <a href="/admin" class="nav-link text-yellow-300 hover:text-yellow-200">
-          ⚙️ Admin Panel
-        </a>
+      <a href="/admin" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">Admin Portal</a>
       {% endif %}
-
-      <!-- LOGOUT -->
-      <a href="/logout" class="nav-link text-red-400 hover:text-red-300">
-        Logout
-      </a>
     </nav>
+
+    <div class="flex items-center gap-4">
+      <div class="hidden sm:flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="font-geist text-xs font-semibold text-emerald-400 uppercase tracking-wider">SYSTEM LIVE</span>
+      </div>
+      <span class="hidden lg:inline text-xs text-gray-400">Welcome, <strong class="text-gray-200">{{ session_username }}</strong></span>
+      <a href="/logout" class="btn-danger-glass px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2">
+        <i data-lucide="log-out" class="w-4 h-4"></i> Logout
+      </a>
+    </div>
   </header>
 
+  <!-- BottomNavBar (Mobile Only) -->
+  <nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe md:hidden h-16 bg-[#131b2e]/85 backdrop-blur-lg border-t border-white/10 shadow-2xl">
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-blue-400" href="/">
+      <i data-lucide="home" class="w-5 h-5 mb-0.5"></i>
+      <span>Home</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/viewer">
+      <i data-lucide="bar-chart-2" class="w-5 h-5 mb-0.5"></i>
+      <span>Records</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/students">
+      <i data-lucide="users" class="w-5 h-5 mb-0.5"></i>
+      <span>Students</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/add_student">
+      <i data-lucide="user-plus" class="w-5 h-5 mb-0.5"></i>
+      <span>Add</span>
+    </a>
+  </nav>
 
+  <main class="p-6 max-w-4xl mx-auto mt-20">
+    
+    <div class="glass-panel p-8 rounded-2xl max-w-2xl mx-auto inner-glow shadow-2xl">
+      <div class="flex flex-col items-center mb-6">
+        <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-3">
+          <i data-lucide="scan" class="w-6 h-6 text-blue-500"></i>
+        </div>
+        <h2 class="text-2xl text-center font-geist font-bold text-white">Mark Attendance</h2>
+        <p class="text-sm text-gray-400 text-center mt-1">Mark student attendance instantly via biometric face matching.</p>
+      </div>
 
-
-  <!-- =============== MAIN CONTENT =============== -->
-  <main class="flex-grow flex flex-col items-center px-4 py-10">
-    <div class="dark-card rounded-xl shadow-2xl p-8 w-full max-w-2xl">
-
-      <h2 class="text-3xl text-center font-bold text-purple-300 mb-8">
-        Mark Attendance with Photo
-      </h2>
-
-      <form id="uploadForm" class="space-y-6">
-
-        <!-- LECTURE + SECTION -->
-        <div class="grid sm:grid-cols-2 gap-4">
+      <form id="uploadForm" class="space-y-6 mt-4">
+        
+        <!-- SESSION DETAILS -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-                <label class="block text-gray-300 mb-1">Lecture Name</label>
-                <input type="text" name="lecture" required class="input-dark w-full rounded-lg px-4 py-2"/>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Lecture Name</label>
+                <input type="text" name="lecture" required placeholder="e.g. CS101" class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm"/>
             </div>
             <div>
-                <label class="block text-gray-300 mb-1">Section</label>
-                <input type="text" name="section" required class="input-dark w-full rounded-lg px-4 py-2"/>
+                <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Section</label>
+                <input type="text" name="section" required placeholder="e.g. A" class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm"/>
             </div>
         </div>
 
-        <!-- GMAIL -->
-        <div>
-            <label class="block text-gray-300 mb-1">Send Report To (Gmail)</label>
-            <input type="email" id="gmailInput" placeholder="example@gmail.com"
-                   class="input-dark w-full rounded-lg px-4 py-2"/>
-        </div>
-
-        <!-- FILE UPLOAD -->
-        <div class="pt-4 border-t border-[#3b3b55]">
-          <label class="block text-gray-300 font-semibold mb-3 text-lg">Upload Images</label>
-          <input id="fileInput" type="file" name="images" accept="image/*" multiple
-            class="input-dark w-full rounded-lg px-4 py-2"/>
-        </div>
-
-        <!-- CAMERA SECTION -->
-        <div class="mt-6 p-4 bg-indigo-900/30 border border-indigo-700/50 rounded-lg">
-            <button type="button" id="openCameraBtn"
-                class="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg font-bold neon-glow">
-                📷 Open Camera / Webcam
-            </button>
-
-            <div id="cameraBox" class="hidden flex flex-col items-center gap-4 pt-4">
-              <video id="video" autoplay playsinline
-                     class="rounded-lg shadow-2xl border-4 border-purple-500 w-full max-w-full"></video>
-
-              <div class="flex flex-wrap justify-center gap-3 w-full">
-                <button type="button" id="captureBtn"
-                        class="flex-1 bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">
-                  📸 Take Snapshot
+        <!-- CAMERA ACTIONS -->
+        <div class="pt-6 border-t border-white/10 mt-6">
+            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Input Method</label>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <!-- Native Camera Trigger (Mobile Only) -->
+                <button type="button" onclick="document.getElementById('nativeCameraInput').click()" 
+                        class="flex sm:hidden flex-col items-center justify-center gap-3 py-6 bg-blue-600/20 border border-blue-500/40 rounded-xl hover:bg-blue-600/30 transition-all group shadow-sm">
+                    <i data-lucide="camera" class="w-8 h-8 text-blue-400 group-hover:scale-110 transition-transform duration-200"></i>
+                    <span class="text-sm font-medium text-white">Mobile Camera</span>
+                </button>
+                
+                <!-- Desktop Webcam Trigger (Desktop/Tablet Only) -->
+                <button type="button" id="openWebcamBtn"
+                        class="hidden sm:flex flex-col items-center justify-center gap-3 py-6 bg-blue-600/20 border border-blue-500/40 rounded-xl hover:bg-blue-600/30 transition-all group shadow-sm">
+                    <i data-lucide="monitor-play" class="w-8 h-8 text-blue-400 group-hover:scale-110 transition-transform duration-200"></i>
+                    <span class="text-sm font-medium text-white">PC Webcam</span>
                 </button>
 
-                <button type="button" id="switchCameraBtn"
-                        class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold">
-                  🔄 Switch Camera
+                <!-- Gallery Trigger (Always visible) -->
+                <button type="button" onclick="document.getElementById('galleryInput').click()" 
+                        class="flex flex-col items-center justify-center gap-3 py-6 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all group shadow-sm">
+                    <i data-lucide="image-plus" class="w-8 h-8 text-gray-400 group-hover:scale-110 transition-transform duration-200"></i>
+                    <span class="text-sm font-medium text-white">Upload Files</span>
                 </button>
-
-                <button type="button" id="autoCaptureBtn"
-                        class="flex-1 bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold">
-                  🤖 Auto Capture 5 Photos
-                </button>
-              </div>
-
-              <canvas id="canvas" class="hidden"></canvas>
             </div>
+
+            <!-- Desktop Webcam Box -->
+            <div id="desktopCameraBox" class="hidden mt-6 p-5 bg-[#0b1326]/60 rounded-2xl border border-white/10 flex-col items-center gap-4 shadow-inner relative overflow-hidden">
+                <div class="relative rounded-lg overflow-hidden border border-white/10">
+                    <!-- Scanner effect overlays -->
+                    <div class="scan-line absolute left-0 w-full z-10"></div>
+                    <div class="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-blue-500"></div>
+                    <div class="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-blue-500"></div>
+                    <div class="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-blue-500"></div>
+                    <div class="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-blue-500"></div>
+                    
+                    <video id="video" autoplay playsinline class="w-full max-w-sm border border-white/5 shadow-md object-cover"></video>
+                </div>
+                <div class="flex gap-3 w-full max-w-sm mt-2">
+                    <button type="button" id="captureWebcamBtn" class="flex-1 btn-primary-glass py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-2"><i data-lucide="aperture" class="w-4 h-4"></i> Capture</button>
+                    <button type="button" id="closeWebcamBtn" class="flex-1 btn-secondary-glass py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-2"><i data-lucide="x" class="w-4 h-4"></i> Close</button>
+                </div>
+                <canvas id="canvas" class="hidden"></canvas>
+            </div>
+            
+            <!-- Hidden File Inputs -->
+            <input id="nativeCameraInput" type="file" name="images" accept="image/*" capture="environment" />
+            <input id="galleryInput" type="file" name="images" accept="image/*" multiple />
+            
+            <!-- Main Input that holds the combined files for submission -->
+            <input id="formFileInput" type="file" name="images" multiple class="hidden" />
         </div>
 
         <!-- PREVIEWS -->
-        <div id="previewBox"
-             class="mt-6 p-3 border border-dashed border-purple-500/50 rounded-lg grid grid-cols-3 gap-3">
-          <p class="text-sm text-gray-400 col-span-full text-center">Image Previews will appear here...</p>
+        <div class="pt-4">
+            <div id="previewBox" class="hidden grid grid-cols-4 sm:grid-cols-5 gap-3"></div>
+            <p id="previewHint" class="text-xs text-center text-gray-500 mt-3 font-medium">No images selected</p>
         </div>
 
         <!-- SUBMIT -->
-        <button type="submit"
-          class="w-full bg-gradient-to-r from-purple-600 to-indigo-500 text-white py-3 rounded-lg font-extrabold neon-glow">
-          📤 EXECUTE SCAN & MARK ATTENDANCE
-        </button>
+        <div class="pt-6 border-t border-white/10">
+            <button type="submit" id="submitBtn" disabled
+            class="w-full btn-primary-glass disabled:opacity-50 disabled:cursor-not-allowed text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2">
+            <i data-lucide="scan-line" class="w-5 h-5"></i>
+            <span id="submitBtnText">Scan & Mark Present</span>
+            </button>
+        </div>
       </form>
     </div>
 
-    <div id="result" class="w-full max-w-5xl mt-12 space-y-8"></div>
+    <!-- RESULT BOX -->
+    <div id="result" class="w-full mt-8 space-y-6"></div>
 
   </main>
 
-<!-- SCRIPT -->
 <script>
+  // Initialize Lucide Icons
+  lucide.createIcons();
 
   /* ------------------------------
-        IMAGE PREVIEWS
+        IMAGE PREVIEWS & FILE HANDLING
   ------------------------------- */
   const previewBox = document.getElementById("previewBox");
-  document.getElementById("fileInput").addEventListener("change", updatePreviews);
-
-  function updatePreviews(files) {
-    previewBox.innerHTML = "";
-    files = files.target ? files.target.files : files;
-
-    Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = ev => {
-        const img = document.createElement("img");
-        img.src = ev.target.result;
-        img.className = "rounded-lg border border-purple-700 h-24 w-full object-cover";
-        previewBox.appendChild(img);
-      };
-      reader.readAsDataURL(file);
-    });
-  }
-
+  const previewHint = document.getElementById("previewHint");
+  const nativeCameraInput = document.getElementById("nativeCameraInput");
+  const galleryInput = document.getElementById("galleryInput");
+  const formFileInput = document.getElementById("formFileInput");
+  const submitBtn = document.getElementById("submitBtn");
+  const submitBtnText = document.getElementById("submitBtnText");
+  
+  // We use DataTransfer to programmatically manage files from multiple input sources
+  let dataTransfer = new DataTransfer();
 
   /* ------------------------------
-        CAMERA HANDLING
+        DESKTOP WEBCAM LOGIC
   ------------------------------- */
-  let stream = null;
-  let usingFrontCamera = true;
-
-  const openCameraBtn = document.getElementById("openCameraBtn");
-  const cameraBox = document.getElementById("cameraBox");
+  const openWebcamBtn = document.getElementById("openWebcamBtn");
+  const desktopCameraBox = document.getElementById("desktopCameraBox");
   const video = document.getElementById("video");
   const canvas = document.getElementById("canvas");
-  const captureBtn = document.getElementById("captureBtn");
-  const switchCameraBtn = document.getElementById("switchCameraBtn");
-  const autoCaptureBtn = document.getElementById("autoCaptureBtn");
-  const fileInput = document.getElementById("fileInput");
+  const captureWebcamBtn = document.getElementById("captureWebcamBtn");
+  const closeWebcamBtn = document.getElementById("closeWebcamBtn");
+  
+  let stream = null;
 
-  async function startCamera() {
-    if (stream) stream.getTracks().forEach(t => t.stop());
-
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: usingFrontCamera ? "user" : "environment" }
-    });
-
-    video.srcObject = stream;
+  async function startWebcam() {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        desktopCameraBox.classList.remove("hidden");
+        desktopCameraBox.classList.add("flex");
+    } catch (err) {
+        console.error("Camera error:", err);
+        alert("Could not access webcam. Please ensure permissions are granted.");
+    }
   }
 
-  openCameraBtn.addEventListener("click", () => {
-    cameraBox.classList.toggle("hidden");
+  function stopWebcam() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
+    desktopCameraBox.classList.add("hidden");
+    desktopCameraBox.classList.remove("flex");
+  }
 
-    if (!cameraBox.classList.contains("hidden")) {
-      startCamera();
-      openCameraBtn.innerHTML = "❌ Close Camera";
+  openWebcamBtn.addEventListener("click", () => {
+    if (desktopCameraBox.classList.contains("hidden")) {
+        startWebcam();
     } else {
-      if (stream) stream.getTracks().forEach(t => t.stop());
-      openCameraBtn.innerHTML = "📷 Open Camera / Webcam";
+        stopWebcam();
     }
   });
 
-  switchCameraBtn.addEventListener("click", () => {
-    usingFrontCamera = !usingFrontCamera;
-    startCamera();
-  });
+  closeWebcamBtn.addEventListener("click", stopWebcam);
 
-  /* ------------------------------
-       SINGLE SNAPSHOT
-  ------------------------------- */
-  captureBtn.addEventListener("click", () => {
-    captureSinglePhoto();
-    alert("📸 Snapshot added!");
-  });
-
-  function captureSinglePhoto() {
+  captureWebcamBtn.addEventListener("click", () => {
+    if (!stream) return;
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext("2d").drawImage(video, 0, 0);
 
     canvas.toBlob(blob => {
-      const file = new File([blob], `capture_${Date.now()}.jpg`, { type: "image/jpeg" });
+      const file = new File([blob], `webcam_${Date.now()}.jpg`, { type: "image/jpeg" });
+      handleFileSelection([file]);
+      
+      // Provide visual feedback
+      const originalHTML = captureWebcamBtn.innerHTML;
+      captureWebcamBtn.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4"></i> Captured!`;
+      lucide.createIcons();
+      setTimeout(() => { 
+          captureWebcamBtn.innerHTML = originalHTML; 
+          lucide.createIcons();
+      }, 1000);
+    }, "image/jpeg", 0.9);
+  });
 
-      const dt = new DataTransfer();
-      for (let f of fileInput.files) dt.items.add(f);
-      dt.items.add(file);
-      fileInput.files = dt.files;
 
-      updatePreviews(fileInput.files);
+  nativeCameraInput.addEventListener("change", (e) => handleFileSelection(e.target.files));
+  galleryInput.addEventListener("change", (e) => handleFileSelection(e.target.files));
+
+  function handleFileSelection(files) {
+    if (!files || files.length === 0) return;
+    
+    // Add new files to our DataTransfer object
+    Array.from(files).forEach(file => {
+        dataTransfer.items.add(file);
     });
+    
+    // Update the master hidden input that will be submitted
+    formFileInput.files = dataTransfer.files;
+    
+    // Enable submit button
+    submitBtn.disabled = false;
+    
+    updatePreviews();
   }
 
-
-  /* ------------------------------
-       🤖 AUTO CAPTURE 5 PHOTOS
-  ------------------------------- */
-  autoCaptureBtn.addEventListener("click", () => {
-    if (!stream) {
-        alert("Open the camera first!");
-        return;
+  function updatePreviews() {
+    previewBox.innerHTML = "";
+    const files = formFileInput.files;
+    
+    if (files.length > 0) {
+        previewBox.classList.remove("hidden");
+        previewHint.innerText = `${files.length} image(s) ready to process. Tap to remove.`;
+        submitBtnText.innerText = `Scan & Mark Present (${files.length})`;
+    } else {
+        previewBox.classList.add("hidden");
+        previewHint.innerText = "No images selected.";
+        submitBtnText.innerText = "Scan & Mark Present";
+        submitBtn.disabled = true;
     }
 
-    autoCaptureBtn.disabled = true;
-    autoCaptureBtn.innerHTML = "🤖 Capturing...";
-
-    let count = 0;
-
-    const interval = setInterval(() => {
-        count++;
-
-        captureSinglePhoto();  // Take photo
-
-        if (count >= 5) {
-            clearInterval(interval);
-
-            autoCaptureBtn.disabled = false;
-            autoCaptureBtn.innerHTML = "🤖 Auto Capture 5 Photos";
-
-            // Auto submit after 1 second
-            setTimeout(() => {
-                document.querySelector("#uploadForm button[type='submit']").click();
-            }, 1000);
-        }
-
-    }, 3000); // 3 seconds gap
-  });
+    Array.from(files).forEach((file, index) => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const container = document.createElement("div");
+        container.className = "relative group cursor-pointer aspect-square rounded overflow-hidden border border-gray-600";
+        container.onclick = () => removeFile(index);
+        
+        const img = document.createElement("img");
+        img.src = ev.target.result;
+        img.className = "w-full h-full object-cover";
+        
+        const overlay = document.createElement("div");
+        overlay.className = "absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 hover:opacity-100 transition";
+        overlay.innerHTML = "<i data-lucide='trash-2' class='text-white w-8 h-8'></i>";
+        
+        container.appendChild(img);
+        container.appendChild(overlay);
+        previewBox.appendChild(container);
+        lucide.createIcons();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  
+  function removeFile(indexToRemove) {
+      const newDt = new DataTransfer();
+      const files = formFileInput.files;
+      for (let i = 0; i < files.length; i++) {
+          if (i !== indexToRemove) {
+              newDt.items.add(files[i]);
+          }
+      }
+      dataTransfer = newDt; // update global reference
+      formFileInput.files = dataTransfer.files;
+      
+      // Reset the actual inputs so change event fires even if same file selected again
+      nativeCameraInput.value = "";
+      galleryInput.value = "";
+      
+      updatePreviews();
+  }
 
 
   /* ------------------------------
@@ -332,72 +336,126 @@
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (formFileInput.files.length === 0) return;
 
+    // Use FormData but replace 'images' from native/gallery inputs with our master formFileInput
     const formData = new FormData(form);
-    resultBox.innerHTML = `<div class='text-center p-6 text-yellow-300'>⚙️ Processing...</div>`;
-
-    const res = await fetch("/upload_photo", { method: "POST", body: formData });
-    const data = await res.json();
-
-    window.currentSessionAttendance = data.session_attendance || [];
-
-    let html = "";
-    data.images.forEach((img, idx) => {
-      html += `
-        <div class="dark-card p-8 rounded-xl">
-          <h2 class="text-2xl text-purple-300 mb-6">Scan Report: Image ${idx + 1}</h2>
-          <img src="${img.annotated}" class="rounded-lg mb-6 border-2 border-purple-500"/>
-          <div class="grid md:grid-cols-2 gap-4">
-      `;
-
-      img.results.forEach(r => {
-        html += `
-          <div class="result-status-card p-4 rounded-lg">
-            <p class="font-bold text-lg">${r.name}</p>
-            <p>Status: ${r.status}</p>
-            <p>Confidence: ${r.confidence}</p>
-            ${r.timestamp ? `<p>Time: ${r.timestamp}</p>` : ""}
-          </div>
-        `;
-      });
-
-      html += `</div></div>`;
+    formData.delete('images'); // remove duplicates
+    
+    Array.from(formFileInput.files).forEach(file => {
+        formData.append('images', file);
     });
 
-    html += `
-      <div class="flex justify-center mt-8">
-        <button id="sendEmailBtn"
-            class="bg-purple-600 text-white px-6 py-3 rounded-lg font-bold neon-glow">
-            📧 Send Attendance Report to Email
-        </button>
-      </div>
-    `;
+    // Loading UI
+    submitBtn.disabled = true;
+    const originalBtnHTML = submitBtn.innerHTML;
+    submitBtn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i><span>Processing...</span>`;
+    lucide.createIcons();
+    resultBox.innerHTML = ``;
 
-    resultBox.innerHTML = html;
+    try {
+        const res = await fetch("/upload_photo", { method: "POST", body: formData });
+        const data = await res.json();
+
+        window.currentSessionAttendance = data.session_attendance || [];
+
+        let html = "";
+        data.images.forEach((img, idx) => {
+          html += `
+            <div class="dark-card p-6 rounded-lg mb-6">
+              <div class="rounded mb-4 overflow-hidden border border-gray-700">
+                  <img src="${img.annotated}" class="w-full h-auto object-cover"/>
+              </div>
+              <div class="grid sm:grid-cols-2 gap-4">
+          `;
+
+          if (img.results.length === 0) {
+              html += `<div class="p-3 bg-red-900 border border-red-600 rounded text-center text-sm text-red-200 col-span-2">No faces detected</div>`;
+          }
+
+          img.results.forEach(r => {
+            let isPresent = r.status.includes('Present');
+            let statusColor = isPresent ? 'text-green-400' : 'text-red-400';
+            
+            html += `
+              <div class="p-3 bg-gray-800 rounded border border-gray-700">
+                <p class="font-bold text-gray-200">${r.name}</p>
+                <p class="text-sm ${statusColor}">${r.status}</p>
+                <p class="text-xs text-purple-300 mt-1">${(parseFloat(r.confidence)*100).toFixed(0)}% Match</p>
+                ${r.timestamp ? `<p class="text-xs text-gray-500 mt-1">${r.timestamp.split(' ')[1]}</p>` : ""}
+              </div>
+            `;
+          });
+
+          html += `</div></div>`;
+        });
+
+        // Add CSV Download Button
+        if (window.currentSessionAttendance.length > 0) {
+            html += `
+              <div class="flex justify-center mt-6 mb-8">
+                <button id="downloadCsvBtn"
+                    class="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded font-bold transition flex justify-center items-center gap-2 neon-button">
+                    <i data-lucide="download" class="w-5 h-5"></i> Download CSV Report
+                </button>
+              </div>
+            `;
+        } else {
+             html += `<p class="text-center text-sm text-gray-500 mb-8 mt-4">No successful attendance marks this session.</p>`;
+        }
+
+        resultBox.innerHTML = html;
+        lucide.createIcons();
+        
+        // Reset form completely on success
+        dataTransfer = new DataTransfer();
+        formFileInput.files = dataTransfer.files;
+        nativeCameraInput.value = "";
+        galleryInput.value = "";
+        form.reset();
+        updatePreviews();
+
+    } catch (err) {
+        console.error(err);
+        resultBox.innerHTML = `<div class="p-3 bg-red-900 border border-red-600 text-red-200 rounded text-center text-sm">Server error during analysis.</div>`;
+    } finally {
+        // Restore submit button
+        submitBtn.innerHTML = originalBtnHTML;
+    }
   });
 
 
   /* ------------------------------
-        SEND EMAIL
+        DOWNLOAD CSV
   ------------------------------- */
-  document.addEventListener("click", async (e) => {
-    if (e.target.id === "sendEmailBtn") {
-
-      const gmail = document.getElementById("gmailInput").value.trim();
-      if (!gmail) return alert("Please enter Gmail.");
-
+  document.addEventListener("click", (e) => {
+    // We use closest or id depending on the click target
+    const btn = e.target.closest("#downloadCsvBtn") || e.target.id === "downloadCsvBtn" ? e.target : null;
+    
+    if (btn) {
       const tableData = window.currentSessionAttendance;
-      if (!tableData.length) return alert("No attendance to send for this session.");
+      if (!tableData || !tableData.length) return alert("No attendance to download.");
 
-      const mailRes = await fetch("/send_attendance_email", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ email: gmail, data: tableData })
+      // Generate CSV string
+      let csvContent = "data:text/csv;charset=utf-8,";
+      // Header matching what backend returned
+      csvContent += "Student_ID,Name,Program,Branch,Mobile,Status,Timestamp,Lecture,Section\n";
+      
+      tableData.forEach(row => {
+          // Wrap elements in quotes to handle commas
+          let formattedRow = row.map(e => `"${e}"`).join(",");
+          csvContent += formattedRow + "\n";
       });
 
-      const result = await mailRes.json();
-      if (result.success) alert("📨 Email sent!");
-      else alert("❌ Error: " + result.message);
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Attendance_Report_${timestamp}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   });
 
@@ -405,4 +463,3 @@
 
 </body>
 </html>
-

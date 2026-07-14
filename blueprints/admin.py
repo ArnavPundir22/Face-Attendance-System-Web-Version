@@ -14,13 +14,11 @@ Routes:
   POST       /admin/user/delete/<id>         — delete user
 """
 
-import bcrypt
 from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
 
-from utils.auth_helpers import is_current_user_admin
-from utils.db import get_db_connection, is_valid_email
+from utils.db import supabase_admin as supabase, is_valid_email
 import config
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -28,7 +26,7 @@ admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
 def _require_admin():
     """Return a redirect/render when the current user is not admin, else None."""
-    if not is_current_user_admin():
+    if not session.get('is_admin'):
         return render_template('login.html', error="Admin access required")
     return None
 
@@ -40,17 +38,22 @@ def admin_dashboard():
     if denied:
         return denied
 
-    conn = get_db_connection()
-    total_students  = conn.execute("SELECT COUNT(*) AS cnt FROM students").fetchone()['cnt'] or 0
-    total_attendance = conn.execute("SELECT COUNT(*) AS cnt FROM attendance").fetchone()['cnt'] or 0
-    total_users     = conn.execute("SELECT COUNT(*) AS cnt FROM users").fetchone()['cnt'] or 0
-    today_date      = datetime.now().strftime("%Y-%m-%d")
-    today_att       = (
-        conn.execute(
-            "SELECT COUNT(*) AS cnt FROM attendance WHERE date(Timestamp)=?", (today_date,)
-        ).fetchone()['cnt'] or 0
-    )
-    conn.close()
+    try:
+        total_students = supabase.table('students').select('*', count='exact').execute().count or 0
+        total_attendance = supabase.table('attendance').select('*', count='exact').execute().count or 0
+        
+        # We can't efficiently count auth.users from client without admin API, so we fetch all
+        users_resp = supabase.auth.admin.list_users()
+        total_users = len(users_resp) if isinstance(users_resp, list) else len(getattr(users_resp, 'users', []))
+        
+        today_date = datetime.now().strftime("%Y-%m-%d")
+        
+        # Count attendance where timestamp starts with today's date
+        today_att_resp = supabase.table('attendance').select('*', count='exact').ilike('timestamp', f'{today_date}%').execute()
+        today_att = today_att_resp.count or 0
+    except Exception as e:
+        print("Dashboard error:", e)
+        total_students, total_attendance, total_users, today_att = 0, 0, 0, 0
 
     return render_template(
         'admin_dashboard.html',
@@ -63,34 +66,29 @@ def admin_dashboard():
 
 @admin_bp.route('/stats')
 def admin_stats():
-    if not is_current_user_admin():
+    if not session.get('is_admin'):
         return jsonify({'error': 'admin required'}), 403
 
-    conn  = get_db_connection()
     trend = []
-    for d in range(6, -1, -1):
-        day = (datetime.now() - timedelta(days=d)).strftime("%Y-%m-%d")
-        cnt = (
-            conn.execute(
-                "SELECT COUNT(*) AS cnt FROM attendance WHERE date(Timestamp)=?", (day,)
-            ).fetchone()['cnt'] or 0
-        )
-        trend.append({'date': day, 'count': cnt})
+    try:
+        for d in range(6, -1, -1):
+            day = (datetime.now() - timedelta(days=d)).strftime("%Y-%m-%d")
+            
+            cnt_resp = supabase.table('attendance').select('*', count='exact').ilike('timestamp', f'{day}%').execute()
+            cnt = cnt_resp.count or 0
+            trend.append({'date': day, 'count': cnt})
 
-    today   = datetime.now().strftime("%Y-%m-%d")
-    present = (
-        conn.execute(
-            "SELECT COUNT(*) AS cnt FROM attendance "
-            "WHERE date(Timestamp)=? AND Status LIKE '%Present%'",
-            (today,),
-        ).fetchone()['cnt'] or 0
-    )
-    total_today = (
-        conn.execute(
-            "SELECT COUNT(*) AS cnt FROM attendance WHERE date(Timestamp)=?", (today,)
-        ).fetchone()['cnt'] or 0
-    )
-    conn.close()
+        today = datetime.now().strftime("%Y-%m-%d")
+        present_resp = supabase.table('attendance').select('*', count='exact').ilike('timestamp', f'{today}%').ilike('status', '%Present%').execute()
+        present = present_resp.count or 0
+        
+        total_today_resp = supabase.table('attendance').select('*', count='exact').ilike('timestamp', f'{today}%').execute()
+        total_today = total_today_resp.count or 0
+        
+    except Exception as e:
+        print("Stats error:", e)
+        present = 0
+        total_today = 0
 
     return jsonify({'trend': trend, 'present': present, 'absent': max(total_today - present, 0)})
 
@@ -101,11 +99,12 @@ def admin_students():
     if denied:
         return denied
 
-    conn     = get_db_connection()
-    students = conn.execute(
-        "SELECT * FROM students ORDER BY Name COLLATE NOCASE"
-    ).fetchall()
-    conn.close()
+    try:
+        students_resp = supabase.table('students').select('*').order('name').execute()
+        students = students_resp.data
+    except Exception:
+        students = []
+        
     return render_template('admin_students.html', students=students)
 
 
@@ -115,10 +114,12 @@ def admin_edit_student(student_id):
     if denied:
         return denied
 
-    conn    = get_db_connection()
-    student = conn.execute("SELECT * FROM students WHERE ID=?", (student_id,)).fetchone()
-    if not student:
-        conn.close()
+    try:
+        student_resp = supabase.table('students').select('*').eq('id', student_id).execute()
+        if not student_resp.data:
+            return redirect(url_for('admin.admin_students'))
+        student = student_resp.data[0]
+    except Exception:
         return redirect(url_for('admin.admin_students'))
 
     if request.method == 'POST':
@@ -127,15 +128,20 @@ def admin_edit_student(student_id):
         branch  = request.form['branch'].strip()
         mobile  = request.form['mobile'].strip()
         gmail   = request.form['gmail'].strip()
-        conn.execute(
-            'UPDATE students SET Name=?, Program=?, Branch=?, Mobile=?, Gmail=? WHERE ID=?',
-            (name, program, branch, mobile, gmail, student_id),
-        )
-        conn.commit()
-        conn.close()
+        
+        try:
+            supabase.table('students').update({
+                'name': name,
+                'program': program,
+                'branch': branch,
+                'mobile': mobile,
+                'gmail': gmail
+            }).eq('id', student_id).execute()
+        except Exception as e:
+            print("Update student error:", e)
+            
         return redirect(url_for('admin.admin_students'))
 
-    conn.close()
     return render_template('edit_student.html', student=student)
 
 
@@ -145,10 +151,11 @@ def admin_delete_student(student_id):
     if denied:
         return denied
 
-    conn = get_db_connection()
-    conn.execute("DELETE FROM students WHERE ID=?", (student_id,))
-    conn.commit()
-    conn.close()
+    try:
+        supabase.table('students').delete().eq('id', student_id).execute()
+    except Exception:
+        pass
+        
     return redirect(url_for('admin.admin_students'))
 
 
@@ -158,10 +165,11 @@ def admin_mark_attendance():
     if denied:
         return denied
 
-    conn     = get_db_connection()
-    students = conn.execute(
-        "SELECT ID, Name FROM students ORDER BY Name COLLATE NOCASE"
-    ).fetchall()
+    try:
+        students_resp = supabase.table('students').select('id, name').order('name').execute()
+        students = students_resp.data
+    except Exception:
+        students = []
 
     if request.method == 'POST':
         student_id = request.form.get('student_id')
@@ -170,26 +178,29 @@ def admin_mark_attendance():
         section    = request.form.get('section', '').strip()
         timestamp  = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        student = conn.execute("SELECT * FROM students WHERE ID=?", (student_id,)).fetchone()
-        if not student:
-            conn.close()
-            return render_template('admin_mark.html', students=students, error="Student not found")
+        try:
+            student_resp = supabase.table('students').select('*').eq('id', student_id).execute()
+            if not student_resp.data:
+                return render_template('admin_mark.html', students=students, error="Student not found")
+            student = student_resp.data[0]
 
-        conn.execute(
-            "INSERT INTO attendance "
-            "(Student_ID, Name, Program, Branch, Mobile, Status, Timestamp, Lecture, Section) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                student['ID'], student['Name'], student['Program'],
-                student['Branch'], student['Mobile'],
-                status, timestamp, lecture, section,
-            ),
-        )
-        conn.commit()
-        conn.close()
+            supabase.table('attendance').insert({
+                "student_id": student.get('id'),
+                "name": student.get('name'),
+                "program": student.get('program'),
+                "branch": student.get('branch'),
+                "mobile": student.get('mobile'),
+                "status": status,
+                "timestamp": timestamp,
+                "lecture": lecture,
+                "section": section
+            }).execute()
+        except Exception as e:
+            print("Mark attendance error:", e)
+            return render_template('admin_mark.html', students=students, error="Database error")
+            
         return redirect(url_for('admin.admin_dashboard'))
 
-    conn.close()
     return render_template('admin_mark.html', students=students)
 
 
@@ -207,22 +218,45 @@ def admin_users():
     if denied:
         return denied
 
-    conn  = get_db_connection()
-    users = conn.execute("SELECT id, username, gmail, is_admin FROM users ORDER BY username COLLATE NOCASE").fetchall()
-    conn.close()
+    try:
+        users_resp = supabase.auth.admin.list_users()
+        users_list = users_resp if isinstance(users_resp, list) else getattr(users_resp, 'users', [])
+        users = []
+        for u in users_list:
+            metadata = u.user_metadata or {}
+            users.append({
+                'id': u.id,
+                'email': u.email,
+                'username': metadata.get('username', u.email),
+                'is_admin': metadata.get('is_admin', False)
+            })
+        
+        # Sort users by username case-insensitive
+        users.sort(key=lambda x: x['username'].lower())
+    except Exception as e:
+        print("List users error:", e)
+        users = []
+        
     return render_template('admin_users.html', users=users, current_user=session.get('username'))
 
 
-@admin_bp.route('/user/edit/<int:user_id>', methods=['GET', 'POST'])
+@admin_bp.route('/user/edit/<user_id>', methods=['GET', 'POST'])
 def admin_edit_user(user_id):
     denied = _require_admin()
     if denied:
         return denied
 
-    conn = get_db_connection()
-    user = conn.execute("SELECT id, username, gmail, is_admin FROM users WHERE id=?", (user_id,)).fetchone()
-    if not user:
-        conn.close()
+    try:
+        user_resp = supabase.auth.admin.get_user_by_id(user_id)
+        u = user_resp.user
+        metadata = u.user_metadata or {}
+        user = {
+            'id': u.id,
+            'email': u.email,
+            'username': metadata.get('username', u.email),
+            'is_admin': metadata.get('is_admin', False)
+        }
+    except Exception:
         return redirect(url_for('admin.admin_users'))
 
     if request.method == 'POST':
@@ -232,96 +266,80 @@ def admin_edit_user(user_id):
         new_password = request.form.get('password', '').strip()
 
         if not new_username:
-            conn.close()
             return render_template('admin_edit_user.html', user=user,
                                    error="Username is required.",
                                    current_user=session.get('username'))
 
         if new_email and not is_valid_email(new_email):
-            conn.close()
             return render_template('admin_edit_user.html', user=user,
                                    error="Enter a valid email address.",
                                    current_user=session.get('username'))
 
         # Prevent removing admin rights from the last admin
         if user['is_admin'] and not new_is_admin:
-            admin_count = conn.execute(
-                "SELECT COUNT(*) AS cnt FROM users WHERE is_admin=1"
-            ).fetchone()['cnt']
-            if admin_count <= 1:
-                conn.close()
-                return render_template('admin_edit_user.html', user=user,
-                                       error="Cannot remove admin rights: at least one admin must remain.",
-                                       current_user=session.get('username'))
+            try:
+                # Count admins
+                all_users_resp = supabase.auth.admin.list_users()
+                users_list = all_users_resp if isinstance(all_users_resp, list) else getattr(all_users_resp, 'users', [])
+                admin_count = sum(1 for u in users_list if (u.user_metadata or {}).get('is_admin', False))
+                
+                if admin_count <= 1:
+                    return render_template('admin_edit_user.html', user=user,
+                                        error="Cannot revoke the last admin account.",
+                                        current_user=session.get('username'))
+            except Exception:
+                pass
 
-        # Check username uniqueness (exclude current user)
-        existing = conn.execute(
-            "SELECT id FROM users WHERE username=? AND id!=?", (new_username, user_id)
-        ).fetchone()
-        if existing:
-            conn.close()
+        try:
+            update_data = {
+                "email": new_email if new_email else user['email'],
+                "user_metadata": {
+                    "username": new_username,
+                    "is_admin": bool(new_is_admin)
+                }
+            }
+            if new_password:
+                if len(new_password) < config.MIN_PASSWORD_LENGTH:
+                    return render_template('admin_edit_user.html', user=user,
+                                           error=f"Password must be >= {config.MIN_PASSWORD_LENGTH} chars.",
+                                           current_user=session.get('username'))
+                update_data["password"] = new_password
+                
+            supabase.auth.admin.update_user_by_id(user_id, update_data)
+        except Exception as e:
             return render_template('admin_edit_user.html', user=user,
-                                   error="That username is already taken.",
+                                   error="Error updating user: " + str(e),
                                    current_user=session.get('username'))
-
-        if new_password:
-            if len(new_password) < config.MIN_PASSWORD_LENGTH:
-                conn.close()
-                return render_template('admin_edit_user.html', user=user,
-                                       error=f"Password must be at least {config.MIN_PASSWORD_LENGTH} characters.",
-                                       current_user=session.get('username'))
-            hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt())
-            conn.execute(
-                "UPDATE users SET username=?, gmail=?, is_admin=?, password=? WHERE id=?",
-                (new_username, new_email, new_is_admin, hashed, user_id),
-            )
-        else:
-            conn.execute(
-                "UPDATE users SET username=?, gmail=?, is_admin=? WHERE id=?",
-                (new_username, new_email, new_is_admin, user_id),
-            )
-
-        conn.commit()
-        conn.close()
-
-        # Keep session consistent if admin edited their own username
-        if session.get('username') == user['username'] and new_username != user['username']:
-            session['username'] = new_username
 
         return redirect(url_for('admin.admin_users'))
 
-    conn.close()
     return render_template('admin_edit_user.html', user=user, current_user=session.get('username'))
 
 
-@admin_bp.route('/user/delete/<int:user_id>', methods=['POST'])
+@admin_bp.route('/user/delete/<user_id>', methods=['POST'])
 def admin_delete_user(user_id):
     denied = _require_admin()
     if denied:
         return denied
 
-    conn = get_db_connection()
-    user = conn.execute("SELECT id, username, is_admin FROM users WHERE id=?", (user_id,)).fetchone()
-
-    if not user:
-        conn.close()
+    # Don't allow user to delete themselves
+    if session.get('user_id') == user_id:
         return redirect(url_for('admin.admin_users'))
 
-    # Prevent deleting the last admin
-    if user['is_admin']:
-        admin_count = conn.execute(
-            "SELECT COUNT(*) AS cnt FROM users WHERE is_admin=1"
-        ).fetchone()['cnt']
-        if admin_count <= 1:
-            conn.close()
-            return redirect(url_for('admin.admin_users', error='last_admin'))
+    try:
+        user_resp = supabase.auth.admin.get_user_by_id(user_id)
+        u = user_resp.user
+        
+        # Prevent deleting the last admin
+        if (u.user_metadata or {}).get('is_admin', False):
+            all_users_resp = supabase.auth.admin.list_users()
+            users_list = all_users_resp if isinstance(all_users_resp, list) else getattr(all_users_resp, 'users', [])
+            admin_count = sum(1 for u in users_list if (u.user_metadata or {}).get('is_admin', False))
+            if admin_count <= 1:
+                return redirect(url_for('admin.admin_users'))
 
-    # Prevent admin from deleting their own account
-    if user['username'] == session.get('username'):
-        conn.close()
-        return redirect(url_for('admin.admin_users', error='self_delete'))
+        supabase.auth.admin.delete_user(user_id)
+    except Exception:
+        pass
 
-    conn.execute("DELETE FROM users WHERE id=?", (user_id,))
-    conn.commit()
-    conn.close()
     return redirect(url_for('admin.admin_users'))

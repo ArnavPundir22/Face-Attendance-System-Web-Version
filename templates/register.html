@@ -3,101 +3,116 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Register • Face Attendance</title>
-
+  <title>Register User — BioSecure AI</title>
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <style>
-    body {
-      background-color: #0d0d1a;
-      color: #e4e4e7;
-      background-image: radial-gradient(#2a2a3e 1px, transparent 0);
-      background-size: 40px 40px;
-    }
-
-    .dark-card {
-      background-color: rgba(32,32,50,0.7);
-      border: 1px solid rgba(168,85,247,0.3);
-      border-top: 4px solid #a855f7;
-      backdrop-filter: blur(6px);
-    }
-
-    .input-dark {
-      background-color: rgba(13,13,26,0.6);
-      border: 1px solid #3b3b55;
-      color: #e4e4e7;
-    }
-    .input-dark:focus {
-      border-color: #a855f7;
-      box-shadow: 0 0 0 1px #a855f7;
-    }
-
-    .neon-glow {
-      box-shadow: 0 0 5px #a855f7, 0 0 10px #a855f7, 0 0 15px #c084fc;
-      transition: all 0.3s ease-in-out;
-    }
-    .neon-glow:hover {
-      box-shadow: 0 0 10px #a855f7, 0 0 20px #a855f7, 0 0 30px #c084fc;
-    }
-  </style>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
+<body class="pb-24 md:pb-8">
 
-<body class="flex justify-center items-center min-h-screen px-4">
+  <!-- TopAppBar -->
+  <header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-3 bg-[#0b1326]/70 backdrop-blur-xl border-b border-white/10 shadow-lg">
+    <div class="flex items-center gap-3">
+      <i data-lucide="scan-face" class="w-8 h-8 text-blue-500"></i>
+      <h1 class="font-geist text-xl font-bold text-blue-400 tracking-tight">BioSecure AI</h1>
+    </div>
+    
+    <!-- Desktop Navigation Links -->
+    <nav class="hidden md:flex items-center gap-6">
+      <a href="/" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">Home</a>
+      <a href="/viewer" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">View Records</a>
+      <a href="/students" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">All Students</a>
+      <a href="/add_student" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">Add Student</a>
+      {% if session_is_admin %}
+      <a href="/admin" class="text-sm font-medium transition-colors hover:text-blue-400 text-blue-400">Admin Portal</a>
+      {% endif %}
+    </nav>
 
-  <div class="dark-card w-full max-w-md rounded-xl p-8 shadow-2xl">
-
-    <h1 class="text-center text-3xl font-extrabold text-purple-300 mb-6">
-      ➕ Register New User
-    </h1>
-
-    {% if error %}
-    <p class="bg-red-900/40 border border-red-600/50 text-red-300 rounded-lg px-4 py-3 mb-4 text-sm text-center font-semibold">
-      ❌ {{ error }}
-    </p>
-    {% endif %}
-
-    {% if success %}
-    <p class="bg-green-900/40 border border-green-600/50 text-green-300 rounded-lg px-4 py-3 mb-4 text-sm text-center font-semibold">
-      ✅ {{ success }}
-    </p>
-    {% endif %}
-
-    <form action="/register" method="POST" class="space-y-5">
-
-      <div>
-        <label class="text-gray-300 mb-1 block">Username</label>
-        <input name="username" type="text" required
-          class="input-dark w-full rounded-lg px-4 py-2">
+    <div class="flex items-center gap-4">
+      <div class="hidden sm:flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="font-geist text-xs font-semibold text-emerald-400 uppercase tracking-wider">SYSTEM LIVE</span>
       </div>
-
-      <div>
-        <label class="text-gray-300 mb-1 block">Email <span class="text-purple-400 text-xs">(used for password reset OTP)</span></label>
-        <input name="email" type="email" required placeholder="user@example.com"
-          class="input-dark w-full rounded-lg px-4 py-2">
-      </div>
-
-      <div>
-        <label class="text-gray-300 mb-1 block">Password</label>
-        <input name="password" type="password" required minlength="8"
-          placeholder="Minimum 8 characters"
-          class="input-dark w-full rounded-lg px-4 py-2">
-        <p class="text-gray-500 text-xs mt-1">Must be at least 8 characters.</p>
-      </div>
-
-      <button type="submit"
-        class="w-full bg-gradient-to-r from-purple-600 to-indigo-500 text-white py-3 mt-4 rounded-lg font-extrabold neon-glow">
-        Create Account
-      </button>
-    </form>
-
-    <div class="mt-6 text-center">
-      <a href="/login" class="text-purple-300 font-semibold hover:text-purple-400">
-        🔙 Back to Login
+      <span class="hidden lg:inline text-xs text-gray-400">Welcome, <strong class="text-gray-200">{{ session_username }}</strong></span>
+      <a href="/logout" class="btn-danger-glass px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2">
+        <i data-lucide="log-out" class="w-4 h-4"></i> Logout
       </a>
     </div>
+  </header>
 
-  </div>
+  <!-- BottomNavBar (Mobile Only) -->
+  <nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe md:hidden h-16 bg-[#131b2e]/85 backdrop-blur-lg border-t border-white/10 shadow-2xl">
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/">
+      <i data-lucide="home" class="w-5 h-5 mb-0.5"></i>
+      <span>Home</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/viewer">
+      <i data-lucide="bar-chart-2" class="w-5 h-5 mb-0.5"></i>
+      <span>Records</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/students">
+      <i data-lucide="users" class="w-5 h-5 mb-0.5"></i>
+      <span>Students</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/add_student">
+      <i data-lucide="user-plus" class="w-5 h-5 mb-0.5"></i>
+      <span>Add</span>
+    </a>
+  </nav>
 
+  <main class="p-6 max-w-lg mx-auto mt-20">
+    <div class="glass-panel shadow-2xl rounded-2xl p-8 inner-glow">
+      
+      <div class="flex items-center gap-2 mb-6 border-b border-white/10 pb-4">
+        <i data-lucide="user-plus" class="w-6 h-6 text-blue-500"></i>
+        <h2 class="text-xl font-bold font-geist text-white">Create System User</h2>
+      </div>
+
+      {% if error %}
+      <div class="mb-4 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-sm flex items-center gap-2">
+        <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+        {{ error }}
+      </div>
+      {% endif %}
+
+      {% if success %}
+      <div class="mb-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-sm flex items-center gap-2">
+        <i data-lucide="check" class="w-5 h-5"></i>
+        {{ success }}
+      </div>
+      {% endif %}
+
+      <form action="/register" method="POST" class="space-y-5">
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Username</label>
+          <input name="username" type="text" required placeholder="e.g. jdoe"
+            class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Email Address</label>
+          <input name="email" type="email" required placeholder="e.g. john@example.com"
+            class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Password</label>
+          <input name="password" type="password" required minlength="8" placeholder="••••••••"
+            class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm">
+          <p class="text-gray-500 text-xs mt-1.5 font-geist">Must be at least 8 characters long.</p>
+        </div>
+
+        <div class="flex gap-3 pt-4 border-t border-white/10">
+          <button type="submit" class="btn-primary-glass px-6 py-2.5 rounded-lg text-sm font-semibold flex-1">Create User Account</button>
+          <a href="/admin/users" class="btn-secondary-glass px-6 py-2.5 rounded-lg text-sm font-semibold flex-1 text-center">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <script>
+    lucide.createIcons();
+  </script>
 </body>
 </html>
 

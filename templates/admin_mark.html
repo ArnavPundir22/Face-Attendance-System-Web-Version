@@ -1,77 +1,124 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Manual Mark Attendance</title>
+  <title>Manual Mark Attendance — BioSecure AI</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style> body { background:#0d0d1a; color:#e4e4e7; } .dark-card { background-color: rgba(32,32,50,0.7); border:1px solid rgba(168,85,247,0.3); border-top:4px solid #a855f7; } </style>
-  <style>
-  body { background:#0d0d1a; color:#e4e4e7; }
-  .dark-card {
-    background-color: rgba(32,32,50,0.7);
-    border:1px solid rgba(168,85,247,0.3);
-    border-top:4px solid #a855f7;
-  }
-
-  /* 🔥 Make select text black */
-  select option {
-    color: black;
-  }
-
-  /* If you want the selected text to appear black inside the box as well */
-  select {
-    color: black;
-  }
-</style>
-
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
-  <header class="p-4 flex justify-between items-center border-b border-purple-800">
-    <h1 class="text-xl text-indigo-200">Manual Attendance</h1>
-    <div>
-      <a href="/admin" class="text-indigo-300 mr-4">Dashboard</a>
-      <a href="/logout" class="text-red-400">Logout</a>
+<body class="pb-24 md:pb-8">
+
+  <!-- TopAppBar -->
+  <header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-3 bg-[#0b1326]/70 backdrop-blur-xl border-b border-white/10 shadow-lg">
+    <div class="flex items-center gap-3">
+      <i data-lucide="scan-face" class="w-8 h-8 text-blue-500"></i>
+      <h1 class="font-geist text-xl font-bold text-blue-400 tracking-tight">BioSecure AI</h1>
+    </div>
+    
+    <!-- Desktop Navigation Links -->
+    <nav class="hidden md:flex items-center gap-6">
+      <a href="/" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">Home</a>
+      <a href="/viewer" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">View Records</a>
+      <a href="/students" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">All Students</a>
+      <a href="/add_student" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">Add Student</a>
+      {% if session_is_admin %}
+      <a href="/admin" class="text-sm font-medium transition-colors hover:text-blue-400 text-blue-400">Admin Portal</a>
+      {% endif %}
+    </nav>
+
+    <div class="flex items-center gap-4">
+      <div class="hidden sm:flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="font-geist text-xs font-semibold text-emerald-400 uppercase tracking-wider">SYSTEM LIVE</span>
+      </div>
+      <span class="hidden lg:inline text-xs text-gray-400">Welcome, <strong class="text-gray-200">{{ session_username }}</strong></span>
+      <a href="/logout" class="btn-danger-glass px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2">
+        <i data-lucide="log-out" class="w-4 h-4"></i> Logout
+      </a>
     </div>
   </header>
 
-  <main class="p-6 max-w-3xl mx-auto">
-    {% if error %}
-      <p class="text-red-400 mb-3">{{ error }}</p>
-    {% endif %}
-    <div class="dark-card p-6 rounded-lg">
-      <form method="POST">
-        <label class="block mb-2">Select Student</label>
-        <select name="student_id" required class="w-full mb-4 p-2 rounded input-dark">
-          <option value="">-- choose student --</option>
-          {% for s in students %}
-            <option value="{{ s['ID'] }}">{{ s['Name'] }} ({{ s['ID'] }})</option>
-          {% endfor %}
-        </select>
+  <!-- BottomNavBar (Mobile Only) -->
+  <nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe md:hidden h-16 bg-[#131b2e]/85 backdrop-blur-lg border-t border-white/10 shadow-2xl">
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/">
+      <i data-lucide="home" class="w-5 h-5 mb-0.5"></i>
+      <span>Home</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/viewer">
+      <i data-lucide="bar-chart-2" class="w-5 h-5 mb-0.5"></i>
+      <span>Records</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/students">
+      <i data-lucide="users" class="w-5 h-5 mb-0.5"></i>
+      <span>Students</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/add_student">
+      <i data-lucide="user-plus" class="w-5 h-5 mb-0.5"></i>
+      <span>Add</span>
+    </a>
+  </nav>
 
-        <div class="grid grid-cols-2 gap-3">
+  <main class="p-6 max-w-2xl mx-auto mt-20">
+    <div class="glass-panel shadow-2xl rounded-2xl p-8 inner-glow">
+      <div class="flex items-center gap-2 mb-6 border-b border-white/10 pb-4">
+        <i data-lucide="check-square" class="w-6 h-6 text-blue-500"></i>
+        <h2 class="text-xl font-bold font-geist text-white">Manual Mark Attendance</h2>
+      </div>
+
+      {% if error %}
+      <div class="mb-4 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-sm flex items-center gap-2">
+        <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+        {{ error }}
+      </div>
+      {% endif %}
+
+      <form method="POST" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Select Student</label>
+          <select name="student_id" required class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm text-white bg-[#131b2e]">
+            <option value="" class="text-gray-900 bg-white">-- Choose Student --</option>
+            {% for s in students %}
+              <option value="{{ s['id'] }}" class="text-gray-900 bg-white">{{ s['name'] }} ({{ s['id'] }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block mb-2">Status</label>
-            <select name="status" class="w-full p-2 rounded input-dark">
-              <option>Present</option>
-              <option>Absent</option>
+            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Status</label>
+            <select name="status" class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm text-white bg-[#131b2e]">
+              <option class="text-gray-900 bg-white">Present</option>
+              <option class="text-gray-900 bg-white">Absent</option>
             </select>
           </div>
           <div>
-            <label class="block mb-2">Lecture</label>
-            <input name="lecture" class="w-full p-2 rounded input-dark" placeholder="Lecture name"/>
+            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Lecture</label>
+            <input name="lecture" class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm text-white" placeholder="e.g. Mathematics" />
           </div>
         </div>
 
-        <label class="block mt-3 mb-2">Section</label>
-        <input name="section" class="w-full p-2 rounded input-dark" placeholder="Section"/>
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Section</label>
+          <input name="section" class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm text-white" placeholder="e.g. Section A" />
+        </div>
 
-        <div class="mt-4">
-          <button class="bg-purple-600 px-4 py-2 rounded text-white">Mark Attendance</button>
+        <div class="flex gap-3 pt-4 border-t border-white/10">
+          <button type="submit" class="btn-primary-glass px-6 py-2.5 rounded-lg text-sm font-semibold flex-1">
+            Mark Attendance
+          </button>
+          <a href="/admin" class="btn-secondary-glass px-6 py-2.5 rounded-lg text-sm font-semibold flex-1 text-center">
+            Cancel
+          </a>
         </div>
       </form>
     </div>
   </main>
+
+  <script>
+    lucide.createIcons();
+  </script>
 </body>
 </html>
 

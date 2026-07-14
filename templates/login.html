@@ -694,11 +694,11 @@
       <!-- Login form -->
       <form id="login-form" action="/login" method="POST" novalidate>
 
-        <!-- Username -->
+        <!-- Email -->
         <div class="field">
-          <input id="username" name="username" type="text" placeholder="Username" required autocomplete="username"
+          <input id="email" name="email" type="email" placeholder="Email Address" required autocomplete="email"
             spellcheck="false" />
-          <label for="username">Username</label>
+          <label for="email">Email Address</label>
           <span class="f-icon">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
               stroke-linecap="round" stroke-linejoin="round">
@@ -738,19 +738,7 @@
 
       </form>
 
-      <!-- Footer -->
-      <div class="card-footer">
-        <div class="divider"><span>account recovery</span></div>
-        <a href="/forgot_password" id="forgot-link">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
-          Forgot Password?
-        </a>
-      </div>
+
 
       <!-- Secure badge -->
       <div class="secure-badge">
@@ -863,7 +851,9 @@
     });
 
     /* ── Input auto-focus ── */
-    document.getElementById('username').focus();
+    document.getElementById('email').focus();
+    
+
   </script>
 </body>
 

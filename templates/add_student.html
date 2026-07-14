@@ -3,121 +3,148 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Add New Student</title>
+  <title>Add Student — BioSecure AI</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    /* Custom Creative Dark Theme Styles */
-    body {
-        background-color: #0d0d1a; /* Even darker base */
-        color: #e4e4e7;
-        background-image: radial-gradient(#2a2a3e 1px, transparent 0);
-        background-size: 40px 40px;
-    }
-    .neon-glow {
-        box-shadow: 0 0 5px #a855f7, 0 0 10px #a855f7, 0 0 15px #c084fc;
-        transition: all 0.3s ease-in-out;
-    }
-    .neon-glow:hover {
-        box-shadow: 0 0 10px #a855f7, 0 0 20px #a855f7, 0 0 30px #c084fc;
-    }
-    .dark-card {
-        background-color: rgba(32, 32, 50, 0.7); /* Glassmorphism transparency */
-        backdrop-filter: blur(5px);
-        border: 1px solid rgba(168, 85, 247, 0.3); /* Purple border */
-        border-top: 4px solid #a855f7;
-    }
-    .input-dark {
-        background-color: rgba(13, 13, 26, 0.5); /* Semi-transparent input */
-        border-color: #3b3b55;
-        color: #e4e4e7;
-    }
-    .input-dark:focus {
-        border-color: #a855f7;
-        box-shadow: 0 0 0 1px #a855f7;
-    }
-    .hover-scale:hover {
-        transform: scale(1.01);
-    }
-  </style>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="min-h-screen flex items-center justify-center px-4 py-8">
+<body class="pb-24 md:pb-8">
 
-  <div class="dark-card shadow-2xl rounded-xl p-8 max-w-lg w-full transform transition-all hover-scale">
-    <h2 class="text-3xl font-bold mb-8 text-center text-purple-300 border-b border-[#3b3b55] pb-3">➕ Register New Student Profile</h2>
-
-    <div class="p-4 mb-6 rounded-lg bg-indigo-900/30 border border-indigo-700/50">
-        <h3 class="text-lg font-bold text-indigo-300 mb-2 flex items-center gap-2">
-            🧬 Face Model Training
-        </h3>
-        <ul class="list-disc list-inside text-sm text-indigo-300/80 space-y-1 ml-4">
-            <li>Ensure all fields are accurate for record integrity.</li>
-            <li><b>Upload Photo:</b> The image should be a clear, high-resolution, forward-facing shot for optimal face embedding generation.</li>
-            <li>Submission creates the student record and trains the facial recognition model.</li>
-        </ul>
+  <!-- TopAppBar -->
+  <header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-3 bg-[#0b1326]/70 backdrop-blur-xl border-b border-white/10 shadow-lg">
+    <div class="flex items-center gap-3">
+      <i data-lucide="scan-face" class="w-8 h-8 text-blue-500"></i>
+      <h1 class="font-geist text-xl font-bold text-blue-400 tracking-tight">BioSecure AI</h1>
     </div>
-    <div id="messageBox" class="hidden p-4 mb-6 rounded-lg font-medium text-center shadow-md animate-fadeIn"></div>
+    
+    <!-- Desktop Navigation Links -->
+    <nav class="hidden md:flex items-center gap-6">
+      <a href="/" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">Home</a>
+      <a href="/viewer" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">View Records</a>
+      <a href="/students" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">All Students</a>
+      <a href="/add_student" class="text-sm font-medium transition-colors hover:text-blue-400 text-blue-400">Add Student</a>
+      {% if session_is_admin %}
+      <a href="/admin" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">Admin Portal</a>
+      {% endif %}
+    </nav>
 
-    <form id="studentForm" enctype="multipart/form-data" class="space-y-5">
-      
-      <div class="space-y-4">
-        <div>
-          <label class="block font-semibold text-gray-300 mb-1">Name</label>
-          <input type="text" name="name" required class="input-dark w-full rounded-lg px-4 py-2 focus:ring-purple-500 transition duration-300 hover:shadow-sm">
-        </div>
-
-        <div>
-          <label class="block font-semibold text-gray-300 mb-1">Student ID (Unique Identifier)</label>
-          <input type="text" name="id" required class="input-dark w-full rounded-lg px-4 py-2 focus:ring-purple-500 transition duration-300 hover:shadow-sm">
-        </div>
+    <div class="flex items-center gap-4">
+      <div class="hidden sm:flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="font-geist text-xs font-semibold text-emerald-400 uppercase tracking-wider">SYSTEM LIVE</span>
       </div>
-
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="block font-semibold text-gray-300 mb-1">Program</label>
-          <input type="text" name="program" required class="input-dark w-full rounded-lg px-4 py-2 focus:ring-purple-500 transition duration-300 hover:shadow-sm">
-        </div>
-
-        <div>
-          <label class="block font-semibold text-gray-300 mb-1">Branch</label>
-          <input type="text" name="branch" required class="input-dark w-full rounded-lg px-4 py-2 focus:ring-purple-500 transition duration-300 hover:shadow-sm">
-        </div>
-      </div>
-      
-      <div class="space-y-4">
-        <div>
-          <label class="block font-semibold text-gray-300 mb-1">Mobile</label>
-          <input type="text" name="mobile" required class="input-dark w-full rounded-lg px-4 py-2 focus:ring-purple-500 transition duration-300 hover:shadow-sm">
-        </div>
-
-        <div>
-          <label class="block font-semibold text-gray-300 mb-1">Email</label>
-          <input type="email" name="email" required class="input-dark w-full rounded-lg px-4 py-2 focus:ring-purple-500 transition duration-300 hover:shadow-sm">
-        </div>
-      </div>
-
-      <div class="pt-4 border-t border-[#3b3b55]">
-        <label class="block font-semibold text-gray-300 mb-2">Upload Profile Photo (Crucial for Recognition)</label>
-        <input type="file" name="photo" accept="image/*" required class="input-dark w-full rounded-lg px-4 py-2 file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-800 file:text-white hover:file:bg-purple-700 transition shadow-inner" onchange="previewImage(event)">
-      </div>
-
-      <div class="text-center p-3 bg-gray-900/50 rounded-lg border border-dashed border-purple-500/50 transform transition-all duration-300">
-        <img id="imagePreview" src="" alt="Preview" class="max-w-xs mx-auto mt-2 rounded-lg shadow-xl hidden border-2 border-purple-500 transform transition-all duration-500" />
-        <p id="previewText" class="text-sm text-gray-400 mt-2">Photo preview will appear here.</p>
-      </div>
-
-      <button type="submit" class="w-full bg-gradient-to-r from-purple-600 to-indigo-500 text-white font-bold text-lg py-3 rounded-lg hover:opacity-95 transition shadow-lg transform hover:scale-[1.01] neon-glow">
-        📥 SUBMIT STUDENT & TRAIN MODEL
-      </button>
-    </form>
-
-    <div class="mt-6 text-center">
-      <a href="/" class="text-purple-400 hover:text-purple-300 hover:underline font-medium flex items-center justify-center gap-2 transition duration-300 transform hover:translate-x-1">
-        <span class="text-xl">⬅️</span> Back to Attendance Home
+      <span class="hidden lg:inline text-xs text-gray-400">Welcome, <strong class="text-gray-200">{{ session_username }}</strong></span>
+      <a href="/logout" class="btn-danger-glass px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2">
+        <i data-lucide="log-out" class="w-4 h-4"></i> Logout
       </a>
     </div>
-  </div>
+  </header>
+
+  <!-- BottomNavBar (Mobile Only) -->
+  <nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe md:hidden h-16 bg-[#131b2e]/85 backdrop-blur-lg border-t border-white/10 shadow-2xl">
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/">
+      <i data-lucide="home" class="w-5 h-5 mb-0.5"></i>
+      <span>Home</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/viewer">
+      <i data-lucide="bar-chart-2" class="w-5 h-5 mb-0.5"></i>
+      <span>Records</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/students">
+      <i data-lucide="users" class="w-5 h-5 mb-0.5"></i>
+      <span>Students</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-blue-400" href="/add_student">
+      <i data-lucide="user-plus" class="w-5 h-5 mb-0.5"></i>
+      <span>Add</span>
+    </a>
+  </nav>
+
+  <main class="p-6 max-w-2xl mx-auto mt-20">
+    <div class="glass-panel shadow-2xl rounded-2xl p-8 inner-glow">
+      
+      <div class="flex flex-col items-center mb-6">
+        <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-3">
+          <i data-lucide="user-plus" class="w-6 h-6 text-blue-500"></i>
+        </div>
+        <h2 class="text-2xl text-center font-geist font-bold text-white">Register Student Profile</h2>
+        <p class="text-sm text-gray-400 text-center mt-1">Add a new student face reference for attendance scans.</p>
+      </div>
+
+      <div class="p-4 mb-6 rounded-lg bg-blue-500/10 border border-blue-500/20">
+          <h3 class="text-sm font-semibold text-blue-400 mb-1.5 flex items-center gap-2">
+              <i data-lucide="info" class="w-4 h-4"></i> Photo Reference Guidelines
+          </h3>
+          <ul class="list-disc list-inside text-xs text-gray-400 space-y-1 ml-1.5">
+              <li>Use a clear, high-resolution portrait shot.</li>
+              <li>Ensure the student is facing directly forward with clear lighting.</li>
+              <li>Only one person should be in the photo reference.</li>
+          </ul>
+      </div>
+
+      <div id="messageBox" class="hidden p-4 mb-6 rounded-lg font-medium text-center shadow-md"></div>
+
+      <form id="studentForm" enctype="multipart/form-data" class="space-y-5">
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Name</label>
+            <input type="text" name="name" required placeholder="e.g. John Doe" class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Student ID (Unique Identifier)</label>
+            <input type="text" name="id" required placeholder="e.g. STU12345" class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Program</label>
+            <input type="text" name="program" required placeholder="e.g. B.Tech" class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Branch</label>
+            <input type="text" name="branch" required placeholder="e.g. CSE" class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm">
+          </div>
+        </div>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Mobile</label>
+            <input type="text" name="mobile" required placeholder="e.g. +1234567890" class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Email</label>
+            <input type="email" name="email" required placeholder="e.g. john@example.com" class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm">
+          </div>
+        </div>
+
+        <div class="pt-4 border-t border-white/10">
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Upload Profile Photo</label>
+          <input type="file" name="photo" accept="image/*" required 
+                 class="input-dark-glass w-full rounded-lg px-4 py-2 file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600/20 file:text-blue-400 hover:file:bg-blue-600/30 file:cursor-pointer cursor-pointer text-sm" 
+                 onchange="previewImage(event)">
+        </div>
+
+        <div class="text-center p-3 bg-white/5 rounded-lg border border-dashed border-white/15">
+          <img id="imagePreview" src="" alt="Preview" class="max-w-xs mx-auto mt-2 rounded-lg shadow-xl hidden border border-white/10" />
+          <p id="previewText" class="text-xs text-gray-400 my-2">Photo preview will appear here.</p>
+        </div>
+
+        <button type="submit" class="w-full btn-primary-glass text-white font-bold text-sm py-3.5 rounded-xl flex items-center justify-center gap-2">
+          <i data-lucide="check" class="w-5 h-5"></i>
+          Register Student & Train Model
+        </button>
+      </form>
+    </div>
+  </main>
 
   <script>
+    lucide.createIcons();
+
     function previewImage(event) {
       const preview = document.getElementById('imagePreview');
       const text = document.getElementById('previewText');
@@ -128,13 +155,11 @@
           preview.src = reader.result;
           preview.classList.remove('hidden');
           text.classList.add('hidden');
-          preview.classList.add('animate-fadeIn'); // Added animation on load
         };
         reader.readAsDataURL(file);
       } else {
         preview.classList.add('hidden');
         text.classList.remove('hidden');
-        preview.classList.remove('animate-fadeIn');
       }
     }
 
@@ -149,7 +174,7 @@
       });
 
       const text = await response.text();
-      showMessage(text.includes("success") ? "✅ Student profile successfully created and model updated!" : "❌ " + text, text.includes("success"));
+      showMessage(text.includes("success") ? "Student profile successfully created and model updated!" : text, text.includes("success"));
       
       if (text.includes("success")) form.reset();
       // Reset preview after form reset
@@ -161,13 +186,13 @@
     function showMessage(msg, success) {
       const box = document.getElementById("messageBox");
       box.textContent = msg;
-      box.className = "p-4 mb-6 rounded-lg font-medium text-center shadow-md animate-fadeIn";
+      box.className = "p-4 mb-6 rounded-lg font-medium text-center shadow-md text-sm";
       if (success) {
-        box.classList.add("bg-green-900/40", "text-green-300", "border", "border-green-600/50", "animate-wiggle-once");
-        box.classList.remove("bg-red-900/40", "text-red-300", "border-red-600/50");
+        box.classList.add("bg-emerald-500/10", "text-emerald-400", "border", "border-emerald-500/20");
+        box.classList.remove("bg-rose-500/10", "text-rose-400", "border-rose-500/20");
       } else {
-        box.classList.add("bg-red-900/40", "text-red-300", "border", "border-red-600/50", "animate-shake");
-        box.classList.remove("bg-green-900/40", "text-green-300", "border-green-600/50");
+        box.classList.add("bg-rose-500/10", "text-rose-400", "border", "border-rose-500/20");
+        box.classList.remove("bg-emerald-500/10", "text-emerald-400", "border-emerald-500/20");
       }
       box.classList.remove("hidden");
     }
