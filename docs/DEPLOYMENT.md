@@ -1,6 +1,6 @@
-# 🌍 Onyx Face Attendance System Production Deployment
+# 🌍 BioSecure AI Production Deployment
 
-Because the **Onyx Face Attendance System** relies on Supabase `pgvector` for its data storage, it is entirely **stateless**. This means you do not have to worry about managing complex Docker volumes or persistent storage drives just to save student photos! 
+Because **BioSecure AI** relies on Supabase `pgvector` for its data storage, it is entirely **stateless**. This means you do not have to worry about managing complex Docker volumes or persistent storage drives just to save student photos! 
 
 You can host this application practically anywhere that supports Python.
 

@@ -1,4 +1,4 @@
-# 🗄️ Onyx Face Attendance System Database Setup
+# 🗄️ BioSecure AI Database Setup
 
 This project relies on **Supabase** (a PostgreSQL database) combined with the **`pgvector`** extension to handle all data persistence and facial similarity math.
 
