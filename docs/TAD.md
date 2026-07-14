@@ -244,7 +244,7 @@ utils/auth_helpers.py
 
 Currently, templates do **not** use Jinja2 `extends`/`block` inheritance — each template is standalone and includes its own `<head>`, navigation, and scripts. This is intentional for simplicity, but creates code duplication in the nav bar and head section.
 
-**Future improvement**: Create `templates/base.html` with `{% block content %}` for DRY navigation.
+**Future improvement**: Create `templates/base.html` with a Jinja content block for DRY navigation.
 
 ---
 
