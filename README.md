@@ -26,11 +26,13 @@ Built for the modern web, this application is **100% stateless**. By leveraging 
 
 To keep this repository clean and easy to navigate, we have split our documentation into focused, in-depth guides. Please select the guide you need from the list below:
 
-*   **[🏗️ Architecture Guide](docs/ARCHITECTURE.md)**: Deep dive into the stateless system flow, the modular Flask blueprints, the AI inference layer, and view the **Mermaid flowcharts**.
-*   **[🗄️ Database Setup (Supabase)](docs/DATABASE.md)**: The exact SQL scripts required to configure your Supabase instance with `pgvector` and the facial matching RPC functions.
-*   **[⚙️ Local Setup Guide](docs/SETUP.md)**: Step-by-step instructions for cloning the repo, installing dependencies, and configuring your `.env` variables.
-*   **[🌍 Production Deployment](docs/DEPLOYMENT.md)**: Learn how to deploy this stateless application to a standard Linux VPS or a modern PaaS like Render.
-*   **[👨‍💼 Administrator Guide](docs/ADMIN_GUIDE.md)**: A user manual covering how to grant admin privileges, manage user accounts, register students, and capture attendance.
+*   **[📖 Documentation Hub](docs/index.md)**: The central portal/table of contents with component flowcharts.
+*   **[🏗️ Architecture Guide](docs/architecture.md)**: Deep dive into the stateless system flow, modular layouts, and execution sequence diagrams.
+*   **[🗄️ Database Setup](docs/database.md)**: SQL schemas, RLS security configurations, and custom cosine matching RPC functions.
+*   **[🧠 ML & Inference Pipeline](docs/ml_pipeline.md)**: InsightFace model specs, RetinaFace alignment, and ArcFace vector mathematics.
+*   **[🔌 API Reference](docs/api_reference.md)**: Comprehensive manual for authentication, students, and attendance REST endpoints.
+*   **[🌍 Production Deployment & Setup](docs/deployment.md)**: Local configurations, environment vars, Gunicorn tuning, and systemd/Nginx configurations.
+*   **[👨‍💼 User & Admin Guide](docs/user_guide.md)**: Operational manual for student registrations, attendance logging, and exporting reports.
 
 ---
 
