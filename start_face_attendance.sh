@@ -34,7 +34,7 @@ if [ -f ".env" ]; then
 fi
 
 # Run with multiple workers since the system has migrated to PostgreSQL.
-exec gunicorn app:app \
+exec gunicorn wsgi:app \
     --workers 2 \
     --bind 0.0.0.0:8000 \
     --timeout 120 \

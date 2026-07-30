@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Attendance Records — BioSecure AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.4.1/css/responsive.dataTables.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+  <script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+
+  <style>
+    /* DataTables Dark Mode Overrides */
+    .dataTables_wrapper .dataTables_filter input,
+    .dataTables_wrapper .dataTables_length select,
+    .dataTables_wrapper .dataTables_info,
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+        color: #dae2fd !important;
+    }
+    .dataTables_wrapper .dataTables_filter input {
+        background: rgba(11, 19, 38, 0.6) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 8px !important;
+        padding: 4px 10px !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: #dae2fd !important;
+        border-radius: 6px !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+        background: rgba(255, 255, 255, 0.1) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    }
+    .dataTables_wrapper .dataTables_paginate .current {
+        background: #3b82f6 !important;
+        border-color: #3b82f6 !important;
+        color: white !important;
+    }
+    #attendanceTable {
+        background-color: transparent !important;
+        border-collapse: collapse !important;
+    }
+    #attendanceTable thead {
+        background-color: rgba(255, 255, 255, 0.03) !important;
+    }
+    #attendanceTable th {
+        color: #ffffff !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        font-family: 'Geist', sans-serif;
+        font-weight: 600;
+    }
+    #attendanceTable tbody tr {
+        background-color: transparent !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    }
+    #attendanceTable tbody tr:hover {
+        background-color: rgba(255, 255, 255, 0.02) !important;
+    }
+  </style>
+</head>
+
+<body class="pb-24 md:pb-8">
+
+  <!-- TopAppBar -->
+  <header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-3 bg-[#0b1326]/70 backdrop-blur-xl border-b border-white/10 shadow-lg">
+    <div class="flex items-center gap-3">
+      <i data-lucide="scan-face" class="w-8 h-8 text-blue-500"></i>
+      <h1 class="font-geist text-xl font-bold text-blue-400 tracking-tight">BioSecure AI</h1>
+    </div>
+    
+    <!-- Desktop Navigation Links -->
+    <nav class="hidden md:flex items-center gap-6">
+      <a href="/" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">Home</a>
+      <a href="/viewer" class="text-sm font-medium transition-colors hover:text-blue-400 text-blue-400 font-semibold">View Records</a>
+      <a href="/students" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">All Students</a>
+      <a href="/add_student" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">Add Student</a>
+      {% if session_is_admin %}
+      <a href="/admin" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">Admin Portal</a>
+      {% endif %}
+    </nav>
+
+    <div class="flex items-center gap-4">
+      <div class="hidden sm:flex items-center gap-2 px-3 py-1 bg-emerald-500/10 rounded-full border border-emerald-500/20">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="font-geist text-xs font-semibold text-emerald-400 uppercase tracking-wider">SYSTEM LIVE</span>
+      </div>
+      <span class="hidden lg:inline text-xs text-gray-400">Welcome, <strong class="text-gray-200">{{ session_username }}</strong></span>
+      <a href="/logout" class="btn-danger-glass px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2">
+        <i data-lucide="log-out" class="w-4 h-4"></i> Logout
+      </a>
+    </div>
+  </header>
+
+  <!-- BottomNavBar (Mobile Only) -->
+  <nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe md:hidden h-16 bg-[#131b2e]/85 backdrop-blur-lg border-t border-white/10 shadow-2xl">
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/">
+      <i data-lucide="home" class="w-5 h-5 mb-0.5"></i>
+      <span>Home</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-350" href="/viewer">
+      <i data-lucide="bar-chart-2" class="w-5 h-5 mb-0.5"></i>
+      <span>Records</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/students">
+      <i data-lucide="users" class="w-5 h-5 mb-0.5"></i>
+      <span>Students</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/add_student">
+      <i data-lucide="user-plus" class="w-5 h-5 mb-0.5"></i>
+      <span>Add</span>
+    </a>
+    {% if session_is_admin %}
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/admin">
+      <i data-lucide="settings" class="w-5 h-5 mb-0.5"></i>
+      <span>Admin</span>
+    </a>
+    {% endif %}
+  </nav>
+
+  <main class="p-6 max-w-7xl mx-auto mt-20">
+    <div class="glass-panel shadow-2xl p-8 rounded-2xl inner-glow animate-fade-in">
+      <div class="flex flex-wrap justify-between items-center mb-6 gap-4 border-b border-white/10 pb-4">
+          <div class="flex items-center gap-2">
+              <i data-lucide="calendar" class="w-6 h-6 text-blue-400"></i>
+              <h2 class="text-xl font-bold font-geist text-white">Attendance Archives</h2>
+          </div>
+          <!-- Tabs -->
+          <div class="flex gap-4">
+            <button id="tabMatrixBtn" class="px-4 py-2 text-sm font-bold rounded-lg border border-blue-500/30 bg-blue-500/10 text-blue-400 transition-all">
+              Class Register Matrix
+            </button>
+            <button id="tabLogsBtn" class="px-4 py-2 text-sm font-bold rounded-lg border border-white/10 text-gray-400 hover:text-gray-200 transition-all">
+              Raw Detailed Logs
+            </button>
+          </div>
+      </div>
+
+      <!-- VIEW 1: MATRIX VIEW CONTAINER -->
+      <div id="matrixViewContainer" class="space-y-6">
+        <div class="glass-card p-5 rounded-xl shadow-inner flex flex-wrap gap-4 items-center justify-between">
+          <div class="flex items-center gap-2 text-gray-400 text-sm font-semibold">
+            <i data-lucide="filter" class="w-4 h-4 text-blue-400"></i>
+            <span>Select Class to Analyze:</span>
+          </div>
+          <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto items-center">
+            <select id="matrixLectureFilter" class="input-dark-glass px-4 py-2 rounded-lg text-sm w-full sm:w-auto">
+              <option value="">Select Lecture</option>
+            </select>
+            <select id="matrixProgramFilter" class="input-dark-glass px-4 py-2 rounded-lg text-sm w-full sm:w-auto">
+              <option value="">Select Program</option>
+            </select>
+            <select id="matrixBranchFilter" class="input-dark-glass px-4 py-2 rounded-lg text-sm w-full sm:w-auto">
+              <option value="">Select Branch</option>
+            </select>
+            <input type="date" id="matrixDateFilter" class="input-dark-glass px-4 py-2 rounded-lg text-sm w-full sm:w-auto" title="Filter by Date (Optional)" />
+            <button id="addSessionBtn" onclick="addNewSessionCol()" class="hidden bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 transform hover:shadow-lg">
+              <i data-lucide="plus" class="w-4 h-4"></i> Add Session
+            </button>
+            <button id="refreshMatrixBtn" onclick="refreshMatrixData()" class="bg-[#0b1326]/60 hover:bg-[#0b1326] text-white px-4 py-2 rounded-lg text-sm font-bold border border-white/10 transition flex items-center gap-2 transform hover:shadow-lg">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i> Refresh
+            </button>
+            <button id="exportMatrixBtn" onclick="exportMatrixToCSV()" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 transform hover:shadow-lg">
+              <i data-lucide="download" class="w-4 h-4"></i> Export Register
+            </button>
+          </div>
+        </div>
+
+        <div id="matrixTableWrapper" class="hidden glass-panel p-6 rounded-xl border border-white/5 overflow-x-auto space-y-4">
+          <div class="flex items-center gap-3 p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-300 text-xs">
+            <i data-lucide="info" class="w-5 h-5 text-blue-400 shrink-0 animate-pulse"></i>
+            <div>
+              <strong class="text-white">Interactive Grid:</strong> Tap or click directly on any <span class="text-emerald-400 font-semibold">Present</span> or <span class="text-rose-400 font-semibold">Absent</span> badge inside the grid cells to instantly toggle/change that student's status for that session.
+            </div>
+          </div>
+          <table id="matrixTable" class="w-full text-sm text-left text-gray-300 border-collapse">
+            <!-- Headers and rows will be generated dynamically -->
+          </table>
+        </div>
+
+        <div id="matrixPlaceholder" class="glass-card p-12 rounded-xl text-center border border-dashed border-white/15">
+          <i data-lucide="grid" class="w-12 h-12 text-gray-500 mx-auto mb-3"></i>
+          <h3 class="text-lg font-bold text-gray-300 font-geist">Select Lecture, Program & Branch</h3>
+          <p class="text-sm text-gray-500 mt-1 max-w-sm mx-auto">Choose a class from the filters above to load the student-by-student register grid.</p>
+        </div>
+      </div>
+
+      <!-- VIEW 2: LOGS VIEW CONTAINER -->
+      <div id="logsViewContainer" class="hidden space-y-6">
+        <div class="glass-card p-4 rounded-xl shadow-inner flex flex-col md:flex-row flex-wrap gap-4 items-center justify-between">
+            <button id="downloadFilteredCsvBtn" class="btn-primary-glass px-6 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2">
+              <i data-lucide="download" class="w-4 h-4"></i> Download CSV Report
+            </button>
+            
+            <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+              <select id="statusFilter" class="input-dark-glass px-4 py-2 rounded-lg text-sm w-full sm:w-auto">
+                <option value="">Filter by Status</option>
+                <option value="Present">Present</option>
+                <option value="Absent">Absent</option>
+                <option value="Already Marked">Already Marked</option>
+              </select>
+
+              <select id="lectureFilter" class="input-dark-glass px-4 py-2 rounded-lg text-sm w-full sm:w-auto">
+                <option value="">Filter by Lecture</option>
+              </select>
+              
+              <button id="todayBtn" class="btn-secondary-glass px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2">
+                <i data-lucide="calendar-days" class="w-4 h-4"></i> Today Only
+              </button>
+            </div>
+        </div>
+
+        <table id="attendanceTable" class="display nowrap w-full text-sm">
+          <thead>
+            <tr>
+              <th class="py-3 px-4 text-left">Student ID</th>
+              <th class="py-3 px-4 text-left">Name</th>
+              <th class="py-3 px-4 text-left">Program</th>
+              <th class="py-3 px-4 text-left">Branch</th>
+              <th class="py-3 px-4 text-left">Status</th>
+              <th class="py-3 px-4 text-left">Timestamp</th>
+              <th class="py-3 px-4 text-left">Lecture</th>
+            </tr>
+          </thead>
+          <tbody>
+          </tbody>
+        </table>
+      </div>
+
+<script>
+  let attendanceTable;
+  let rawAttendanceData = [];
+  let rawStudentsData = [];
+  let todayFilterActive = false;
+
+  // Toggle between matrix view and raw logs view
+  $('#tabMatrixBtn').click(function() {
+      $(this).removeClass('text-gray-400 hover:text-gray-200 border-white/10').addClass('border-blue-500/30 bg-blue-500/10 text-blue-400');
+      $('#tabLogsBtn').removeClass('border-blue-500/30 bg-blue-500/10 text-blue-400').addClass('border-white/10 text-gray-400 hover:text-gray-200');
+      $('#matrixViewContainer').removeClass('hidden');
+      $('#logsViewContainer').addClass('hidden');
+  });
+
+  $('#tabLogsBtn').click(function() {
+      $(this).removeClass('text-gray-400 hover:text-gray-200 border-white/10').addClass('border-blue-500/30 bg-blue-500/10 text-blue-400');
+      $('#tabMatrixBtn').removeClass('border-blue-500/30 bg-blue-500/10 text-blue-400').addClass('border-white/10 text-gray-400 hover:text-gray-200');
+      $('#logsViewContainer').removeClass('hidden');
+      $('#matrixViewContainer').addClass('hidden');
+      if (attendanceTable) {
+          attendanceTable.columns.adjust().draw();
+      }
+  });
+
+  $(document).ready(function () {
+    lucide.createIcons();
+
+    attendanceTable = $('#attendanceTable').DataTable({
+      ajax: {
+        url: "/get_attendance_data",
+        dataSrc: function(json) {
+            rawAttendanceData = json.attendance || [];
+            rawStudentsData = json.students || [];
+            // Populate Matrix Filters
+            populateFilters(rawAttendanceData);
+            return rawAttendanceData;
+        }
+      },
+      columns: [
+        { data: 0 },
+        { data: 1 },
+        { data: 2 },
+        { data: 3 },
+        { data: 4, 
+          "render": function (data, type, row) {
+                if (type === 'display') {
+                    let className = 'font-semibold px-2.5 py-1 rounded-full text-xs transition duration-200';
+                    let label = data;
+                    if (data === 'Present') {
+                        className += ' bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20';
+                    } else if (data === 'Already Marked') {
+                        className += ' bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20';
+                    } else {
+                        className += ' bg-rose-500/10 text-rose-400 border border-rose-500/20 hover:bg-rose-500/20';
+                        label = 'Absent';
+                    }
+                    let nextStatus = (data === 'Present' || data === 'Already Marked') ? 'Absent' : 'Present';
+                    return `<button type="button" onclick="toggleLogStatus('${row[0]}', '${row[6]}', '${row[5]}', '${nextStatus}', this)" title="Click to toggle status" class="transform hover:scale-105 active:scale-95 transition-all"><span class="${className}">${label}</span></button>`;
+                }
+                return data;
+            }
+        },
+        { data: 5 },
+        { data: 6 }
+      ],
+      responsive: false,
+      scrollX: true,
+      dom: 'Bfrtip',
+      buttons: [
+        {
+          extend: 'collection',
+          text: 'Export Data ⬇',
+          buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],
+          className: 'bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg font-semibold transition duration-300 transform hover:shadow-lg neon-button'
+        }
+      ]
+    });
+
+    async function populateFilters(data) {
+        let lectureSet = new Set();
+        let programSet = new Set();
+        let branchSet = new Set();
+
+        // Load created options directly from our academic lookup API first
+        try {
+            const res = await fetch('/api/academic_options');
+            const acadData = await res.json();
+            (acadData.programs || []).forEach(p => programSet.add(p));
+            (acadData.branches || []).forEach(b => branchSet.add(b));
+        } catch (err) {
+            console.error("Failed to read academic options:", err);
+        }
+
+        // Add options found in the last logs
+        data.forEach(row => {
+            if (row[6]) lectureSet.add(row[6]);
+        });
+
+        // Clear existing, keep placeholder
+        $("#lectureFilter").html('<option value="">Filter by Lecture</option>');
+        $("#matrixLectureFilter").html('<option value="">Select Lecture</option>');
+        $("#matrixProgramFilter").html('<option value="">Select Program</option>');
+        $("#matrixBranchFilter").html('<option value="">Select Branch</option>');
+
+        lectureSet.forEach(l => {
+            $("#lectureFilter").append(`<option value="${l}">${l}</option>`);
+            $("#matrixLectureFilter").append(`<option value="${l}">${l}</option>`);
+        });
+        programSet.forEach(p => {
+            $("#matrixProgramFilter").append(`<option value="${p}">${p}</option>`);
+        });
+        branchSet.forEach(b => {
+            $("#matrixBranchFilter").append(`<option value="${b}">${b}</option>`);
+        });
+
+        // Auto-select first lecture/program/branch on initial load
+        if (lectureSet.size > 0 && programSet.size > 0 && branchSet.size > 0 && !window.hasAutoSelected) {
+            const firstLec = Array.from(lectureSet)[0];
+            const firstProg = Array.from(programSet)[0];
+            const firstBranch = Array.from(branchSet)[0];
+            $("#matrixLectureFilter").val(firstLec);
+            $("#matrixProgramFilter").val(firstProg);
+            $("#matrixBranchFilter").val(firstBranch);
+            window.hasAutoSelected = true;
+            renderMatrixRegister();
+        }
+    }
+
+    // Trigger matrix rendering on filters change, reloading fresh logs first
+    $('#matrixLectureFilter, #matrixProgramFilter, #matrixBranchFilter, #matrixDateFilter').on('change input', async function() {
+        try {
+            const res = await fetch("/get_attendance_data");
+            const json = await res.json();
+            rawAttendanceData = json.attendance || [];
+            rawStudentsData = json.students || [];
+        } catch (e) {
+            console.error("Failed to reload data on filter change:", e);
+        }
+        renderMatrixRegister();
+    });
+
+    function renderMatrixRegister() {
+        const selectedLec = $('#matrixLectureFilter').val();
+        const selectedProg = $('#matrixProgramFilter').val();
+        const selectedBranch = $('#matrixBranchFilter').val();
+        const selectedDate = $('#matrixDateFilter').val();
+
+        if (!selectedLec || !selectedProg || !selectedBranch) {
+            $('#matrixTableWrapper').addClass('hidden');
+            $('#exportMatrixBtn').addClass('hidden');
+            $('#matrixPlaceholder').removeClass('hidden');
+            return;
+        }
+
+        $('#matrixPlaceholder').addClass('hidden');
+        $('#matrixTableWrapper').removeClass('hidden');
+        $('#exportMatrixBtn').removeClass('hidden');
+        $('#addSessionBtn').removeClass('hidden');
+
+        // Filter relevant records by lecture (case-insensitive) and program/branch
+        let filtered = rawAttendanceData.filter(r => 
+            (r[6] || "").toString().toUpperCase() === selectedLec.toUpperCase() &&
+            (r[2] || "").toString().toUpperCase() === selectedProg.toUpperCase() &&
+            (r[3] || "").toString().toUpperCase() === selectedBranch.toUpperCase()
+        );
+
+        // Apply optional Date Filter (r[5] is the timestamp formatted as 'YYYY-MM-DD HH:MM:SS')
+        if (selectedDate) {
+            filtered = filtered.filter(r => r[5].startsWith(selectedDate));
+        }
+
+        // Find unique timestamps and sort them in reverse chronological order (newest first)
+        const timestamps = [...new Set(filtered.map(r => r[5]))].sort((a, b) => b.localeCompare(a));
+
+        // Find unique students, details, and sort alphabetically
+        const studentMap = {};
+        rawStudentsData.forEach(s => {
+            // Only add students that belong to the selected program & branch (case-insensitive)
+            if (s.program && s.program.toString().toUpperCase() === selectedProg.toUpperCase() &&
+                s.branch && s.branch.toString().toUpperCase() === selectedBranch.toUpperCase()) {
+                studentMap[s.id] = { name: s.name, branch: s.branch || 'N/A' };
+            }
+        });
+        const sortedStudentIds = Object.keys(studentMap).sort((a, b) => {
+            return studentMap[a].name.toLowerCase().localeCompare(studentMap[b].name.toLowerCase());
+        });
+
+        // Build Table
+        let html = '';
+        
+        // Table Header
+        html += `
+          <thead>
+            <tr class="bg-white/5 border-b border-white/10">
+              <th class="py-3 px-4 text-left font-semibold text-white">Student ID</th>
+              <th class="py-3 px-4 text-left font-semibold text-white">Name</th>
+              <th class="py-3 px-4 text-left font-semibold text-white">Branch</th>
+        `;
+        timestamps.forEach(ts => {
+            // Display date and time split into two lines for cleaner header
+            const parts = ts.split(' ');
+            html += `<th class="py-3 px-4 text-center font-semibold text-white min-w-[120px]">${parts[0]}<br><span class="text-xs text-gray-500 font-normal">${parts[1]}</span></th>`;
+        });
+        html += `</tr></thead><tbody>`;
+
+        // Table Rows
+        sortedStudentIds.forEach(sId => {
+            const student = studentMap[sId];
+            html += `
+              <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                <td class="py-3 px-4 font-mono text-xs text-gray-400">${sId}</td>
+                <td class="py-3 px-4 font-semibold text-white">${student.name}</td>
+                <td class="py-3 px-4 text-xs text-gray-400">${student.branch}</td>
+            `;
+
+            timestamps.forEach(ts => {
+                 const isPresent = filtered.some(r => 
+                     (r[0] || "").toString().trim().toUpperCase() === sId.toString().trim().toUpperCase() && 
+                     r[5] === ts && 
+                     (r[4] === 'Present' || r[4] === 'Already Marked')
+                 );
+                 const status = isPresent ? 'Present' : 'Absent';
+                 let badgeClass = 'flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition';
+                 let innerContent = '';
+                 if (isPresent) {
+                     badgeClass += ' bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-500/20';
+                     innerContent = `<i data-lucide="check" class="w-3.5 h-3.5"></i> Present`;
+                 } else {
+                     badgeClass += ' bg-rose-500/10 text-rose-400 border border-rose-500/25 hover:bg-rose-500/20';
+                     innerContent = `<i data-lucide="x" class="w-3.5 h-3.5"></i> Absent`;
+                 }
+
+                 html += `
+                   <td class="py-3 px-4 text-center">
+                     <button type="button" onclick="toggleMatrixStatus('${sId}', '${selectedLec}', '${ts}', '${status}', this)" class="transform active:scale-95 transition-all inline-block">
+                       <span class="${badgeClass}">${innerContent}</span>
+                     </button>
+                   </td>
+                 `;
+            });
+
+            html += `</tr>`;
+        });
+
+        html += `</tbody>`;
+        $('#matrixTable').html(html);
+        lucide.createIcons();
+    }
+
+    $("#downloadFilteredCsvBtn").click(function () {
+      $(this).addClass('animate-pulse-once');
+      setTimeout(() => $(this).removeClass('animate-pulse-once'), 1000);
+
+      const tableData = attendanceTable.rows({ search: 'applied' }).data().toArray();
+      
+      if (!tableData || !tableData.length) {
+        alert("No attendance records to download in the current filter.");
+        return;
+      }
+
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Student_ID,Name,Program,Branch,Status,Timestamp,Lecture\n";
+      
+      tableData.forEach(row => {
+          let formattedRow = row.map(e => `"${e}"`).join(",");
+          csvContent += formattedRow + "\n";
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Filtered_Attendance_Report_${timestamp}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+
+    $("#statusFilter, #lectureFilter").on("change", function () {
+        $(this).addClass('border-4 border-yellow-300');
+        setTimeout(() => $(this).removeClass('border-4 border-yellow-300'), 500);
+    });
+
+    $("#statusFilter").on("change", function () {
+      attendanceTable.column(5).search(this.value).draw();
+    });
+
+    $("#lectureFilter").on("change", function () {
+      attendanceTable.column(7).search(this.value).draw();
+    });
+
+    $("#todayBtn").on("click", function () {
+      const today = new Date().toISOString().split("T")[0];
+
+      if (!todayFilterActive) {
+        attendanceTable.column(6).search(today).draw();
+        $(this).html('<i data-lucide="calendar" class="w-4 h-4"></i> Clear Date Filter');
+        $(this).removeClass("btn-secondary-glass").addClass("btn-danger-glass");
+        todayFilterActive = true;
+      } else {
+        attendanceTable.column(6).search("").draw();
+        $(this).html('<i data-lucide="calendar-days" class="w-4 h-4"></i> Today Only');
+        $(this).removeClass("btn-danger-glass").addClass("btn-secondary-glass");
+        todayFilterActive = false;
+      }
+      lucide.createIcons();
+    });
+  });
+
+  // API Call to toggle status on backend & sync local caches/DataTables
+  async function toggleLogStatus(studentId, lecture, timestamp, newStatus, btnElement) {
+      const span = btnElement.querySelector('span');
+      const originalHtml = span.outerHTML;
+      span.innerHTML = 'Updating...';
+      btnElement.disabled = true;
+
+      try {
+          const response = await fetch('/update_attendance_status', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  student_id: studentId,
+                  lecture: lecture,
+                  timestamp: timestamp,
+                  status: newStatus
+              })
+          });
+          const result = await response.json();
+          if (result.success) {
+              // Sync local DataTable datasource
+              const matchedRow = rawAttendanceData.find(r => r[0] === studentId && r[6] === lecture && r[5] === timestamp);
+              if (matchedRow) {
+                  matchedRow[4] = newStatus;
+              }
+              attendanceTable.clear().rows.add(rawAttendanceData).draw(false);
+          } else {
+              alert("Error updating status: " + (result.error || "Unknown error"));
+              span.outerHTML = originalHtml;
+          }
+      } catch (err) {
+          console.error(err);
+          alert("Network error updating status.");
+          span.outerHTML = originalHtml;
+      } finally {
+          btnElement.disabled = false;
+      }
+  }
+
+  // Toggle status inside matrix and sync DataTable as well
+  async function toggleMatrixStatus(studentId, lecture, timestamp, currentStatus, btnElement) {
+      const newStatus = (currentStatus === 'Present' || currentStatus === 'Already Marked') ? 'Absent' : 'Present';
+      const span = btnElement.querySelector('span');
+      const originalClass = span.className;
+      const originalHtml = span.innerHTML;
+      
+      span.innerText = '...';
+      btnElement.disabled = true;
+
+      try {
+          const response = await fetch('/update_attendance_status', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  student_id: studentId,
+                  lecture: lecture,
+                  timestamp: timestamp,
+                  status: newStatus
+              })
+          });
+          const result = await response.json();
+          if (result.success) {
+              // Find and update matched record in local cache
+              let matchedRow = rawAttendanceData.find(r => r[0] === studentId && r[6] === lecture && r[5] === timestamp);
+              if (matchedRow) {
+                  matchedRow[4] = newStatus;
+              } else {
+                  // If no record existed (e.g. N/A or new absent record), insert into cache
+                  rawAttendanceData.push([studentId, '', '', '', newStatus, timestamp, lecture]);
+              }
+
+              // Update cell styling dynamically
+              let nextClass = 'flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition';
+              if (newStatus === 'Present') {
+                  nextClass += ' bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-500/20';
+                  span.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i> Present`;
+              } else {
+                  nextClass += ' bg-rose-500/10 text-rose-400 border border-rose-500/25 hover:bg-rose-500/20';
+                  span.innerHTML = `<i data-lucide="x" class="w-3.5 h-3.5"></i> Absent`;
+              }
+              span.className = nextClass;
+              lucide.createIcons();
+
+              // Re-bind onclick with updated status
+              btnElement.setAttribute('onclick', `toggleMatrixStatus('${studentId}', '${lecture}', '${timestamp}', '${newStatus}', this)`);
+
+              // Sync background log DataTable
+              if (attendanceTable) {
+                  attendanceTable.clear().rows.add(rawAttendanceData).draw(false);
+              }
+          } else {
+              alert("Error updating status: " + (result.error || "Unknown error"));
+              span.innerHTML = originalHtml;
+              span.className = originalClass;
+          }
+      } catch (err) {
+          console.error(err);
+          alert("Network error updating status.");
+          span.innerHTML = originalHtml;
+          span.className = originalClass;
+      } finally {
+          btnElement.disabled = false;
+      }
+  }
+
+  function addNewSessionCol() {
+      const selectedLec = $('#matrixLectureFilter').val();
+      const selectedProg = $('#matrixProgramFilter').val();
+      const selectedBranch = $('#matrixBranchFilter').val();
+      if (!selectedLec || !selectedProg || !selectedBranch) return;
+
+      const dateStr = new Date().toISOString().split('T')[0];
+      const timeStr = new Date().toTimeString().split(' ')[0];
+      const newTimestamp = `${dateStr} ${timeStr}`;
+
+      // Insert default absent logs for all students belonging to this class into local cache
+      let addedAny = false;
+      rawStudentsData.forEach(s => {
+          if (s.program && s.program.toString().toUpperCase() === selectedProg.toUpperCase() &&
+              s.branch && s.branch.toString().toUpperCase() === selectedBranch.toUpperCase()) {
+              rawAttendanceData.push([
+                  s.id, s.name, s.program, s.branch, '', 'Absent', newTimestamp, selectedLec
+              ]);
+              addedAny = true;
+          }
+      });
+
+      if (addedAny) {
+          renderMatrixRegister();
+          alert("New manual attendance session added! You can now click on status badges to mark students Present.");
+      } else {
+          alert("No registered students found in this program and branch to create a session.");
+      }
+  }
+
+  async function refreshMatrixData() {
+      const btn = document.getElementById("refreshMatrixBtn");
+      const originalHTML = btn.innerHTML;
+      btn.innerHTML = `<i data-lucide="refresh-cw" class="w-4 h-4 animate-spin"></i> Refreshing...`;
+      lucide.createIcons();
+
+      try {
+          const res = await fetch("/get_attendance_data");
+          const json = await res.json();
+          rawAttendanceData = json.attendance || [];
+          rawStudentsData = json.students || [];
+          renderMatrixRegister();
+      } catch (e) {
+          console.error("Refresh failed:", e);
+      } finally {
+          btn.innerHTML = originalHTML;
+          lucide.createIcons();
+      }
+  }
+
+  function exportMatrixToCSV() {
+      const table = document.getElementById("matrixTable");
+      if (!table) return alert("No matrix table found.");
+
+      let csv = [];
+      const rows = table.querySelectorAll("tr");
+      
+      for (let i = 0; i < rows.length; i++) {
+          let row = [], cols = rows[i].querySelectorAll("td, th");
+          
+          for (let j = 0; j < cols.length; j++) {
+              let text = cols[j].innerText.trim();
+              
+              // Standardize toggle-button Present/Absent labels
+              if (text.includes("Present")) text = "Present";
+              else if (text.includes("Absent")) text = "Absent";
+              
+              text = text.replace(/"/g, '""');
+              row.push('"' + text + '"');
+          }
+          csv.push(row.join(","));
+      }
+
+      const csvContent = "data:text/csv;charset=utf-8," + csv.join("\n");
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      const lecture = document.getElementById("matrixLectureFilter").value || "Class";
+      const program = document.getElementById("matrixProgramFilter").value || "Prog";
+      const branch = document.getElementById("matrixBranchFilter").value || "Branch";
+      
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Attendance_Register_${lecture}_${program}_${branch}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Academic Structure Management — BioSecure AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="pb-24 md:pb-8">
+
+  <!-- TopAppBar -->
+  <header class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 py-3 bg-[#0b1326]/70 backdrop-blur-xl border-b border-white/10 shadow-lg">
+    <div class="flex items-center gap-3">
+      <i data-lucide="scan-face" class="w-8 h-8 text-blue-500"></i>
+      <h1 class="font-geist text-xl font-bold text-blue-400 tracking-tight">BioSecure AI</h1>
+    </div>
+    
+    <nav class="hidden md:flex items-center gap-6">
+      <a href="/" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">Home</a>
+      <a href="/viewer" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">View Records</a>
+      <a href="/students" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">All Students</a>
+      <a href="/add_student" class="text-sm font-medium transition-colors hover:text-blue-400 text-gray-300">Add Student</a>
+      <a href="/admin" class="text-sm font-medium transition-colors hover:text-blue-400 text-blue-400">Admin Portal</a>
+    </nav>
+
+    <div class="flex items-center gap-4">
+      <a href="/logout" class="btn-danger-glass px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2">
+        <i data-lucide="log-out" class="w-4 h-4"></i> Logout
+      </a>
+    </div>
+  </header>
+
+  <main class="p-6 max-w-6xl mx-auto mt-20">
+    <div class="glass-panel shadow-2xl p-8 rounded-2xl inner-glow">
+      <div class="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
+        <div class="flex items-center gap-3">
+          <i data-lucide="layers" class="w-6 h-6 text-blue-400"></i>
+          <h2 class="text-xl font-bold font-geist text-white">Manage Programs & Branches</h2>
+        </div>
+        <a href="/admin" class="btn-secondary-glass px-4 py-2 rounded-lg text-xs font-semibold">Back to Admin</a>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        <!-- PROGRAMS -->
+        <div class="bg-white/5 border border-white/10 rounded-xl p-5 space-y-4">
+          <h3 class="text-sm font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
+            <i data-lucide="book-open" class="w-4 h-4"></i> Programs
+          </h3>
+          <form action="/admin/academics" method="POST" class="flex gap-2">
+            <input type="hidden" name="action" value="add">
+            <input type="hidden" name="type" value="program">
+            <input type="text" name="value" required placeholder="e.g. B.Tech" class="input-dark-glass w-full px-3 py-2 text-xs rounded-lg">
+            <button type="submit" class="btn-primary-glass px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-1">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add
+            </button>
+          </form>
+          <div class="space-y-2 max-h-60 overflow-y-auto">
+            {% for item in programs %}
+            <div class="flex justify-between items-center bg-[#0b1326]/60 p-2.5 rounded-lg border border-white/5 text-xs text-white">
+              <span>{{ item }}</span>
+              <form action="/admin/academics" method="POST">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="type" value="program">
+                <input type="hidden" name="value" value="{{ item }}">
+                <button type="submit" class="text-rose-400 hover:text-rose-300 text-xs flex items-center gap-1">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </form>
+            </div>
+            {% else %}
+            <p class="text-xs text-gray-500 text-center py-2">No custom programs added.</p>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- BRANCHES -->
+        <div class="bg-white/5 border border-white/10 rounded-xl p-5 space-y-4">
+          <h3 class="text-sm font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">
+            <i data-lucide="git-branch" class="w-4 h-4"></i> Branches
+          </h3>
+          <form action="/admin/academics" method="POST" class="flex gap-2">
+            <input type="hidden" name="action" value="add">
+            <input type="hidden" name="type" value="branch">
+            <input type="text" name="value" required placeholder="e.g. CSE" class="input-dark-glass w-full px-3 py-2 text-xs rounded-lg">
+            <button type="submit" class="btn-primary-glass px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-1">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add
+            </button>
+          </form>
+          <div class="space-y-2 max-h-60 overflow-y-auto">
+            {% for item in branches %}
+            <div class="flex justify-between items-center bg-[#0b1326]/60 p-2.5 rounded-lg border border-white/5 text-xs text-white">
+              <span>{{ item }}</span>
+              <form action="/admin/academics" method="POST">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="type" value="branch">
+                <input type="hidden" name="value" value="{{ item }}">
+                <button type="submit" class="text-rose-400 hover:text-rose-300 text-xs flex items-center gap-1">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                </button>
+              </form>
+            </div>
+            {% else %}
+            <p class="text-xs text-gray-500 text-center py-2">No custom branches added.</p>
+            {% endfor %}
+          </div>
+        </div>
+
+
+
+      </div>
+    </div>
+  </main>
+
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>
