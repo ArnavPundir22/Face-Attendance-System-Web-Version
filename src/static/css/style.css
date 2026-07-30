@@ -1,0 +1,296 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+
+/* Premium Liquid Glassmorphism Light Tokens */
+:root {
+    --bg-main: #f3f4f6;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --accent-blue: #2563eb;
+    --accent-glow: rgba(37, 99, 235, 0.12);
+    --border-color: rgba(255, 255, 255, 0.6);
+    --glass-bg: rgba(255, 255, 255, 0.45);
+    --glass-card-bg: rgba(255, 255, 255, 0.22);
+}
+
+/* Base Overhaul with Liquid Pastel Fluid Gradients */
+body {
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    font-family: 'Outfit', sans-serif;
+    min-height: 100vh;
+    background-attachment: fixed;
+    background-image: 
+        radial-gradient(circle at 10% 20%, rgba(244, 63, 94, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 90% 10%, rgba(99, 102, 241, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 50% 80%, rgba(14, 165, 233, 0.06) 0%, transparent 50%),
+        radial-gradient(circle at 80% 90%, rgba(234, 179, 8, 0.05) 0%, transparent 45%);
+    background-size: 200% 200%;
+    animation: liquid-bg 18s ease-in-out infinite;
+    letter-spacing: -0.01em;
+}
+
+@keyframes liquid-bg {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+h1, h2, h3, h4, h5, h6, .font-geist {
+    font-family: 'Geist', sans-serif;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+}
+
+/* Liquid Glass Panels & Cards */
+.glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(30px);
+    -webkit-backdrop-filter: blur(30px);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 20px 40px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.glass-card {
+    background: var(--glass-card-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease;
+}
+.glass-card:hover {
+    border-color: rgba(37, 99, 235, 0.25);
+}
+
+.inner-glow {
+    box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.6);
+}
+
+/* Global Layout Overrides for Light Mode */
+header.fixed.top-0 {
+    background: rgba(255, 255, 255, 0.45) !important;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.06) !important;
+}
+header a, header span, header strong {
+    color: var(--text-secondary) !important;
+}
+header a:hover {
+    color: var(--accent-blue) !important;
+}
+header h1, header strong {
+    color: var(--text-primary) !important;
+}
+
+/* Tables & Data Grid Overrides */
+table, tr, td, th {
+    border-color: rgba(15, 23, 42, 0.06) !important;
+    color: var(--text-secondary) !important;
+}
+td {
+    color: #334155 !important;
+}
+th {
+    background-color: rgba(15, 23, 42, 0.03) !important;
+    color: var(--text-primary) !important;
+}
+tr:hover {
+    background-color: rgba(15, 23, 42, 0.015) !important;
+}
+.text-white {
+    color: var(--text-primary) !important;
+}
+
+/* Input Fields overrides */
+.input-dark-glass {
+    background: rgba(255, 255, 255, 0.6) !important;
+    border: 1px solid rgba(15, 23, 42, 0.1) !important;
+    color: var(--text-primary) !important;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02) !important;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.input-dark-glass:focus {
+    border-color: var(--accent-blue) !important;
+    background: rgba(255, 255, 255, 0.85) !important;
+    box-shadow: 0 0 0 3px var(--accent-glow), inset 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+}
+::placeholder {
+    color: #94a3b8 !important;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.03);
+}
+::-webkit-scrollbar-thumb {
+    background: rgba(15, 23, 42, 0.1);
+    border-radius: 10px;
+    border: 2px solid #f3f4f6;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(37, 99, 235, 0.4);
+}
+
+/* Scanning Animation Effect */
+.scan-line {
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--accent-blue), transparent);
+    animation: scan-anim 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    box-shadow: 0 0 12px var(--accent-blue);
+}
+
+@keyframes scan-anim {
+    0% { top: 0%; opacity: 0.3; }
+    50% { top: 100%; opacity: 1; }
+    100% { top: 0%; opacity: 0.3; }
+}
+
+/* Glass Buttons */
+.btn-primary-glass {
+    background: linear-gradient(135deg, var(--accent-blue), #1d4ed8) !important;
+    color: #ffffff !important;
+    font-weight: 600;
+    box-shadow: 0 8px 20px var(--accent-glow) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.btn-primary-glass:hover {
+    background: linear-gradient(135deg, #4f46e5, var(--accent-blue)) !important;
+    box-shadow: 0 12px 25px rgba(37, 99, 235, 0.25) !important;
+    transform: translateY(-1.5px) !important;
+}
+.btn-primary-glass:active {
+    transform: translateY(0) !important;
+}
+
+.btn-secondary-glass {
+    background: rgba(255, 255, 255, 0.4) !important;
+    border: 1px solid rgba(15, 23, 42, 0.1) !important;
+    color: var(--text-secondary) !important;
+    font-weight: 500;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.btn-secondary-glass:hover {
+    background: rgba(255, 255, 255, 0.7) !important;
+    border-color: rgba(15, 23, 42, 0.18) !important;
+    color: var(--text-primary) !important;
+    transform: translateY(-1px) !important;
+}
+
+.btn-danger-glass {
+    background: rgba(239, 68, 68, 0.08) !important;
+    border: 1px solid rgba(239, 68, 68, 0.2) !important;
+    color: #ef4444 !important;
+    font-weight: 600;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.btn-danger-glass:hover {
+    background: rgba(239, 68, 68, 0.18) !important;
+    border-color: rgba(239, 68, 68, 0.4) !important;
+    transform: translateY(-1px) !important;
+}
+
+/* DataTables Custom Overrides */
+.dataTables_wrapper .dataTables_filter input,
+.dataTables_wrapper .dataTables_length select,
+.dataTables_wrapper .dataTables_info,
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    color: var(--text-secondary) !important;
+}
+
+.dataTables_wrapper .dataTables_filter input {
+    background: rgba(255, 255, 255, 0.5) !important;
+    border: 1px solid rgba(15, 23, 42, 0.1) !important;
+    border-radius: 8px !important;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    background: rgba(255, 255, 255, 0.4) !important;
+    border: 1px solid rgba(15, 23, 42, 0.08) !important;
+    border-radius: 6px !important;
+}
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background: rgba(255, 255, 255, 0.8) !important;
+    border-color: rgba(15, 23, 42, 0.15) !important;
+}
+.dataTables_wrapper .dataTables_paginate .current {
+    background: var(--accent-blue) !important;
+    border-color: var(--accent-blue) !important;
+    color: white !important;
+}
+
+/* DataTables Dropdown */
+div.dt-button-collection {
+    background-color: rgba(255, 255, 255, 0.85) !important;
+    border: 1px solid rgba(15, 23, 42, 0.1) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 15px 30px rgba(15, 23, 42, 0.08) !important;
+    backdrop-filter: blur(15px);
+}
+div.dt-button-collection button.dt-button {
+    color: var(--text-secondary) !important;
+}
+div.dt-button-collection button.dt-button:hover {
+    background-color: rgba(37, 99, 235, 0.1) !important;
+    color: var(--accent-blue) !important;
+}
+
+/* Curved Mobile Bottom Nav Bar with FAB */
+@media (max-width: 767px) {
+    nav.fixed.bottom-0 {
+        background: rgba(255, 255, 255, 0.82) !important;
+        border-top: 1px solid rgba(15, 23, 42, 0.06) !important;
+        height: 72px !important;
+        box-shadow: 0 -10px 40px rgba(15, 23, 42, 0.04) !important;
+        padding-top: 6px !important;
+        padding-bottom: calc(env(safe-area-inset-bottom) + 4px) !important;
+        display: flex !important;
+        justify-content: space-around !important;
+        align-items: center !important;
+        border-radius: 20px 20px 0 0 !important;
+        backdrop-filter: blur(25px) !important;
+    }
+
+    nav.fixed.bottom-0 a {
+        color: var(--text-secondary) !important;
+    }
+    nav.fixed.bottom-0 a.text-blue-400 {
+        color: var(--accent-blue) !important;
+    }
+
+    nav.fixed.bottom-0 a[href="/add_student"],
+    nav.fixed.bottom-0 a.mobile-fab-btn {
+        position: relative !important;
+        top: -24px !important;
+        width: 58px !important;
+        height: 58px !important;
+        background: linear-gradient(135deg, var(--accent-blue), #1d4ed8) !important;
+        border-radius: 50% !important;
+        box-shadow: 0 8px 24px rgba(37, 99, 235, 0.35), 0 0 0 6px #f3f4f6 !important;
+        color: white !important;
+        order: 3 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: transform 0.2s ease !important;
+    }
+    nav.fixed.bottom-0 a[href="/add_student"] i,
+    nav.fixed.bottom-0 a.mobile-fab-btn i {
+        color: white !important;
+    }
+
+    nav.fixed.bottom-0 a:nth-child(1) { order: 1 !important; }
+    nav.fixed.bottom-0 a:nth-child(2) { order: 2 !important; }
+    nav.fixed.bottom-0 a:nth-child(3) { order: 4 !important; }
+    nav.fixed.bottom-0 a:nth-child(4) { order: 5 !important; }
+    nav.fixed.bottom-0 a:nth-child(5) { order: 6 !important; }
+}
+
+/* Animations helper */
+.animate-fade-in {
+    animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

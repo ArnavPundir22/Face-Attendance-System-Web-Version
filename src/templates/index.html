@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mark Attendance — BioSecure AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    /* Hide the default file input entirely */
+    #nativeCameraInput, #galleryInput {
+        display: none;
+    }
+  </style>
+</head>
+<body class="pb-24 md:pb-8 flex flex-col md:flex-row">
+
+  <!-- Desktop Left Sidebar (Desktop Only) -->
+  <aside class="hidden md:flex flex-col fixed top-0 left-0 h-screen w-64 bg-[#0b1326]/75 backdrop-blur-xl border-r border-white/10 p-6 z-50">
+    <div class="flex items-center gap-3 mb-8">
+      <i data-lucide="scan-face" class="w-8 h-8 text-blue-500"></i>
+      <h1 class="font-geist text-xl font-bold text-blue-400 tracking-tight">BioSecure AI</h1>
+    </div>
+
+    <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 rounded-full border border-emerald-500/20 mb-8 self-start">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span class="font-geist text-xs font-semibold text-emerald-400 uppercase tracking-wider">SYSTEM LIVE</span>
+    </div>
+
+    <nav class="flex-1 flex flex-col gap-2">
+      <a href="/" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all bg-blue-500/10 text-blue-400 border border-blue-500/20">
+        <i data-lucide="home" class="w-5 h-5"></i>
+        <span>Home</span>
+      </a>
+      <a href="/viewer" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-gray-300 hover:bg-white/5">
+        <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
+        <span>View Records</span>
+      </a>
+      <a href="/students" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-gray-300 hover:bg-white/5">
+        <i data-lucide="users" class="w-5 h-5"></i>
+        <span>All Students</span>
+      </a>
+      <a href="/add_student" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-gray-300 hover:bg-white/5">
+        <i data-lucide="user-plus" class="w-5 h-5"></i>
+        <span>Add Student</span>
+      </a>
+      {% if session_is_admin %}
+      <a href="/admin" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-gray-300 hover:bg-white/5">
+        <i data-lucide="settings" class="w-5 h-5"></i>
+        <span>Admin Portal</span>
+      </a>
+      {% endif %}
+    </nav>
+
+    <div class="pt-6 border-t border-white/10 flex flex-col gap-4">
+      <div class="flex flex-col">
+        <span class="text-xs text-gray-500">Logged in as</span>
+        <span class="text-sm font-semibold text-gray-200">{{ session_username }}</span>
+      </div>
+      <a href="/logout" class="btn-danger-glass w-full py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2">
+        <i data-lucide="log-out" class="w-4 h-4"></i> Logout
+      </a>
+    </div>
+  </aside>
+
+  <!-- TopAppBar (Mobile Only) -->
+  <header class="fixed top-0 left-0 w-full z-50 flex md:hidden justify-between items-center px-6 py-3 bg-[#0b1326]/70 backdrop-blur-xl border-b border-white/10 shadow-lg">
+    <div class="flex items-center gap-3">
+      <i data-lucide="scan-face" class="w-8 h-8 text-blue-500"></i>
+      <h1 class="font-geist text-xl font-bold text-blue-400 tracking-tight">BioSecure AI</h1>
+    </div>
+    
+    <div class="flex items-center gap-4">
+      <a href="/logout" class="btn-danger-glass px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2">
+        <i data-lucide="log-out" class="w-4 h-4"></i> Logout
+      </a>
+    </div>
+  </header>
+
+  <!-- BottomNavBar (Mobile Only) -->
+  <nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe md:hidden h-16 bg-[#131b2e]/85 backdrop-blur-lg border-t border-white/10 shadow-2xl">
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-blue-400" href="/">
+      <i data-lucide="home" class="w-5 h-5 mb-0.5"></i>
+      <span>Home</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/viewer">
+      <i data-lucide="bar-chart-2" class="w-5 h-5 mb-0.5"></i>
+      <span>Records</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/students">
+      <i data-lucide="users" class="w-5 h-5 mb-0.5"></i>
+      <span>Students</span>
+    </a>
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/add_student">
+      <i data-lucide="user-plus" class="w-5 h-5 mb-0.5"></i>
+      <span>Add</span>
+    </a>
+    {% if session_is_admin %}
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/admin">
+      <i data-lucide="settings" class="w-5 h-5 mb-0.5"></i>
+      <span>Admin</span>
+    </a>
+    {% endif %}
+  </nav>
+
+  <main class="flex-1 p-6 max-w-4xl mx-auto mt-20 md:mt-8 md:pl-72">
+    
+    <div class="glass-panel p-8 rounded-2xl max-w-2xl mx-auto inner-glow shadow-2xl">
+      <div class="flex flex-col items-center mb-6">
+        <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-3">
+          <i data-lucide="scan" class="w-6 h-6 text-blue-500"></i>
+        </div>
+        <h2 class="text-2xl text-center font-geist font-bold text-white">Mark Attendance</h2>
+        <p class="text-sm text-gray-400 text-center mt-1">Mark student attendance instantly via biometric face matching.</p>
+      </div>
+
+      <form id="uploadForm" class="space-y-6 mt-4">
+        
+        <!-- SESSION DETAILS -->
+        <div>
+            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Lecture Name</label>
+            <input type="text" name="lecture" required placeholder="e.g. CS101" class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm"/>
+        </div>
+
+        <!-- CAMERA ACTIONS -->
+        <div class="pt-6 border-t border-white/10 mt-6">
+            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Input Method</label>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <!-- Native Camera Trigger (Mobile Only) -->
+                <button type="button" onclick="document.getElementById('nativeCameraInput').click()" 
+                        class="flex sm:hidden flex-col items-center justify-center gap-3 py-6 bg-blue-600/20 border border-blue-500/40 rounded-xl hover:bg-blue-600/30 transition-all group shadow-sm">
+                    <i data-lucide="camera" class="w-8 h-8 text-blue-400 group-hover:scale-110 transition-transform duration-200"></i>
+                    <span class="text-sm font-medium text-white">Mobile Camera</span>
+                </button>
+                
+                <!-- Desktop Webcam Trigger (Desktop/Tablet Only) -->
+                <button type="button" id="openWebcamBtn"
+                        class="hidden sm:flex flex-col items-center justify-center gap-3 py-6 bg-blue-600/20 border border-blue-500/40 rounded-xl hover:bg-blue-600/30 transition-all group shadow-sm">
+                    <i data-lucide="monitor-play" class="w-8 h-8 text-blue-400 group-hover:scale-110 transition-transform duration-200"></i>
+                    <span class="text-sm font-medium text-white">PC Webcam</span>
+                </button>
+
+                <!-- Gallery Trigger (Always visible) -->
+                <button type="button" onclick="document.getElementById('galleryInput').click()" 
+                        class="flex flex-col items-center justify-center gap-3 py-6 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all group shadow-sm">
+                    <i data-lucide="image-plus" class="w-8 h-8 text-gray-400 group-hover:scale-110 transition-transform duration-200"></i>
+                    <span class="text-sm font-medium text-white">Upload Files</span>
+                </button>
+            </div>
+
+            <!-- Desktop Webcam Box -->
+            <div id="desktopCameraBox" class="hidden mt-6 p-5 bg-[#0b1326]/60 rounded-2xl border border-white/10 flex-col items-center gap-4 shadow-inner relative overflow-hidden">
+                <div class="relative rounded-lg overflow-hidden border border-white/10">
+                    <!-- Scanner effect overlays -->
+                    <div class="scan-line absolute left-0 w-full z-10"></div>
+                    <div class="absolute top-4 left-4 w-6 h-6 border-t-2 border-l-2 border-blue-500"></div>
+                    <div class="absolute top-4 right-4 w-6 h-6 border-t-2 border-r-2 border-blue-500"></div>
+                    <div class="absolute bottom-4 left-4 w-6 h-6 border-b-2 border-l-2 border-blue-500"></div>
+                    <div class="absolute bottom-4 right-4 w-6 h-6 border-b-2 border-r-2 border-blue-500"></div>
+                    
+                    <video id="video" autoplay playsinline class="w-full max-w-sm border border-white/5 shadow-md object-cover"></video>
+                </div>
+                <div class="flex gap-3 w-full max-w-sm mt-2">
+                    <button type="button" id="captureWebcamBtn" class="flex-1 btn-primary-glass py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-2"><i data-lucide="aperture" class="w-4 h-4"></i> Capture</button>
+                    <button type="button" id="closeWebcamBtn" class="flex-1 btn-secondary-glass py-2.5 rounded-lg font-semibold text-sm flex items-center justify-center gap-2"><i data-lucide="x" class="w-4 h-4"></i> Close</button>
+                </div>
+                <canvas id="canvas" class="hidden"></canvas>
+            </div>
+            
+            <!-- Hidden File Inputs -->
+            <input id="nativeCameraInput" type="file" name="images" accept="image/*" capture="environment" />
+            <input id="galleryInput" type="file" name="images" accept="image/*" multiple />
+            
+            <!-- Main Input that holds the combined files for submission -->
+            <input id="formFileInput" type="file" name="images" multiple class="hidden" />
+        </div>
+
+        <!-- PREVIEWS -->
+        <div class="pt-4">
+            <div id="previewBox" class="hidden grid grid-cols-4 sm:grid-cols-5 gap-3"></div>
+            <p id="previewHint" class="text-xs text-center text-gray-500 mt-3 font-medium">No images selected</p>
+        </div>
+
+        <!-- SUBMIT -->
+        <div class="pt-6 border-t border-white/10">
+            <button type="submit" id="submitBtn" disabled
+            class="w-full btn-primary-glass disabled:opacity-50 disabled:cursor-not-allowed text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2">
+            <i data-lucide="scan-line" class="w-5 h-5"></i>
+            <span id="submitBtnText">Scan & Mark Present</span>
+            </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- RESULT BOX -->
+    <div id="result" class="w-full mt-8 space-y-6"></div>
+
+  </main>
+
+<script>
+  // Initialize Lucide Icons
+  lucide.createIcons();
+
+  /* ------------------------------
+        IMAGE PREVIEWS & FILE HANDLING
+  ------------------------------- */
+  const previewBox = document.getElementById("previewBox");
+  const previewHint = document.getElementById("previewHint");
+  const nativeCameraInput = document.getElementById("nativeCameraInput");
+  const galleryInput = document.getElementById("galleryInput");
+  const formFileInput = document.getElementById("formFileInput");
+  const submitBtn = document.getElementById("submitBtn");
+  const submitBtnText = document.getElementById("submitBtnText");
+  
+  // We use DataTransfer to programmatically manage files from multiple input sources
+  let dataTransfer = new DataTransfer();
+
+  /* ------------------------------
+        DESKTOP WEBCAM LOGIC
+  ------------------------------- */
+  const openWebcamBtn = document.getElementById("openWebcamBtn");
+  const desktopCameraBox = document.getElementById("desktopCameraBox");
+  const video = document.getElementById("video");
+  const canvas = document.getElementById("canvas");
+  const captureWebcamBtn = document.getElementById("captureWebcamBtn");
+  const closeWebcamBtn = document.getElementById("closeWebcamBtn");
+  
+  let stream = null;
+
+  async function startWebcam() {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        desktopCameraBox.classList.remove("hidden");
+        desktopCameraBox.classList.add("flex");
+    } catch (err) {
+        console.error("Camera error:", err);
+        alert("Could not access webcam. Please ensure permissions are granted.");
+    }
+  }
+
+  function stopWebcam() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
+    desktopCameraBox.classList.add("hidden");
+    desktopCameraBox.classList.remove("flex");
+  }
+
+  openWebcamBtn.addEventListener("click", () => {
+    if (desktopCameraBox.classList.contains("hidden")) {
+        startWebcam();
+    } else {
+        stopWebcam();
+    }
+  });
+
+  closeWebcamBtn.addEventListener("click", stopWebcam);
+
+  captureWebcamBtn.addEventListener("click", () => {
+    if (!stream) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+
+    canvas.toBlob(blob => {
+      const file = new File([blob], `webcam_${Date.now()}.jpg`, { type: "image/jpeg" });
+      handleFileSelection([file]);
+      
+      // Provide visual feedback
+      const originalHTML = captureWebcamBtn.innerHTML;
+      captureWebcamBtn.innerHTML = `<i data-lucide="check-circle-2" class="w-4 h-4"></i> Captured!`;
+      lucide.createIcons();
+      setTimeout(() => { 
+          captureWebcamBtn.innerHTML = originalHTML; 
+          lucide.createIcons();
+      }, 1000);
+    }, "image/jpeg", 0.9);
+  });
+
+
+  nativeCameraInput.addEventListener("change", (e) => handleFileSelection(e.target.files));
+  galleryInput.addEventListener("change", (e) => handleFileSelection(e.target.files));
+
+  function handleFileSelection(files) {
+    if (!files || files.length === 0) return;
+    
+    // Add new files to our DataTransfer object
+    Array.from(files).forEach(file => {
+        dataTransfer.items.add(file);
+    });
+    
+    // Update the master hidden input that will be submitted
+    formFileInput.files = dataTransfer.files;
+    
+    // Enable submit button
+    submitBtn.disabled = false;
+    
+    updatePreviews();
+
+    // Automatically trigger form submission if lecture and section are valid/filled
+    if (form.reportValidity()) {
+        submitBtn.click();
+    }
+  }
+
+  function updatePreviews() {
+    previewBox.innerHTML = "";
+    const files = formFileInput.files;
+    
+    if (files.length > 0) {
+        previewBox.classList.remove("hidden");
+        previewHint.innerText = `${files.length} image(s) ready to process. Tap to remove.`;
+        submitBtnText.innerText = `Scan & Mark Present (${files.length})`;
+    } else {
+        previewBox.classList.add("hidden");
+        previewHint.innerText = "No images selected.";
+        submitBtnText.innerText = "Scan & Mark Present";
+        submitBtn.disabled = true;
+    }
+
+    Array.from(files).forEach((file, index) => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const container = document.createElement("div");
+        container.className = "relative group cursor-pointer aspect-square rounded overflow-hidden border border-gray-600";
+        container.onclick = () => removeFile(index);
+        
+        const img = document.createElement("img");
+        img.src = ev.target.result;
+        img.className = "w-full h-full object-cover";
+        
+        const overlay = document.createElement("div");
+        overlay.className = "absolute inset-0 bg-red-600/80 flex items-center justify-center opacity-0 hover:opacity-100 transition";
+        overlay.innerHTML = "<i data-lucide='trash-2' class='text-white w-8 h-8'></i>";
+        
+        container.appendChild(img);
+        container.appendChild(overlay);
+        previewBox.appendChild(container);
+        lucide.createIcons();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  
+  function removeFile(indexToRemove) {
+      const newDt = new DataTransfer();
+      const files = formFileInput.files;
+      for (let i = 0; i < files.length; i++) {
+          if (i !== indexToRemove) {
+              newDt.items.add(files[i]);
+          }
+      }
+      dataTransfer = newDt; // update global reference
+      formFileInput.files = dataTransfer.files;
+      
+      // Reset the actual inputs so change event fires even if same file selected again
+      nativeCameraInput.value = "";
+      galleryInput.value = "";
+      
+      updatePreviews();
+  }
+
+
+  /* ------------------------------
+        ATTENDANCE SUBMIT
+  ------------------------------- */
+  const form = document.getElementById("uploadForm");
+  const resultBox = document.getElementById("result");
+
+  // Keep a record of the lecture name when form was submitted for CSV naming
+  let lastSubmittedLecture = "UnknownSub";
+  let detectedProgram = "UnknownProgram";
+  let detectedBranch = "UnknownBranch";
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (formFileInput.files.length === 0) return;
+
+    // Capture the name for filename generation
+    lastSubmittedLecture = (form.querySelector('input[name="lecture"]').value || "").trim() || "UnknownSub";
+
+    // Use FormData but replace 'images' from native/gallery inputs with our master formFileInput
+    const formData = new FormData(form);
+    formData.delete('images'); // remove duplicates
+    
+    Array.from(formFileInput.files).forEach(file => {
+        formData.append('images', file);
+    });
+
+    // Loading UI
+    submitBtn.disabled = true;
+    const originalBtnHTML = submitBtn.innerHTML;
+    submitBtn.innerHTML = `<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i><span>Processing...</span>`;
+    lucide.createIcons();
+    
+    // Premium Interactive Loading Card
+    resultBox.innerHTML = `
+      <div class="glass-panel p-8 rounded-2xl text-center border border-blue-500/20 max-w-xl mx-auto mt-6 animate-fade-in relative overflow-hidden">
+        <div class="scan-line absolute left-0 w-full z-10"></div>
+        <div class="relative w-20 h-20 mx-auto mb-6 flex items-center justify-center bg-blue-500/10 rounded-full border border-blue-500/30">
+          <i data-lucide="scan-face" class="w-10 h-10 text-blue-400 animate-pulse"></i>
+        </div>
+        <h3 class="text-lg font-bold text-white font-geist mb-2">Analyzing Face Biometrics</h3>
+        <p id="loadingStatusText" class="text-sm text-blue-400 font-medium animate-pulse">Extracting facial landmarks...</p>
+        <div class="mt-6 flex justify-center gap-1.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-bounce" style="animation-delay: 0.1s"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-bounce" style="animation-delay: 0.3s"></span>
+          <span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-bounce" style="animation-delay: 0.5s"></span>
+        </div>
+      </div>
+    `;
+    lucide.createIcons();
+
+    const statusMessages = [
+        "Detecting face bounding boxes...",
+        "Normalizing color channels & alignments...",
+        "Generating 512-dimensional face embeddings...",
+        "Performing pgvector cosine distance match...",
+        "Validating matches against student directory...",
+        "Finalizing class register report..."
+    ];
+    let msgIdx = 0;
+    window.currentStatusInterval = setInterval(() => {
+        const textEl = document.getElementById("loadingStatusText");
+        if (textEl && msgIdx < statusMessages.length) {
+            textEl.innerText = statusMessages[msgIdx++];
+        }
+    }, 1500);
+
+    try {
+        const res = await fetch("/upload_photo", { method: "POST", body: formData });
+        const data = await res.json();
+
+        window.currentSessionAttendance = data.session_attendance || [];
+        detectedProgram = data.detected_program || "UnknownProgram";
+        detectedBranch = data.detected_branch || "UnknownBranch";
+
+        let html = "";
+        data.images.forEach((img, idx) => {
+          html += `
+            <div class="dark-card p-6 rounded-lg mb-6">
+              <div class="rounded overflow-hidden border border-gray-700">
+                  <img src="${img.annotated}" class="w-full h-auto object-cover"/>
+              </div>
+            </div>
+          `;
+        });
+
+        // Add Session Attendance Register
+        if (window.currentSessionAttendance.length > 0) {
+            html += `
+              <div class="glass-panel p-6 rounded-2xl shadow-xl mt-8">
+                <div class="flex items-center justify-between gap-2 mb-4 border-b border-white/10 pb-3">
+                  <div class="flex items-center gap-2">
+                    <i data-lucide="clipboard-list" class="w-6 h-6 text-blue-400"></i>
+                    <h3 class="text-lg font-bold font-geist text-white">Session Attendance Register</h3>
+                  </div>
+                  <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                    Detected Class: ${detectedProgram} - ${detectedBranch}
+                  </span>
+                </div>
+                <div class="overflow-x-auto">
+                  <table class="w-full text-sm text-left text-gray-300">
+                    <thead class="text-xs text-gray-400 uppercase bg-white/5 sticky top-0 backdrop-blur-md">
+                      <tr>
+                        <th class="py-3 px-4">Student ID</th>
+                        <th class="py-3 px-4">Name</th>
+                        <th class="py-3 px-4">Branch</th>
+                        <th class="py-3 px-4">Status</th>
+                        <th class="py-3 px-4 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+            `;
+            // Sort alphabetically by Name (ascending, case-insensitive)
+            const sortedAttendance = [...window.currentSessionAttendance].sort((a, b) => {
+                return a[1].toLowerCase().localeCompare(b[1].toLowerCase());
+            });
+            sortedAttendance.forEach(row => {
+                let isPresent = row[4] === 'Present';
+                let statusBadge = isPresent 
+                  ? `<span class="status-badge px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Present</span>` 
+                  : `<span class="status-badge px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">Absent</span>`;
+                
+                let actionBtn = isPresent
+                  ? `<button type="button" onclick="toggleStudentStatus('${row[0]}', 'Absent', '${row[5]}', this)" class="action-btn text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1 rounded-lg font-semibold transition flex items-center justify-center gap-1"><i data-lucide="user-x" class="w-3.5 h-3.5"></i> Mark Absent</button>`
+                  : `<button type="button" onclick="toggleStudentStatus('${row[0]}', 'Present', '${row[5]}', this)" class="action-btn text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-lg font-semibold transition flex items-center justify-center gap-1"><i data-lucide="user-check" class="w-3.5 h-3.5"></i> Mark Present</button>`;
+
+                html += `
+                  <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <td class="py-3 px-4 font-mono text-xs">${row[0]}</td>
+                    <td class="py-3 px-4 font-semibold text-white">${row[1]}</td>
+                    <td class="py-3 px-4 text-xs text-gray-400">${row[3]}</td>
+                    <td class="status-cell py-3 px-4">${statusBadge}</td>
+                    <td class="action-cell py-3 px-4 flex justify-center">${actionBtn}</td>
+                  </tr>
+                `;
+            });
+            html += `
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            `;
+        }
+
+        // Add CSV Download Button
+        if (window.currentSessionAttendance.length > 0) {
+            html += `
+              <div class="flex justify-center mt-6 mb-8">
+                <button id="downloadCsvBtn"
+                     class="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded font-bold transition flex justify-center items-center gap-2 neon-button">
+                    <i data-lucide="download" class="w-5 h-5"></i> Download CSV Report
+                </button>
+              </div>
+            `;
+        } else {
+             html += `<p class="text-center text-sm text-gray-500 mb-8 mt-4">No successful attendance marks this session.</p>`;
+        }
+
+        resultBox.innerHTML = html;
+        lucide.createIcons();
+        
+        // Reset form completely on success
+        dataTransfer = new DataTransfer();
+        formFileInput.files = dataTransfer.files;
+        nativeCameraInput.value = "";
+        galleryInput.value = "";
+        form.reset();
+        updatePreviews();
+
+        // Automatically download the CSV file
+        if (window.currentSessionAttendance.length > 0) {
+            downloadCSV();
+        }
+
+    } catch (err) {
+        console.error(err);
+        resultBox.innerHTML = `<div class="p-3 bg-red-900 border border-red-600 text-red-200 rounded text-center text-sm">Server error during analysis.</div>`;
+    } finally {
+        if (window.currentStatusInterval) {
+            clearInterval(window.currentStatusInterval);
+        }
+        // Restore submit button
+        submitBtn.innerHTML = originalBtnHTML;
+    }
+  });
+
+
+  /* ------------------------------
+        DOWNLOAD CSV
+  ------------------------------- */
+  function downloadCSV() {
+    const tableData = window.currentSessionAttendance;
+    if (!tableData || !tableData.length) return alert("No attendance to download.");
+
+    // Generate CSV string
+    let csvContent = "data:text/csv;charset=utf-8,";
+    // Header matching what backend returned
+    csvContent += "Student_ID,Name,Program,Branch,Status,Timestamp,Lecture\n";
+    
+    tableData.forEach(row => {
+        // Wrap elements in quotes to handle commas
+        let formattedRow = row.map(e => `"${e}"`).join(",");
+        csvContent += formattedRow + "\n";
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    
+    const filename = `Attendance_${detectedProgram}_${detectedBranch}_(${lastSubmittedLecture})_${today}.csv`;
+
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  async function toggleStudentStatus(studentId, newStatus, timestamp, btnElement) {
+      const originalText = btnElement.innerHTML;
+      btnElement.disabled = true;
+      btnElement.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>...`;
+      lucide.createIcons();
+
+      try {
+          const response = await fetch('/update_attendance_status', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                  student_id: studentId,
+                  lecture: lastSubmittedLecture,
+                  timestamp: timestamp,
+                  status: newStatus
+              })
+          });
+          const result = await response.json();
+          if (result.success) {
+              const row = window.currentSessionAttendance.find(r => r[0] === studentId);
+              if (row) {
+                  row[4] = newStatus;
+              }
+
+              const tr = btnElement.closest('tr');
+              const statusCell = tr.querySelector('.status-cell');
+              const actionCell = tr.querySelector('.action-cell');
+
+              if (newStatus === 'Present') {
+                  statusCell.innerHTML = `<span class="status-badge px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Present</span>`;
+                  actionCell.innerHTML = `<button type="button" onclick="toggleStudentStatus('${studentId}', 'Absent', '${timestamp}', this)" class="action-btn text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 px-3 py-1 rounded-lg font-semibold transition flex items-center justify-center gap-1"><i data-lucide="user-x" class="w-3.5 h-3.5"></i> Mark Absent</button>`;
+              } else {
+                  statusCell.innerHTML = `<span class="status-badge px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">Absent</span>`;
+                  actionCell.innerHTML = `<button type="button" onclick="toggleStudentStatus('${studentId}', 'Present', '${timestamp}', this)" class="action-btn text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-lg font-semibold transition flex items-center justify-center gap-1"><i data-lucide="user-check" class="w-3.5 h-3.5"></i> Mark Present</button>`;
+              }
+              lucide.createIcons();
+          } else {
+              alert("Error updating status: " + (result.error || "Unknown error"));
+              btnElement.disabled = false;
+              btnElement.innerHTML = originalText;
+              lucide.createIcons();
+          }
+      } catch (err) {
+          console.error(err);
+          alert("Network error updating status.");
+          btnElement.disabled = false;
+          btnElement.innerHTML = originalText;
+          lucide.createIcons();
+      }
+  }
+
+  // No dynamic dropdown population required on homepage as Program/Branch/Section are auto-detected
+
+  document.addEventListener("click", (e) => {
+    // We use closest or id depending on the click target
+    const btn = e.target.closest("#downloadCsvBtn") || e.target.id === "downloadCsvBtn" ? e.target : null;
+    if (btn) {
+      downloadCSV();
+    }
+  });
+
+</script>
+
+</body>
+</html>
