@@ -171,19 +171,19 @@
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 p-4 bg-white/5 rounded-xl border border-white/10">
         <div>
           <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Filter Program</label>
-          <select id="filterProgram" class="input-dark-glass w-full rounded-lg px-3 py-2 text-xs text-white">
+          <select id="filterProgram" class="input-dark-glass w-full rounded-lg px-3 py-2 text-xs">
             <option value="">All Programs</option>
           </select>
         </div>
         <div>
           <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Filter Branch</label>
-          <select id="filterBranch" class="input-dark-glass w-full rounded-lg px-3 py-2 text-xs text-white">
+          <select id="filterBranch" class="input-dark-glass w-full rounded-lg px-3 py-2 text-xs">
             <option value="">All Branches</option>
           </select>
         </div>
         <div>
           <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Filter Year</label>
-          <select id="filterYear" class="input-dark-glass w-full rounded-lg px-3 py-2 text-xs text-white">
+          <select id="filterYear" class="input-dark-glass w-full rounded-lg px-3 py-2 text-xs">
             <option value="">All Years</option>
           </select>
         </div>
@@ -247,10 +247,11 @@
           
           column.data().unique().sort().each(function (d) {
             if (d && d !== '-') {
-              const upperVal = d.toString().toUpperCase().trim();
+              const rawVal = d.toString().trim();
+              const upperVal = rawVal.toUpperCase();
               if (!addedValues.has(upperVal)) {
                 addedValues.add(upperVal);
-                select.append('<option value="' + upperVal + '">' + upperVal + '</option>');
+                select.append('<option value="' + rawVal + '">' + rawVal + '</option>');
               }
             }
           });
@@ -260,8 +261,9 @@
             if (!val) {
               column.search('').draw();
             } else {
-              // Custom column filtering logic for case-insensitive match
-              column.search(val, true, false).draw();
+              // Custom exact match filtering logic
+              const regexVal = '^' + $.fn.dataTable.util.escapeRegex(val) + '$';
+              column.search(regexVal, true, false).draw();
             }
           });
         });
