@@ -205,26 +205,26 @@
       </div>
 
       <div class="overflow-x-auto w-full">
-        <table id="studentsTable" class="display nowrap w-full text-sm">
+        <table id="studentsTable" class="w-full text-sm text-left">
         <thead>
-          <tr>
-            <th class="py-3 px-4 text-left">ID</th>
-            <th class="py-3 px-4 text-left">Name</th>
-            <th class="py-3 px-4 text-left">Program</th>
-            <th class="py-3 px-4 text-left">Branch</th>
-            <th class="py-3 px-4 text-left">Year</th>
-            <th class="py-3 px-4 text-left">Email</th>
+          <tr class="text-gray-400 border-b border-white/10 uppercase tracking-wider text-xs font-semibold font-geist">
+            <th class="p-4">ID</th>
+            <th class="p-4">Name</th>
+            <th class="p-4">Program</th>
+            <th class="p-4">Branch</th>
+            <th class="p-4">Year</th>
+            <th class="p-4">Email</th>
           </tr>
         </thead>
         <tbody>
           {% for s in students %}
-          <tr>
-            <td class="py-2.5 px-4 font-geist text-gray-300">{{ s['id'] }}</td>
-            <td class="py-2.5 px-4 font-medium text-white">{{ s['name'] }}</td>
-            <td class="py-2.5 px-4 text-gray-300">{{ s['program'] or '-' }}</td>
-            <td class="py-2.5 px-4 text-gray-300">{{ s['branch'] or '-' }}</td>
-            <td class="py-2.5 px-4 text-gray-300">{{ s['enrollment_year'] or '-' }}</td>
-            <td class="py-2.5 px-4 text-gray-300">{{ s['gmail'] or '-' }}</td>
+          <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+            <td class="p-4 font-semibold text-blue-400 font-geist">{{ s['id'] }}</td>
+            <td class="p-4 font-medium text-white">{{ s['name'] }}</td>
+            <td class="p-4 text-gray-300 font-geist">{{ s['program'] or '-' }}</td>
+            <td class="p-4 text-gray-300 font-geist">{{ s['branch'] or '-' }}</td>
+            <td class="p-4 text-gray-300 font-geist">{{ s['enrollment_year'] or '-' }}</td>
+            <td class="p-4 text-gray-300 font-geist">{{ s['gmail'] or '-' }}</td>
           </tr>
           {% endfor %}
         </tbody>
