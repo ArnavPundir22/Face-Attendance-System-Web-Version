@@ -55,12 +55,12 @@ def submit_student():
 
     # Check for existing student
     try:
-        # Check by exact ID or case-insensitive Name
-        existing = supabase.table('students').select('id').or_(f"id.eq.{student_id},name.ilike.{name}").execute()
+        # Check by exact ID only to allow same-name students
+        existing = supabase.table('students').select('id').eq('id', student_id).execute()
         if existing.data:
             return redirect(url_for(
                 'students.add_student', status='error',
-                message='Duplicate Name or ID found',
+                message='Duplicate Student ID found',
             ))
     except Exception as e:
         return redirect(url_for(
@@ -68,14 +68,14 @@ def submit_student():
             message='Error checking existing students',
         ))
 
-    # Save photo to known_faces/ — use secure_filename to prevent path traversal.
-    safe_name = secure_filename(name)
-    if not safe_name:
+    # Save photo to known_faces/ — use secure_filename of the student_id to prevent path traversal and name collisions.
+    safe_id = secure_filename(student_id)
+    if not safe_id:
         return redirect(url_for(
             'students.add_student', status='error',
-            message='Student name contains invalid characters',
+            message='Student ID contains invalid characters',
         ))
-    filename = f"{safe_name}.jpg"
+    filename = f"{safe_id}.jpg"
     filepath = os.path.join(config.KNOWN_FACES_DIR, filename)
     photo.save(filepath)
 

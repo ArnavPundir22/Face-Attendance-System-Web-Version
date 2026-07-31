@@ -104,49 +104,62 @@
     {% endif %}
   </nav>
 
-  <main class="flex-1 p-6 max-w-4xl mx-auto mt-20 md:mt-8 md:pl-72">
+  <main class="w-full flex-1 p-4 sm:p-6 max-w-4xl mx-auto mt-24 md:mt-8 md:pl-72">
     
-    <div class="glass-panel p-8 rounded-2xl max-w-2xl mx-auto inner-glow shadow-2xl">
-      <div class="flex flex-col items-center mb-6">
-        <div class="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center mb-3">
-          <i data-lucide="scan" class="w-6 h-6 text-blue-500"></i>
+    <div class="glass-panel p-6 sm:p-10 rounded-3xl max-w-2xl mx-auto inner-glow shadow-2xl relative overflow-hidden">
+      <!-- Glow effect behind container -->
+      <div class="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-blue-500/10 blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none"></div>
+
+      <div class="flex flex-col items-center mb-8 relative z-10">
+        <div class="relative w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center mb-4 shadow-lg shadow-blue-500/25">
+          <div class="absolute inset-0 rounded-2xl bg-blue-400 animate-pulse opacity-30"></div>
+          <i data-lucide="scan" class="w-8 h-8 text-white relative z-10"></i>
         </div>
-        <h2 class="text-2xl text-center font-geist font-bold text-white">Mark Attendance</h2>
-        <p class="text-sm text-gray-400 text-center mt-1">Mark student attendance instantly via biometric face matching.</p>
+        <h2 class="text-3xl text-center font-geist font-extrabold text-slate-900 tracking-tight">Mark Attendance</h2>
+        <p class="text-sm text-slate-500 text-center mt-1.5 max-w-md">Instantly verify identity and record presence using AI-powered face recognition.</p>
       </div>
 
-      <form id="uploadForm" class="space-y-6 mt-4">
+      <form id="uploadForm" class="space-y-6 mt-4 relative z-10">
         
         <!-- SESSION DETAILS -->
-        <div>
-            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Lecture Name</label>
-            <input type="text" name="lecture" required placeholder="e.g. CS101" class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm"/>
+        <div class="space-y-2">
+            <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider">Lecture Name</label>
+            <div class="relative">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                    <i data-lucide="book-open" class="w-4 h-4"></i>
+                </div>
+                <input type="text" name="lecture" required placeholder="e.g. CS101" class="input-dark-glass w-full rounded-xl pl-10 pr-4 py-3.5 text-sm font-medium"/>
+            </div>
         </div>
 
         <!-- CAMERA ACTIONS -->
-        <div class="pt-6 border-t border-white/10 mt-6">
-            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Input Method</label>
+        <div class="pt-6 border-t border-white/15 mt-6">
+            <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Input Method</label>
             
             <div class="grid grid-cols-2 gap-4">
                 <!-- Native Camera Trigger (Mobile Only) -->
                 <button type="button" onclick="document.getElementById('nativeCameraInput').click()" 
-                        class="flex sm:hidden flex-col items-center justify-center gap-3 py-6 bg-blue-600/20 border border-blue-500/40 rounded-xl hover:bg-blue-600/30 transition-all group shadow-sm">
-                    <i data-lucide="camera" class="w-8 h-8 text-blue-400 group-hover:scale-110 transition-transform duration-200"></i>
-                    <span class="text-sm font-medium text-white">Mobile Camera</span>
+                        class="flex sm:hidden flex-col items-center justify-center gap-2 py-5 bg-gradient-to-b from-blue-500/10 to-blue-500/5 hover:from-blue-500/15 hover:to-blue-500/10 border border-blue-500/30 rounded-2xl hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/5 transition-all duration-300 group">
+                    <i data-lucide="camera" class="w-7 h-7 text-blue-500 group-hover:scale-110 transition-transform duration-200"></i>
+                    <span class="text-sm font-bold text-slate-800">Mobile Camera</span>
+                    <span class="text-[10px] text-slate-500 font-medium">Use device lens</span>
                 </button>
                 
                 <!-- Desktop Webcam Trigger (Desktop/Tablet Only) -->
                 <button type="button" id="openWebcamBtn"
-                        class="hidden sm:flex flex-col items-center justify-center gap-3 py-6 bg-blue-600/20 border border-blue-500/40 rounded-xl hover:bg-blue-600/30 transition-all group shadow-sm">
-                    <i data-lucide="monitor-play" class="w-8 h-8 text-blue-400 group-hover:scale-110 transition-transform duration-200"></i>
-                    <span class="text-sm font-medium text-white">PC Webcam</span>
+                        class="hidden sm:flex flex-col items-center justify-center gap-2 py-5 bg-gradient-to-b from-blue-500/10 to-blue-500/5 hover:from-blue-500/15 hover:to-blue-500/10 border border-blue-500/30 rounded-2xl hover:border-blue-500/50 hover:shadow-lg hover:shadow-blue-500/5 transition-all duration-300 group">
+                    <i data-lucide="monitor-play" class="w-7 h-7 text-blue-500 group-hover:scale-110 transition-transform duration-200"></i>
+                    <span class="text-sm font-bold text-slate-800">PC Webcam</span>
+                    <span class="text-[10px] text-slate-500 font-medium">Scan live feed</span>
                 </button>
 
                 <!-- Gallery Trigger (Always visible) -->
                 <button type="button" onclick="document.getElementById('galleryInput').click()" 
-                        class="flex flex-col items-center justify-center gap-3 py-6 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all group shadow-sm">
-                    <i data-lucide="image-plus" class="w-8 h-8 text-gray-400 group-hover:scale-110 transition-transform duration-200"></i>
-                    <span class="text-sm font-medium text-white">Upload Files</span>
+                        class="flex flex-col items-center justify-center gap-2 py-5 bg-gradient-to-b from-white/10 to-white/5 hover:from-white/15 hover:to-white/10 border border-white/10 rounded-2xl hover:border-blue-500/30 hover:shadow-lg transition-all duration-300 group">
+                    <i data-lucide="image-plus" class="w-7 h-7 text-gray-500 group-hover:scale-110 transition-transform duration-200"></i>
+                    <span class="text-sm font-bold text-slate-800">Upload Files</span>
+                    <span class="text-[10px] text-slate-500 font-medium">Image references</span>
                 </button>
             </div>
 
@@ -178,15 +191,15 @@
         </div>
 
         <!-- PREVIEWS -->
-        <div class="pt-4">
+        <div class="pt-2">
             <div id="previewBox" class="hidden grid grid-cols-4 sm:grid-cols-5 gap-3"></div>
-            <p id="previewHint" class="text-xs text-center text-gray-500 mt-3 font-medium">No images selected</p>
+            <p id="previewHint" class="text-xs text-center text-gray-400 mt-2 font-medium">No images selected</p>
         </div>
 
         <!-- SUBMIT -->
-        <div class="pt-6 border-t border-white/10">
+        <div class="pt-6 border-t border-white/15">
             <button type="submit" id="submitBtn" disabled
-            class="w-full btn-primary-glass disabled:opacity-50 disabled:cursor-not-allowed text-white py-3.5 rounded-xl font-bold flex items-center justify-center gap-2">
+            class="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white py-4 rounded-xl font-bold transition-all duration-300 flex items-center justify-center gap-2.5 shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-600/30 transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none">
             <i data-lucide="scan-line" class="w-5 h-5"></i>
             <span id="submitBtnText">Scan & Mark Present</span>
             </button>
