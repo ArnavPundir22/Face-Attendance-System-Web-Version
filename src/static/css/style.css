@@ -314,3 +314,78 @@ div.dt-button-collection button.dt-button:hover {
 .animate-fade-in {
     animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ==========================================
+   LIGHT MODE DESIGN SYSTEM COMPATIBILITY FIXES
+   ========================================== */
+
+/* 1. Layout & Sidebar Offset Fixes for Desktop (>= 768px)
+   Prevents 'max-w-* mx-auto' from combining with 'md:pl-72' to squish content. */
+@media (min-width: 768px) {
+    main.md\:pl-72 {
+        max-width: none !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-left: 18rem !important; /* 16rem sidebar + 2rem padding */
+        padding-right: 2rem !important;
+        box-sizing: border-box !important;
+        display: block !important;
+    }
+    
+    /* Center the direct children of main within the remaining space */
+    main.md\:pl-72 > div, 
+    main.md\:pl-72 > form {
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
+    
+    /* Dynamically map the max-w classes to the content wrapper */
+    main.max-w-lg > div, main.max-w-lg > form { max-width: 32rem !important; }
+    main.max-w-xl > div, main.max-w-xl > form { max-width: 36rem !important; }
+    main.max-w-2xl > div, main.max-w-2xl > form { max-width: 42rem !important; }
+    main.max-w-4xl > div, main.max-w-4xl > form { max-width: 56rem !important; }
+    main.max-w-5xl > div, main.max-w-5xl > form { max-width: 64rem !important; }
+    main.max-w-6xl > div, main.max-w-6xl > form { max-width: 72rem !important; }
+    main.max-w-7xl > div, main.max-w-7xl > form { max-width: 80rem !important; }
+}
+
+/* 2. Text Visibility / High Contrast Fixes for Glass Panels
+   Forces text-white / light text from dark theme templates to be legible in light mode. */
+.glass-panel h2,
+.glass-panel h3,
+.glass-panel .text-white,
+.glass-panel label,
+.glass-panel input,
+.glass-panel select {
+    color: var(--text-primary) !important;
+}
+
+.glass-panel p.text-slate-500,
+.glass-panel p.text-gray-500 {
+    color: var(--text-secondary) !important;
+}
+
+/* 3. Inputs & Options Styling */
+.glass-panel input::placeholder {
+    color: #94a3b8 !important;
+}
+.glass-panel select {
+    background-color: rgba(255, 255, 255, 0.45) !important;
+}
+.glass-panel select option {
+    background-color: #ffffff !important;
+    color: var(--text-primary) !important;
+}
+
+/* 4. Data Tables Overrides */
+.glass-panel table td.text-white, 
+.glass-panel table th.text-white {
+    color: var(--text-secondary) !important;
+}
+.glass-panel table td.text-blue-400 {
+    color: var(--accent-blue) !important;
+}
+input.input-dark-glass, 
+select.input-dark-glass {
+    color: var(--text-primary) !important;
+}
