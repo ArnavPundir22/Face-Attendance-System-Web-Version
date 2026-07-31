@@ -150,9 +150,22 @@ def admin_delete_student(student_id):
         return denied
 
     try:
+        # 1. Delete student attendance logs first to satisfy foreign key constraints
+        supabase.table('attendance').delete().eq('student_id', student_id).execute()
+        
+        # 2. Delete the student profile from the database
         supabase.table('students').delete().eq('id', student_id).execute()
-    except Exception:
-        pass
+        
+        # 3. Clean up the registered photo from disk
+        from werkzeug.utils import secure_filename
+        safe_id = secure_filename(student_id)
+        if safe_id:
+            filename = f"{safe_id}.jpg"
+            filepath = os.path.join(config.KNOWN_FACES_DIR, filename)
+            if os.path.exists(filepath):
+                os.remove(filepath)
+    except Exception as e:
+        print(f"Cascading delete failed for student {student_id}: {e}")
         
     return redirect(url_for('admin.admin_students'))
 
