@@ -192,9 +192,9 @@
             const prog = item.getAttribute('data-program');
             const bran = item.getAttribute('data-branch');
             const yr = item.getAttribute('data-year');
-            if (prog) programs.add(prog);
-            if (bran) branches.add(bran);
-            if (yr) years.add(yr);
+            if (prog) programs.add(prog.toUpperCase().trim());
+            if (bran) branches.add(bran.toUpperCase().trim());
+            if (yr) years.add(yr.toUpperCase().trim());
         });
         
         const progSelect = document.getElementById('filterProgram');
@@ -215,17 +215,17 @@
 
     function filterStudents() {
         const query = document.getElementById('studentSearch').value.toLowerCase();
-        const selectedProg = document.getElementById('filterProgram').value;
-        const selectedBran = document.getElementById('filterBranch').value;
-        const selectedYr = document.getElementById('filterYear').value;
+        const selectedProg = document.getElementById('filterProgram').value.toUpperCase().trim();
+        const selectedBran = document.getElementById('filterBranch').value.toUpperCase().trim();
+        const selectedYr = document.getElementById('filterYear').value.toUpperCase().trim();
         
         const items = document.querySelectorAll('.student-item');
         items.forEach(item => {
             const name = item.querySelector('.student-name').innerText.toLowerCase();
             const id = item.querySelector('.student-id').innerText.toLowerCase();
-            const prog = item.getAttribute('data-program');
-            const bran = item.getAttribute('data-branch');
-            const yr = item.getAttribute('data-year');
+            const prog = (item.getAttribute('data-program') || '').toUpperCase().trim();
+            const bran = (item.getAttribute('data-branch') || '').toUpperCase().trim();
+            const yr = (item.getAttribute('data-year') || '').toUpperCase().trim();
             
             const matchesText = name.includes(query) || id.includes(query);
             const matchesProg = !selectedProg || prog === selectedProg;

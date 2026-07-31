@@ -217,7 +217,7 @@
                 const upperVal = rawVal.toUpperCase();
                 if (!addedValues.has(upperVal)) {
                   addedValues.add(upperVal);
-                  select.append('<option value="' + rawVal + '">' + rawVal + '</option>');
+                  select.append('<option value="' + upperVal + '">' + upperVal + '</option>');
                 }
               }
             });
@@ -227,9 +227,9 @@
               if (!val) {
                 column.search('').draw();
               } else {
-                // Exact match filtering
+                // Custom case-insensitive exact match filtering logic
                 const regexVal = '^' + $.fn.dataTable.util.escapeRegex(val) + '$';
-                column.search(regexVal, true, false).draw();
+                column.search(regexVal, true, false, true).draw();
               }
             });
           });
