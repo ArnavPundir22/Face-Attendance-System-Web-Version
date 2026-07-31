@@ -82,20 +82,20 @@ def create_app() -> Flask:
     def not_found(error):
         if _is_api_request():
             return jsonify({"error": "Resource not found"}), 404
-        return redirect(url_for("attendance.index"))
+        return render_template("error_404.html"), 404
 
     @app.errorhandler(403)
     def forbidden(error):
         if _is_api_request():
             return jsonify({"error": "Forbidden"}), 403
-        return redirect(url_for("auth.login"))
+        return render_template("error_403.html"), 403
 
     @app.errorhandler(500)
     def internal_error(error):
         logger.exception("Internal server error: %s", error)
         if _is_api_request():
             return jsonify({"error": "Internal server error"}), 500
-        return redirect(url_for("attendance.index"))
+        return render_template("error_500.html"), 500
 
     # ------------------------------------------------------------------
     # Context processors

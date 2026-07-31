@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Access Denied — BioSecure AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+  <div class="glass-panel max-w-md w-full p-8 sm:p-10 rounded-3xl shadow-2xl text-center relative overflow-hidden">
+    <div class="absolute -top-24 -left-24 w-48 h-48 rounded-full bg-rose-500/10 blur-3xl pointer-events-none"></div>
+    <div class="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-orange-500/10 blur-3xl pointer-events-none"></div>
+
+    <div class="relative z-10 flex flex-col items-center">
+      <!-- Animated Icon -->
+      <div class="relative w-20 h-20 rounded-2xl bg-gradient-to-tr from-rose-500/10 to-orange-500/10 border border-rose-500/20 flex items-center justify-center mb-6 shadow-inner animate-pulse">
+        <i data-lucide="shield-alert" class="w-10 h-10 text-rose-500"></i>
+      </div>
+
+      <!-- Error Code -->
+      <h1 class="text-7xl font-extrabold font-geist text-slate-900 tracking-tight mb-2">403</h1>
+      
+      <!-- Subheading -->
+      <h3 class="text-xl font-bold font-geist text-slate-800 mb-3">Access Denied</h3>
+      
+      <!-- Description -->
+      <p class="text-sm text-slate-500 leading-relaxed mb-8 max-w-xs">
+        You do not have the required permissions to view this resource or perform this action.
+      </p>
+
+      <!-- Action Buttons -->
+      <div class="flex flex-col sm:flex-row gap-3 w-full">
+        <a href="/login" class="btn-primary-glass py-3 px-6 rounded-xl text-sm font-semibold flex-1 flex items-center justify-center gap-2">
+          <i data-lucide="log-in" class="w-4 h-4"></i> Login As Admin
+        </a>
+        <a href="/" class="btn-secondary-glass py-3 px-6 rounded-xl text-sm font-semibold flex-1 flex items-center justify-center gap-2">
+          <i data-lucide="home" class="w-4 h-4"></i> Home
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>
