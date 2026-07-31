@@ -116,48 +116,137 @@
       </div>
     </div>
 
-    <div class="glass-panel p-6 rounded-2xl inner-glow overflow-x-auto shadow-2xl">
-      <table class="w-full text-sm text-left">
-        <thead>
-          <tr class="text-gray-400 border-b border-white/10 uppercase tracking-wider text-xs font-semibold font-geist">
-            <th class="p-4">ID</th>
-            <th class="p-4">Name</th>
-            <th class="p-4">Program</th>
-            <th class="p-4">Branch</th>
-            <th class="p-4">Gmail</th>
-            <th class="p-4">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for s in students %}
-          <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
-            <td class="p-4 font-semibold text-blue-400 font-geist">{{ s['id'] }}</td>
-            <td class="p-4 font-medium text-white">{{ s['name'] }}</td>
-            <td class="p-4 text-gray-300 font-geist">{{ s['program'] }}</td>
-            <td class="p-4 text-gray-300 font-geist">{{ s['branch'] }}</td>
-            <td class="p-4 text-gray-300 font-geist">{{ s['gmail'] }}</td>
-            <td class="p-4">
-              <div class="flex items-center gap-3">
-                <a href="/admin/student/edit/{{ s['id'] }}" class="text-blue-400 hover:text-blue-300 text-sm font-semibold transition-colors flex items-center gap-1">
-                  <i data-lucide="edit-2" class="w-4 h-4"></i> Edit
-                </a>
-                <form method="POST" action="/admin/student/delete/{{ s['id'] }}" class="inline"
-                      onsubmit="return confirm('Delete student? This will remove the student record but keep attendance history.');">
-                  <button class="text-rose-400 hover:text-rose-350 text-sm font-semibold transition-colors flex items-center gap-1">
-                    <i data-lucide="trash-2" class="w-4 h-4"></i> Delete
-                  </button>
-                </form>
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="glass-panel p-6 rounded-2xl inner-glow shadow-2xl space-y-6">
+      
+      <!-- Filter & Search Bar -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white/5 rounded-xl border border-white/10">
+        <div class="md:col-span-1">
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Search Students</label>
+          <input type="text" id="studentSearch" onkeyup="filterStudents()" placeholder="Search by name or ID..." class="input-dark-glass w-full rounded-lg px-3 py-2 text-xs" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Filter Program</label>
+          <select id="filterProgram" onchange="filterStudents()" class="input-dark-glass w-full rounded-lg px-3 py-2 text-xs">
+            <option value="">All Programs</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Filter Branch</label>
+          <select id="filterBranch" onchange="filterStudents()" class="input-dark-glass w-full rounded-lg px-3 py-2 text-xs">
+            <option value="">All Branches</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Filter Year</label>
+          <select id="filterYear" onchange="filterStudents()" class="input-dark-glass w-full rounded-lg px-3 py-2 text-xs">
+            <option value="">All Years</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto w-full">
+        <table class="w-full text-sm text-left">
+          <thead>
+            <tr class="text-gray-400 border-b border-white/10 uppercase tracking-wider text-xs font-semibold font-geist">
+              <th class="p-4">ID</th>
+              <th class="p-4">Name</th>
+              <th class="p-4">Program</th>
+              <th class="p-4">Branch</th>
+              <th class="p-4">Gmail</th>
+              <th class="p-4">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in students %}
+            <tr class="student-row border-b border-white/5 hover:bg-white/5 transition-colors"
+                data-program="{{ s['program'] or '' }}"
+                data-branch="{{ s['branch'] or '' }}"
+                data-year="{{ s['enrollment_year'] or '' }}">
+              <td class="p-4 font-semibold text-blue-400 font-geist student-id">{{ s['id'] }}</td>
+              <td class="p-4 font-medium text-white student-name">{{ s['name'] }}</td>
+              <td class="p-4 text-gray-300 font-geist">{{ s['program'] }}</td>
+              <td class="p-4 text-gray-300 font-geist">{{ s['branch'] }}</td>
+              <td class="p-4 text-gray-300 font-geist">{{ s['gmail'] }}</td>
+              <td class="p-4">
+                <div class="flex items-center gap-3">
+                  <a href="/admin/student/edit/{{ s['id'] }}" class="text-blue-400 hover:text-blue-300 text-sm font-semibold transition-colors flex items-center gap-1">
+                    <i data-lucide="edit-2" class="w-4 h-4"></i> Edit
+                  </a>
+                  <form method="POST" action="/admin/student/delete/{{ s['id'] }}" class="inline"
+                        onsubmit="return confirm('Delete student? This will remove the student record but keep attendance history.');">
+                    <button class="text-rose-400 hover:text-rose-350 text-sm font-semibold transition-colors flex items-center gap-1">
+                      <i data-lucide="trash-2" class="w-4 h-4"></i> Delete
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </main>
 
   <script>
     lucide.createIcons();
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const programs = new Set();
+        const branches = new Set();
+        const years = new Set();
+        
+        document.querySelectorAll('.student-row').forEach(row => {
+            const prog = row.getAttribute('data-program');
+            const bran = row.getAttribute('data-branch');
+            const yr = row.getAttribute('data-year');
+            if (prog) programs.add(prog.toUpperCase().trim());
+            if (bran) branches.add(bran.toUpperCase().trim());
+            if (yr) years.add(yr.toUpperCase().trim());
+        });
+        
+        const progSelect = document.getElementById('filterProgram');
+        Array.from(programs).sort().forEach(p => {
+            progSelect.add(new Option(p, p));
+        });
+        
+        const branSelect = document.getElementById('filterBranch');
+        Array.from(branches).sort().forEach(b => {
+            branSelect.add(new Option(b, b));
+        });
+        
+        const yrSelect = document.getElementById('filterYear');
+        Array.from(years).sort().forEach(y => {
+            yrSelect.add(new Option(y, y));
+        });
+    });
+
+    function filterStudents() {
+        const query = document.getElementById('studentSearch').value.toLowerCase();
+        const selectedProg = document.getElementById('filterProgram').value.toUpperCase().trim();
+        const selectedBran = document.getElementById('filterBranch').value.toUpperCase().trim();
+        const selectedYr = document.getElementById('filterYear').value.toUpperCase().trim();
+        
+        const rows = document.querySelectorAll('.student-row');
+        rows.forEach(row => {
+            const name = row.querySelector('.student-name').innerText.toLowerCase();
+            const id = row.querySelector('.student-id').innerText.toLowerCase();
+            const prog = (row.getAttribute('data-program') || '').toUpperCase().trim();
+            const bran = (row.getAttribute('data-branch') || '').toUpperCase().trim();
+            const yr = (row.getAttribute('data-year') || '').toUpperCase().trim();
+            
+            const matchesText = name.includes(query) || id.includes(query);
+            const matchesProg = !selectedProg || prog === selectedProg;
+            const matchesBran = !selectedBran || bran === selectedBran;
+            const matchesYr = !selectedYr || yr === selectedYr;
+            
+            if (matchesText && matchesProg && matchesBran && matchesYr) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
   </script>
   <script src="{{ url_for('static', filename='js/offline-detector.js') }}"></script>
 </body>
