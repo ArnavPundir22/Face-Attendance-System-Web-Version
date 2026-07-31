@@ -1,76 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Registered Students — BioSecure AI</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
-  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
-  <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.4.1/css/responsive.dataTables.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
-  <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
-  <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
-  <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
-  <script src="https://cdn.datatables.net/responsive/2.4.1/js/dataTables.responsive.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
-  <style>
-    /* DataTables Dark Mode Overrides */
-    .dataTables_wrapper .dataTables_filter input,
-    .dataTables_wrapper .dataTables_length select,
-    .dataTables_wrapper .dataTables_info,
-    .dataTables_wrapper .dataTables_paginate .paginate_button {
-        color: #dae2fd !important;
-    }
-    .dataTables_wrapper .dataTables_filter input {
-        background: rgba(11, 19, 38, 0.6) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 8px !important;
-        padding: 4px 10px !important;
-    }
-    .dataTables_wrapper .dataTables_paginate .paginate_button {
-        background: rgba(255, 255, 255, 0.05) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        color: #dae2fd !important;
-        border-radius: 6px !important;
-    }
-    .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
-        background: rgba(255, 255, 255, 0.1) !important;
-        border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    }
-    .dataTables_wrapper .dataTables_paginate .current {
-        background: #3b82f6 !important;
-        border-color: #3b82f6 !important;
-        color: white !important;
-    }
-    #studentsTable {
-        background-color: transparent !important;
-        border-collapse: collapse !important;
-    }
-    #studentsTable thead {
-        background-color: rgba(255, 255, 255, 0.03) !important;
-    }
-    #studentsTable th {
-        color: #ffffff !important;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-        font-family: 'Geist', sans-serif;
-        font-weight: 600;
-    }
-    #studentsTable tbody tr {
-        background-color: transparent !important;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
-    }
-    #studentsTable tbody tr:hover {
-        background-color: rgba(255, 255, 255, 0.02) !important;
-    }
-  </style>
 </head>
-
 <body class="pb-24 md:pb-8 flex flex-col md:flex-row">
 
   <!-- Desktop Left Sidebar (Desktop Only) -->
@@ -163,57 +100,32 @@
 
   <main class="w-full flex-1 p-4 sm:p-6 max-w-6xl mx-auto mt-24 space-y-6 md:mt-8 md:pl-72">
     
-    <!-- Secondary Sub-Navigation (Matching Admin View Style) -->
+    <!-- Secondary Sub-Navigation -->
     <div class="glass-panel p-4 rounded-xl flex flex-wrap items-center justify-between gap-4 inner-glow">
       <div class="flex items-center gap-2">
         <i data-lucide="database" class="w-6 h-6 text-blue-500"></i>
-        <h2 class="text-lg font-bold font-geist text-white">Registered Students ({{ students|length }})</h2>
+        <h2 class="text-lg font-bold font-geist text-white">Student Database Records ({{ students|length }})</h2>
       </div>
       <div class="flex flex-wrap gap-3">
         <a href="/add_student" class="btn-primary-glass px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2">
           <i data-lucide="user-plus" class="w-4 h-4"></i> Add Student Profile
         </a>
-        {% if session_is_admin %}
         <a href="/admin" class="btn-secondary-glass px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2">
-          <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Admin Dashboard
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
         </a>
-        {% endif %}
       </div>
     </div>
 
-    <div class="glass-panel p-6 rounded-2xl inner-glow shadow-2xl">
-      <!-- Filter Bar -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 p-4 bg-white/5 rounded-xl border border-white/10">
-        <div>
-          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Filter Program</label>
-          <select id="filterProgram" class="input-dark-glass w-full rounded-lg px-3 py-2 text-xs">
-            <option value="">All Programs</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Filter Branch</label>
-          <select id="filterBranch" class="input-dark-glass w-full rounded-lg px-3 py-2 text-xs">
-            <option value="">All Branches</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Filter Year</label>
-          <select id="filterYear" class="input-dark-glass w-full rounded-lg px-3 py-2 text-xs">
-            <option value="">All Years</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="overflow-x-auto w-full">
-        <table id="studentsTable" class="w-full text-sm text-left">
+    <div class="glass-panel p-6 rounded-2xl inner-glow overflow-x-auto shadow-2xl">
+      <table class="w-full text-sm text-left">
         <thead>
           <tr class="text-gray-400 border-b border-white/10 uppercase tracking-wider text-xs font-semibold font-geist">
             <th class="p-4">ID</th>
             <th class="p-4">Name</th>
             <th class="p-4">Program</th>
             <th class="p-4">Branch</th>
-            <th class="p-4">Year</th>
-            <th class="p-4">Email</th>
+            <th class="p-4">Gmail</th>
+            <th class="p-4 text-left">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -223,69 +135,29 @@
             <td class="p-4 font-medium text-white">{{ s['name'] }}</td>
             <td class="p-4 text-gray-300 font-geist">{{ s['program'] or '-' }}</td>
             <td class="p-4 text-gray-300 font-geist">{{ s['branch'] or '-' }}</td>
-            <td class="p-4 text-gray-300 font-geist">{{ s['enrollment_year'] or '-' }}</td>
             <td class="p-4 text-gray-300 font-geist">{{ s['gmail'] or '-' }}</td>
+            <td class="p-4">
+              <div class="flex items-center gap-3">
+                <a href="/admin/student/edit/{{ s['id'] }}" class="text-blue-400 hover:text-blue-300 text-sm font-semibold transition-colors flex items-center gap-1">
+                  <i data-lucide="edit-2" class="w-4 h-4"></i> Edit
+                </a>
+                <form method="POST" action="/admin/student/delete/{{ s['id'] }}" class="inline"
+                      onsubmit="return confirm('Delete student? This will remove the student record but keep attendance history.');">
+                  <button class="text-rose-400 hover:text-rose-350 text-sm font-semibold transition-colors flex items-center gap-1">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i> Delete
+                  </button>
+                </form>
+              </div>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
-      </div>
     </div>
   </main>
 
-<script>
-  $(document).ready(function () {
+  <script>
     lucide.createIcons();
-    const table = $('#studentsTable').DataTable({
-      responsive: false,
-      scrollX: true,
-      order: [[1, 'asc']],
-      dom: 'Bfrtip',
-      buttons: [
-        {
-          extend: 'collection',
-          text: 'Export Data ⬇',
-          buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],
-          className: 'bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg font-semibold transition duration-300 transform hover:shadow-lg neon-button'
-        }
-      ],
-      initComplete: function () {
-        // Populate filter dropdowns dynamically from existing table data
-        this.api().columns([2, 3, 4]).every(function (colIdx) {
-          const column = this;
-          let selectId = '#filterProgram';
-          if (colIdx === 3) selectId = '#filterBranch';
-          if (colIdx === 4) selectId = '#filterYear';
-
-          const select = $(selectId);
-          const addedValues = new Set();
-          
-          column.data().unique().sort().each(function (d) {
-            if (d && d !== '-') {
-              const rawVal = d.toString().trim();
-              const upperVal = rawVal.toUpperCase();
-              if (!addedValues.has(upperVal)) {
-                addedValues.add(upperVal);
-                select.append('<option value="' + rawVal + '">' + rawVal + '</option>');
-              }
-            }
-          });
-
-          select.on('change', function () {
-            const val = $(this).val();
-            if (!val) {
-              column.search('').draw();
-            } else {
-              // Custom exact match filtering logic
-              const regexVal = '^' + $.fn.dataTable.util.escapeRegex(val) + '$';
-              column.search(regexVal, true, false).draw();
-            }
-          });
-        });
-      }
-    });
-  });
-</script>
-
+  </script>
 </body>
 </html>
