@@ -31,14 +31,14 @@ graph TD
     Nginx -->|WSGI Proxy| Gunicorn[Gunicorn Process Manager]
     Gunicorn -->|WSGI Handlers| Flask[Flask Application Factory]
 
-    subgraph Computational Pipeline (Flask Backend)
+    subgraph "Computational Pipeline (Flask Backend)"
         Flask --> |1. Image Bytes| Dec[cv2.imdecode]
         Dec --> |2. Detect & Align| Retina[RetinaFace Detector]
         Retina --> |3. Face Encoding| Arc[ArcFace Encoder]
         Arc --> |4. Normalised Vector| L2[L2 Normalisation]
     end
 
-    subgraph Database Search Engine (Supabase)
+    subgraph "Database Search Engine (Supabase)"
         L2 --> |5. Cosine Distance Matching| RPC[match_face RPC]
         RPC --> |6. Similarity Lookup| Db[(Postgres + pgvector)]
     end
