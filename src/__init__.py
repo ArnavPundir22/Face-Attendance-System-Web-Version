@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import os
 
-from flask import Flask, jsonify, redirect, session, url_for
+from flask import Flask, jsonify, redirect, render_template, session, url_for
 
 from src import config
 
