@@ -127,18 +127,62 @@ def admin_edit_student(student_id):
         program = request.form['program'].strip()
         branch  = request.form['branch'].strip()
         gmail   = request.form['gmail'].strip()
-        
+        photo   = request.files.get('photo')
+
+        update_payload = {
+            'name': name,
+            'program': program,
+            'branch': branch,
+            'gmail': gmail
+        }
+
+        # If a new re-enrollment photo is provided, encode it and reset EWMA
+        if photo and photo.filename:
+            from werkzeug.utils import secure_filename
+            import os
+            import cv2
+            import numpy as np
+            from src.utils.face import model, normalize_embedding
+
+            safe_id = secure_filename(student_id)
+            if safe_id:
+                filename = f"{safe_id}.jpg"
+                filepath = os.path.join(config.KNOWN_FACES_DIR, filename)
+                photo.save(filepath)
+
+                image = cv2.imread(filepath)
+                if image is not None:
+                    faces = model.get(image)
+                    if faces:
+                        face = faces[0]
+                        new_emb = np.array(face.embedding, dtype=np.float32)
+                        normalized_emb = normalize_embedding(new_emb)
+                        if normalized_emb is not None:
+                            update_payload['embedding'] = normalized_emb.tolist()
+                            update_payload['current_ewma_drift'] = 0.0
+                            update_payload['drift_alert_level'] = 'HEALTHY'
+
+                            # Log re-enrollment event
+                            try:
+                                supabase.table('embedding_health').insert({
+                                    'student_id': student_id,
+                                    'drift_score': 0.0,
+                                    'ewma_drift': 0.0,
+                                    'match_confidence': 1.0,
+                                    'alert_level': 'RE_ENROLLED',
+                                    'pose_yaw': 0.0,
+                                    'pose_pitch': 0.0,
+                                    'pose_accepted': True
+                                }).execute()
+                            except Exception as err:
+                                print(f"Error logging re-enrollment event: {err}")
+
         try:
-            supabase.table('students').update({
-                'name': name,
-                'program': program,
-                'branch': branch,
-                'gmail': gmail
-            }).eq('id', student_id).execute()
+            supabase.table('students').update(update_payload).eq('id', student_id).execute()
         except Exception as e:
             print("Update student error:", e)
             
-        return redirect(url_for('admin.admin_students'))
+        return redirect(url_for('admin.admin_drift'))
 
     return render_template('edit_student.html', student=student)
 
@@ -438,4 +482,96 @@ def admin_academics():
         programs=programs,
         branches=branches
     )
+
+
+# ---------------------------------------------------------------------------
+# Biometric Drift Monitoring Dashboard (Patent Idea #3)
+# ---------------------------------------------------------------------------
+
+@admin_bp.route('/drift')
+def admin_drift():
+    """Biometric Drift Monitoring Dashboard."""
+    denied = _require_admin()
+    if denied:
+        return denied
+
+    try:
+        # Fetch all students sorted by EWMA drift descending (most critical first)
+        students_resp = supabase.table('students') \
+            .select('id, name, program, branch, current_ewma_drift, drift_alert_level') \
+            .order('current_ewma_drift', desc=True) \
+            .execute()
+        students = students_resp.data or []
+
+        # Count summary stats
+        summary = {
+            'total': len(students),
+            'healthy': sum(1 for s in students if (s.get('drift_alert_level') or 'HEALTHY') == 'HEALTHY'),
+            'warning': sum(1 for s in students if s.get('drift_alert_level') == 'WARNING'),
+            'critical': sum(1 for s in students if s.get('drift_alert_level') == 'CRITICAL'),
+            'alert': sum(1 for s in students if s.get('drift_alert_level') == 'ALERT'),
+        }
+    except Exception as e:
+        print("Error loading drift dashboard:", e)
+        students = []
+        summary = {'total': 0, 'healthy': 0, 'warning': 0, 'critical': 0, 'alert': 0}
+
+    return render_template(
+        'admin_drift.html',
+        students=students,
+        summary=summary,
+        config=config
+    )
+
+
+@admin_bp.route('/api/drift_history/<student_id>')
+def api_drift_history(student_id):
+    """JSON API endpoint returning historical drift log events for a student."""
+    denied = _require_admin()
+    if denied:
+        return jsonify({'error': 'Unauthorized'}), 403
+
+    try:
+        logs_resp = supabase.table('embedding_health') \
+            .select('*') \
+            .eq('student_id', student_id) \
+            .order('created_at', desc=False) \
+            .limit(50) \
+            .execute()
+        return jsonify({'success': True, 'data': logs_resp.data or []})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@admin_bp.route('/student/reset_drift/<student_id>', methods=['POST'])
+def reset_student_drift(student_id):
+    """Reset EWMA drift score to 0.00 upon re-enrollment."""
+    denied = _require_admin()
+    if denied:
+        return denied
+
+    try:
+        # Reset current_ewma_drift and status in students table
+        supabase.table('students').update({
+            'current_ewma_drift': 0.0,
+            'drift_alert_level': 'HEALTHY'
+        }).eq('id', student_id).execute()
+
+        # Append re-enrollment event to health log
+        supabase.table('embedding_health').insert({
+            'student_id': student_id,
+            'drift_score': 0.0,
+            'ewma_drift': 0.0,
+            'match_confidence': 1.0,
+            'alert_level': 'RE_ENROLLED',
+            'pose_yaw': 0.0,
+            'pose_pitch': 0.0,
+            'pose_accepted': True
+        }).execute()
+
+    except Exception as e:
+        print(f"Error resetting drift for {student_id}: {e}")
+
+    return redirect(url_for('admin.admin_drift'))
+
 

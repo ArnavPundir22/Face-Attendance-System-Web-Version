@@ -12,6 +12,9 @@ EncodeFile_Insight.pkl
 # Student face photos (PII)
 known_faces/
 
+#IDF
+IDF/
+
 # Legacy data files
 data.csv
 

@@ -17,10 +17,153 @@ import numpy as np
 from flask import Blueprint, jsonify, render_template, request
 
 from src import config
-from src.utils.db import supabase
+from src.utils.db import supabase, is_valid_email
 from src.utils.face import model, normalize_embedding
 
 attendance_bp = Blueprint('attendance', __name__)
+
+
+# ---------------------------------------------------------------------------
+# Drift Detection Helper
+# ---------------------------------------------------------------------------
+
+def _compute_drift_level(ewma: float) -> str:
+    """Map an EWMA drift value to a human-readable alert level."""
+    if ewma >= config.DRIFT_ALERT_THRESHOLD:
+        return 'ALERT'
+    if ewma >= config.DRIFT_CRITICAL_THRESHOLD:
+        return 'CRITICAL'
+    if ewma >= config.DRIFT_WARN_THRESHOLD:
+        return 'WARNING'
+    return 'HEALTHY'
+
+
+def _send_drift_email_alert(student_id: str, alert_level: str, ewma_drift: float):
+    """Send an automated SMTP email notification to admin when biometric drift triggers CRITICAL or ALERT."""
+    if not config.EMAIL_USER or not config.EMAIL_PASS:
+        return  # Email not configured
+
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    try:
+        # Fetch student & admin contact info
+        stu_resp = supabase.table('students').select('name, program, branch, gmail').eq('id', student_id).maybe_single().execute()
+        student = stu_resp.data or {}
+        student_name = student.get('name', student_id)
+        student_email = student.get('gmail', '')
+
+        subject = f"Biometric Drift Alert [{alert_level}]: {student_name} ({student_id})"
+        
+        body_html = f"""
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; background-color: #f9f9f9; border-radius: 8px;">
+            <h2 style="color: #c0392b;">Biometric Template Drift Alert</h2>
+            <p>Biometric monitoring system has detected significant template aging / appearance shift for student:</p>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+                <tr><td style="padding: 8px; font-weight: bold; width: 150px;">Student ID:</td><td>{student_id}</td></tr>
+                <tr><td style="padding: 8px; font-weight: bold;">Student Name:</td><td>{student_name}</td></tr>
+                <tr><td style="padding: 8px; font-weight: bold;">Program / Branch:</td><td>{student.get('program', 'N/A')} - {student.get('branch', 'N/A')}</td></tr>
+                <tr><td style="padding: 8px; font-weight: bold;">Current EWMA Drift:</td><td><b>{ewma_drift:.4f}</b></td></tr>
+                <tr><td style="padding: 8px; font-weight: bold;">Alert Level:</td><td><span style="background-color: #e74c3c; color: white; padding: 4px 8px; border-radius: 4px;">{alert_level}</span></td></tr>
+            </table>
+            <p style="margin-top: 20px;"><b>Action Recommended:</b> Please arrange for student re-enrollment (capturing a new high-quality reference photo) in the admin portal.</p>
+            <hr style="border: none; border-top: 1px solid #ddd; margin-top: 20px;">
+            <p style="font-size: 12px; color: #777;">BioSecure AI Autonomous System Monitoring</p>
+        </div>
+        """
+
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = config.EMAIL_USER
+        msg['To'] = config.EMAIL_USER  # Admin recipient
+        if student_email and is_valid_email(student_email):
+            msg['Cc'] = student_email
+
+        msg.attach(MIMEText(body_html, 'html'))
+
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=10) as server:
+            server.login(config.EMAIL_USER, config.EMAIL_PASS)
+            server.send_message(msg)
+
+    except Exception as err:
+        import logging
+        logging.getLogger(__name__).warning("Failed to send drift email alert: %s", err)
+
+
+def _update_drift(student_id: str, cosine_sim: float, pose_yaw: float, pose_pitch: float) -> dict:
+    """
+    Pose-Gated EWMA Drift Tracking (Patent Idea #3).
+
+    If the detected face pose exceeds the configured yaw/pitch thresholds,
+    the EWMA is NOT updated — the event is logged as POSE_REJECTED so that
+    bad-angle photos never inflate the drift signal.
+
+    Returns a dict with keys: pose_accepted, alert_level, ewma_drift.
+    """
+    pose_accepted = (
+        abs(pose_yaw)   <= config.DRIFT_POSE_YAW_MAX and
+        abs(pose_pitch) <= config.DRIFT_POSE_PITCH_MAX
+    )
+
+    try:
+        if pose_accepted:
+            drift_score = 1.0 - cosine_sim
+
+            # Fetch current EWMA from students table (fast single-row lookup)
+            stu_resp = supabase.table('students') \
+                .select('current_ewma_drift') \
+                .eq('id', student_id) \
+                .maybe_single() \
+                .execute()
+            prev_ewma = (stu_resp.data or {}).get('current_ewma_drift') or 0.0
+
+            new_ewma    = config.DRIFT_ALPHA * drift_score + (1 - config.DRIFT_ALPHA) * prev_ewma
+            alert_level = _compute_drift_level(new_ewma)
+
+            # Append event to embedding_health history
+            supabase.table('embedding_health').insert({
+                'student_id':       student_id,
+                'drift_score':      round(drift_score, 6),
+                'ewma_drift':       round(new_ewma,    6),
+                'match_confidence': round(cosine_sim,  6),
+                'alert_level':      alert_level,
+                'pose_yaw':         round(pose_yaw,    2),
+                'pose_pitch':       round(pose_pitch,  2),
+                'pose_accepted':    True,
+            }).execute()
+
+            # Keep students table in sync for fast dashboard queries
+            supabase.table('students').update({
+                'current_ewma_drift': round(new_ewma, 6),
+                'drift_alert_level':  alert_level,
+            }).eq('id', student_id).execute()
+
+            # Trigger email alert if CRITICAL or ALERT
+            if alert_level in ('CRITICAL', 'ALERT'):
+                _send_drift_email_alert(student_id, alert_level, new_ewma)
+
+            return {'pose_accepted': True, 'alert_level': alert_level, 'ewma_drift': round(new_ewma, 4)}
+
+        else:
+            # Pose rejected — log the event but do NOT touch the EWMA
+            supabase.table('embedding_health').insert({
+                'student_id':       student_id,
+                'drift_score':      None,
+                'ewma_drift':       None,
+                'match_confidence': round(cosine_sim, 6),
+                'alert_level':      'POSE_REJECTED',
+                'pose_yaw':         round(pose_yaw,   2),
+                'pose_pitch':       round(pose_pitch,  2),
+                'pose_accepted':    False,
+            }).execute()
+            return {'pose_accepted': False, 'alert_level': 'POSE_REJECTED', 'ewma_drift': None}
+
+    except Exception as exc:
+        # Drift tracking must never break attendance marking
+        import logging
+        logging.getLogger(__name__).warning('Drift tracking error for %s: %s', student_id, exc)
+        return {'pose_accepted': pose_accepted, 'alert_level': 'UNKNOWN', 'ewma_drift': None}
 
 
 @attendance_bp.route('/')
@@ -157,10 +300,19 @@ def upload_photo():
                 if matched_id and best_score >= config.FACE_MATCH_THRESHOLD:
                     recognized_ids.add(matched_id)
                     confidence_map[matched_id] = best_score
+
+                    # ── Pose-Gated Drift Detection (Patent Idea #3) ──────────────────
+                    pose_yaw   = float(face.pose[1]) if (hasattr(face, 'pose') and face.pose is not None) else 0.0
+                    pose_pitch = float(face.pose[0]) if (hasattr(face, 'pose') and face.pose is not None) else 0.0
+                    drift_info = _update_drift(matched_id, best_score, pose_yaw, pose_pitch)
+                    # ─────────────────────────────────────────────────────────────────
+
                     results.append({
-                        "name": best_name,
-                        "status": "Present",
-                        "confidence": f"{best_score:.2f}",
+                        'name':       best_name,
+                        'status':     'Present',
+                        'confidence': f'{best_score:.2f}',
+                        'drift_alert': drift_info['alert_level'],
+                        'pose_accepted': drift_info['pose_accepted'],
                     })
                 else:
                     results.append({

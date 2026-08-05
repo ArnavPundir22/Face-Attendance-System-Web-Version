@@ -1,8 +1,8 @@
-# 🛡️ BioSecure AI — Documentation Hub
+# 🛡️ BioSecure AI — Technical Documentation Hub
 
-Welcome to the official technical documentation portal for **BioSecure AI**. BioSecure AI is a production-ready, stateless, and high-performance automated facial recognition classroom attendance system. 
+Welcome to the official technical documentation portal for **BioSecure AI**, developed at **COER University, Roorkee**. 
 
-By leveraging local AI inference (via ONNX Runtime) and offloading vector embeddings search to a PostgreSQL database powered by Supabase and `pgvector`, BioSecure AI is fast, secure, and incredibly easy to scale.
+BioSecure AI is a production-ready, stateless, high-performance automated facial recognition classroom attendance system designed to replace traditional paper registers. It incorporates a novel **Pose-Gated EWMA Embedding Drift Engine (2026 Patent Application)** to solve biometric template aging.
 
 ---
 
@@ -12,46 +12,56 @@ Explore the system through our dedicated sub-documentation modules:
 
 | Document | Description | Core Contents |
 | :--- | :--- | :--- |
-| 🏗️ **[System Architecture](file:///home/dell/Face-Attendance-System-Web-Version/docs/architecture.md)** | Core components & logic flows | WSGI Factory pattern, Nginx/Gunicorn proxies, sequence flowcharts |
-| 🗄️ **[Database & pgvector](file:///home/dell/Face-Attendance-System-Web-Version/docs/database.md)** | Storage layer & vector similarity | Table schemas, Row Level Security (RLS), custom cosine RPC matching |
-| 🧠 **[ML & Inference Pipeline](file:///home/dell/Face-Attendance-System-Web-Version/docs/ml_pipeline.md)** | Facial recognition logic | InsightFace, ArcFace embeddings, RetinaFace alignment, L2 normalisation |
-| 🔌 **[API Reference](file:///home/dell/Face-Attendance-System-Web-Version/docs/api_reference.md)** | REST endpoints manual | Endpoint schemas, request/response formats, status codes |
-| 🌍 **[Ops & Deployment](file:///home/dell/Face-Attendance-System-Web-Version/docs/deployment.md)** | Production setup & guidelines | Gunicorn tuning, systemd setup, environment files |
-| 👤 **[User & Admin Guide](file:///home/dell/Face-Attendance-System-Web-Version/docs/user_guide.md)** | How to use the app | Registering students, taking attendance, managing roles, reports |
+| 🏗️ **[System Architecture](architecture.md)** | Dual-pipeline architecture | Attendance Pipeline, 3D Pose Gate, EWMA Drift Engine, Sequence Flowcharts |
+| 🗄️ **[Database & pgvector](database.md)** | Storage layer & vector similarity | Supabase PostgreSQL schemas, `match_face` RPC, `students` & `drift_logs` tables |
+| 🧠 **[ML & Inference Pipeline](ml_pipeline.md)** | Facial recognition & drift logic | InsightFace ArcFace 512D embeddings, RetinaFace alignment, 3D Euler angles, EWMA math ($\alpha=0.30$) |
+| 🔌 **[API Reference](api_reference.md)** | REST endpoints manual | Attendance logging, student registration, `/admin/drift` APIs, status codes |
+| 🌍 **[Ops & Deployment](deployment.md)** | Production setup & guidelines | Gunicorn tuning, Nginx reverse proxy, systemd services, `.env` config |
+| 👤 **[User & Admin Guide](user_guide.md)** | How to use the app | Registering students, classroom photo uploads, SMTP alerts, single-click drift resets |
 
 ---
 
-## 🚀 High-Level Architecture Overview
+## 📜 Intellectual Property & Patent Documentation
 
-BioSecure AI relies on a clean, stateless layout where computationally-heavy operations happen in the Flask backend, and matching operations are handled directly inside Postgres:
+* 📄 **[Invention Disclosure Form (IDF)](file:///home/dell/Face-Attendance-System-Web-Version/IDF/New%20Patent%20IDF.docx)**: Official patent disclosure document detailing system architecture, traditional attendance replacement context, pose-gated EWMA drift scoring math, and 300 DPI system flowchart.
+* 📄 **[Patent Prior Art & Novelty Search Report](file:///home/dell/Face-Attendance-System-Web-Version/IDF/Patent_Prior_Art_Search_Report.docx)**: Exhaustive search report covering InPASS, Google Patents, Espacenet, WIPO, USPTO, and IEEE Xplore databases up to August 2026.
+
+---
+
+## 🚀 High-Level Dual-Pipeline Architecture Overview
+
+BioSecure AI relies on a clean dual-pipeline architecture where attendance marking and biometric template health monitoring execute in parallel:
 
 ```mermaid
 graph TD
-    Browser[Client Browser] -->|HTTPS Request| Nginx[Nginx Reverse Proxy]
+    Browser[Client Browser / Instructor App] -->|1. Classroom Photo Upload| Nginx[Nginx Reverse Proxy]
     Nginx -->|WSGI Proxy| Gunicorn[Gunicorn Process Manager]
-    Gunicorn -->|WSGI Handlers| Flask[Flask Application Factory]
+    Gunicorn -->|Flask Routing| AttendanceBP[Attendance Blueprint]
 
-    subgraph "Computational Pipeline (Flask Backend)"
-        Flask --> |1. Image Bytes| Dec[cv2.imdecode]
-        Dec --> |2. Detect & Align| Retina[RetinaFace Detector]
-        Retina --> |3. Face Encoding| Arc[ArcFace Encoder]
-        Arc --> |4. Normalised Vector| L2[L2 Normalisation]
+    subgraph "Part A: Primary Attendance Pipeline"
+        AttendanceBP --> |2. Decode Image| Dec[cv2.imdecode]
+        Dec --> |3. Detect & Align| Retina[RetinaFace Detector]
+        Retina --> |4. 512D Embedding| Arc[ArcFace Encoder]
+        Arc --> |5. Vector Search S >= 0.40| RPC[match_face RPC]
+        RPC --> |6. Similarity Match| Db[(Supabase Postgres + pgvector)]
+        Db --> |7. Mark Attendance| RecLog[Mark Student PRESENT]
     end
 
-    subgraph "Database Search Engine (Supabase)"
-        L2 --> |5. Cosine Distance Matching| RPC[match_face RPC]
-        RPC --> |6. Similarity Lookup| Db[(Postgres + pgvector)]
+    subgraph "Part B: Novel Embedding Drift Engine (Patent #3)"
+        Arc --> |8. 3D Euler Angles| PoseGate{3D Pose Gate<br/>|Yaw|<=25° AND |Pitch|<=20°}
+        PoseGate -->|No: Rejected| PoseReject[Log POSE_REJECTED<br/>EWMA Unchanged]
+        PoseGate -->|Yes: Accepted| DriftCalc[Calculate Drift D = 1.0 - S]
+        DriftCalc --> |9. EWMA Accumulator| EWMA[EWMA_t = 0.30*D + 0.70*EWMA_old]
+        EWMA --> |10. State Evaluator| AlertEval{Alert Evaluator}
+        AlertEval -->|EWMA >= 0.25| SMTP[Dispatch Gmail SMTP Alert]
+        AlertEval -->|EWMA >= 0.35| AdminDash[Flag on /admin/drift Dashboard]
     end
-
-    Db --> |7. Match / Similarity Score| Flask
-    Flask --> |8. Cooldown Checks & Insert| Db
-    Flask --> |9. Annotated Image + Results JSON| Browser
 
     style Browser fill:#6366f1,stroke:#fafafa,stroke-width:2px,color:#fff
-    style Flask fill:#18181b,stroke:#6366f1,stroke-width:2px,color:#fff
-    style Retina fill:#312e81,stroke:#6366f1,stroke-width:1px,color:#fff
+    style AttendanceBP fill:#18181b,stroke:#6366f1,stroke-width:2px,color:#fff
     style RPC fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#fff
-    style Db fill:#0f172a,stroke:#38bdf8,stroke-width:1px,color:#fff
+    style PoseGate fill:#d97706,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style SMTP fill:#991b1b,stroke:#ef4444,stroke-width:2px,color:#fff
 ```
 
 ---
@@ -59,6 +69,7 @@ graph TD
 ## ⚡ Core Technical Highlights
 
 - **Stateless App Architecture**: The Flask application holds no state. No face templates are cached on server disks, allowing effortless horizontal scaling.
-- **pgvector Integration**: Employs PostgreSQL's `pgvector` extension. Cosine similarity queries are calculated directly in-database in milliseconds.
-- **Double-Match Cooldown Guard**: Prevents recording duplicate attendance logs within a configurable interval (default: 10 minutes).
-- **Stunning Dark Glassmorphic Design**: Implements a visually premium user experience with modern canvas interactive particles, HSL curated colors, and clear feed loops.
+- **pgvector Integration**: Employs PostgreSQL's `pgvector` extension. Cosine similarity queries are calculated directly in-database in milliseconds (`FACE_MATCH_THRESHOLD = 0.40`).
+- **3D Pose-Gated Noise Suppression**: Filters out uncooperative head angles ($|\text{Yaw}| \le 25^\circ, |\text{Pitch}| \le 20^\circ$) to eliminate group-photo artifacts.
+- **Exponentially Weighted Moving Average (EWMA)**: Smooths single-session lighting noise ($\alpha = 0.30$) to isolate genuine facial appearance aging.
+- **Single-Click Template Reset**: Allows administrators to refresh outdated student embeddings with a single click upon re-enrollment.

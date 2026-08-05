@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Biometric Drift Health — BioSecure AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="pb-24 md:pb-8 flex flex-col md:flex-row bg-[#0b1326] text-gray-100 min-h-screen">
+
+  <!-- Desktop Left Sidebar -->
+  <aside class="hidden md:flex flex-col fixed top-0 left-0 h-screen w-64 bg-[#0b1326]/90 backdrop-blur-xl border-r border-white/10 p-6 z-50">
+    <div class="flex items-center gap-3 mb-8">
+      <i data-lucide="activity" class="w-8 h-8 text-blue-500"></i>
+      <h1 class="font-geist text-xl font-bold text-blue-400 tracking-tight">BioSecure AI</h1>
+    </div>
+
+    <div class="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 rounded-full border border-emerald-500/20 mb-8 self-start">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span class="font-geist text-xs font-semibold text-emerald-400 uppercase tracking-wider">DRIFT MONITOR LIVE</span>
+    </div>
+
+    <nav class="flex-1 flex flex-col gap-2">
+      <a href="/admin" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-gray-300 hover:bg-white/5">
+        <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+        <span>Dashboard</span>
+      </a>
+      <a href="/admin/drift" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all bg-blue-500/10 text-blue-400 border border-blue-500/20">
+        <i data-lucide="shield-alert" class="w-5 h-5"></i>
+        <span>Drift Monitoring</span>
+      </a>
+      <a href="/admin/students" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-gray-300 hover:bg-white/5">
+        <i data-lucide="users" class="w-5 h-5"></i>
+        <span>Student Directory</span>
+      </a>
+      <a href="/admin/mark" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-gray-300 hover:bg-white/5">
+        <i data-lucide="check-square" class="w-5 h-5"></i>
+        <span>Manual Mark</span>
+      </a>
+      <a href="/admin/academics" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-gray-300 hover:bg-white/5">
+        <i data-lucide="graduation-cap" class="w-5 h-5"></i>
+        <span>Academics</span>
+      </a>
+      <a href="/" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-gray-400 hover:bg-white/5 mt-auto">
+        <i data-lucide="arrow-left" class="w-5 h-5"></i>
+        <span>Back to Portal</span>
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 md:ml-64 p-6 md:p-10 max-w-7xl">
+    
+    <!-- Top Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+      <div>
+        <div class="flex items-center gap-3">
+          <h1 class="text-3xl font-bold text-white tracking-tight">Biometric Template Health</h1>
+          <span class="px-3 py-1 text-xs font-semibold rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">Patent Idea #3</span>
+        </div>
+        <p class="text-gray-400 text-sm mt-1">Real-time Exponentially Weighted Moving Average (EWMA) drift tracking and template aging analysis.</p>
+      </div>
+
+      <a href="/admin/drift" class="btn-glass px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 self-start md:self-auto">
+        <i data-lucide="refresh-cw" class="w-4 h-4 text-blue-400"></i> Refresh Health Data
+      </a>
+    </div>
+
+    <!-- Summary Metrics Grid -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+      
+      <div class="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-xl">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-medium text-gray-400 uppercase tracking-wider">Total Enrolled</span>
+          <i data-lucide="users" class="w-5 h-5 text-gray-400"></i>
+        </div>
+        <div class="text-2xl font-bold text-white">{{ summary.total }}</div>
+        <span class="text-xs text-gray-500 mt-1 block">Active templates</span>
+      </div>
+
+      <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 backdrop-blur-xl">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-medium text-emerald-400 uppercase tracking-wider">Healthy</span>
+          <i data-lucide="check-circle-2" class="w-5 h-5 text-emerald-400"></i>
+        </div>
+        <div class="text-2xl font-bold text-emerald-300">{{ summary.healthy }}</div>
+        <span class="text-xs text-emerald-500/80 mt-1 block">EWMA &lt; {{ config.DRIFT_WARN_THRESHOLD }}</span>
+      </div>
+
+      <div class="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-5 backdrop-blur-xl">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-medium text-amber-400 uppercase tracking-wider">Warning</span>
+          <i data-lucide="alert-circle" class="w-5 h-5 text-amber-400"></i>
+        </div>
+        <div class="text-2xl font-bold text-amber-300">{{ summary.warning }}</div>
+        <span class="text-xs text-amber-500/80 mt-1 block">&ge; {{ config.DRIFT_WARN_THRESHOLD }} EWMA</span>
+      </div>
+
+      <div class="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-5 backdrop-blur-xl">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-medium text-orange-400 uppercase tracking-wider">Critical</span>
+          <i data-lucide="alert-triangle" class="w-5 h-5 text-orange-400"></i>
+        </div>
+        <div class="text-2xl font-bold text-orange-300">{{ summary.critical }}</div>
+        <span class="text-xs text-orange-500/80 mt-1 block">&ge; {{ config.DRIFT_CRITICAL_THRESHOLD }} EWMA</span>
+      </div>
+
+      <div class="bg-red-500/10 border border-red-500/20 rounded-2xl p-5 backdrop-blur-xl col-span-2 md:col-span-1">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-medium text-red-400 uppercase tracking-wider">Re-Enroll Alert</span>
+          <i data-lucide="siren" class="w-5 h-5 text-red-400 animate-pulse"></i>
+        </div>
+        <div class="text-2xl font-bold text-red-400">{{ summary.alert }}</div>
+        <span class="text-xs text-red-500/80 mt-1 block">&ge; {{ config.DRIFT_ALERT_THRESHOLD }} EWMA</span>
+      </div>
+
+    </div>
+
+    <!-- Student Biometric Health Table -->
+    <div class="bg-white/5 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-xl mb-12">
+      <div class="p-6 border-b border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="sliders" class="w-5 h-5 text-blue-400"></i>
+            Student Biometric Health Directory
+          </h2>
+          <p class="text-xs text-gray-400 mt-0.5">Ranked by EWMA drift score (highest divergence first)</p>
+        </div>
+
+        <div class="relative w-full sm:w-64">
+          <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-gray-400"></i>
+          <input type="text" id="searchBox" onkeyup="filterStudents()" placeholder="Search name or ID..." class="w-full pl-9 pr-4 py-2 bg-black/40 border border-white/10 rounded-xl text-xs text-gray-200 focus:outline-none focus:border-blue-500">
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm text-gray-300" id="driftTable">
+          <thead class="bg-black/40 text-xs font-semibold uppercase text-gray-400 border-b border-white/10">
+            <tr>
+              <th class="px-6 py-4">Student</th>
+              <th class="px-6 py-4">Program / Branch</th>
+              <th class="px-6 py-4">EWMA Drift Score</th>
+              <th class="px-6 py-4">Health Status</th>
+              <th class="px-6 py-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-white/5">
+            {% for s in students %}
+            {% set ewma = s.current_ewma_drift or 0.0 %}
+            {% set status = s.drift_alert_level or 'HEALTHY' %}
+            <tr class="hover:bg-white/[0.02] transition-colors">
+              <td class="px-6 py-4">
+                <div class="flex flex-col">
+                  <span class="font-bold text-white text-base">{{ s.name }}</span>
+                  <span class="text-xs text-gray-400 font-mono">{{ s.id }}</span>
+                </div>
+              </td>
+
+              <td class="px-6 py-4">
+                <div class="flex flex-col">
+                  <span class="text-xs font-medium text-gray-200">{{ s.program }}</span>
+                  <span class="text-xs text-gray-500">{{ s.branch }}</span>
+                </div>
+              </td>
+
+              <td class="px-6 py-4">
+                <div class="flex items-center gap-3">
+                  <!-- EWMA Progress Bar -->
+                  <div class="w-28 bg-white/10 h-2 rounded-full overflow-hidden">
+                    {% set pct = (ewma / 0.5 * 100) if (ewma / 0.5 * 100) <= 100 else 100 %}
+                    {% if status == 'HEALTHY' %}
+                      <div class="bg-emerald-400 h-full rounded-full" style="width: {{ pct }}%"></div>
+                    {% elif status == 'WARNING' %}
+                      <div class="bg-amber-400 h-full rounded-full" style="width: {{ pct }}%"></div>
+                    {% elif status == 'CRITICAL' %}
+                      <div class="bg-orange-500 h-full rounded-full" style="width: {{ pct }}%"></div>
+                    {% else %}
+                      <div class="bg-red-500 h-full rounded-full animate-pulse" style="width: {{ pct }}%"></div>
+                    {% endif %}
+                  </div>
+                  <span class="font-mono text-xs font-bold text-white">{{ "%.4f"|format(ewma) }}</span>
+                </div>
+              </td>
+
+              <td class="px-6 py-4">
+                {% if status == 'HEALTHY' %}
+                  <span class="px-3 py-1 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 inline-flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Healthy
+                  </span>
+                {% elif status == 'WARNING' %}
+                  <span class="px-3 py-1 text-xs font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 inline-flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Warning
+                  </span>
+                {% elif status == 'CRITICAL' %}
+                  <span class="px-3 py-1 text-xs font-semibold rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 inline-flex items-center gap-1.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-orange-400"></span> Critical
+                  </span>
+                {% else %}
+                  <span class="px-3 py-1 text-xs font-semibold rounded-full bg-red-500/20 text-red-400 border border-red-500/30 inline-flex items-center gap-1.5 animate-pulse">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-400"></span> Re-Enroll Required
+                  </span>
+                {% endif %}
+              </td>
+
+              <td class="px-6 py-4 text-right">
+                <div class="flex items-center justify-end gap-2">
+                  <button onclick="viewHistory({{ s.id|tojson }}, {{ s.name|tojson }})" class="btn-glass px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-300 hover:text-white flex items-center gap-1.5">
+                    <i data-lucide="line-chart" class="w-3.5 h-3.5"></i> Logs
+                  </button>
+
+                  <a href="/admin/student/edit/{{ s.id }}" class="btn-glass px-3 py-1.5 rounded-lg text-xs font-semibold text-purple-300 hover:text-white flex items-center gap-1.5">
+                    <i data-lucide="camera" class="w-3.5 h-3.5"></i> Re-Enroll Photo
+                  </a>
+
+                  <form action="/admin/student/reset_drift/{{ s.id }}" method="POST" onsubmit="return confirm('Reset EWMA drift score for {{ s.name }} to 0.00 (Re-enrolled)?')">
+                    <button type="submit" class="btn-glass px-3 py-1.5 rounded-lg text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 flex items-center gap-1.5">
+                      <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Quick Reset
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="5" class="text-center py-8 text-gray-500">No student biometric drift records found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Drift History Modal -->
+  <div id="historyModal" class="fixed inset-0 z-50 hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#131b2e] border border-white/10 rounded-2xl max-w-2xl w-full p-6 shadow-2xl">
+      <div class="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
+        <div>
+          <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <i data-lucide="line-chart" class="w-5 h-5 text-blue-400"></i>
+            <span id="modalStudentName">Drift History</span>
+          </h3>
+          <p class="text-xs text-gray-400" id="modalStudentId">ID: --</p>
+        </div>
+        <button onclick="closeModal()" class="text-gray-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+      </div>
+
+      <!-- Chart Container -->
+      <div class="h-48 mb-6 bg-black/40 p-4 rounded-xl border border-white/5">
+        <canvas id="driftChart"></canvas>
+      </div>
+
+      <!-- Recent Log Events List -->
+      <div class="max-h-48 overflow-y-auto pr-1">
+        <h4 class="text-xs font-semibold uppercase text-gray-400 mb-2">Recent Capture Logs</h4>
+        <div id="logEventsList" class="flex flex-col gap-2">
+          <div class="text-center text-xs text-gray-500 py-4">Loading logs...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    function filterStudents() {
+      const q = document.getElementById('searchBox').value.toLowerCase();
+      const rows = document.querySelectorAll('#driftTable tbody tr');
+      rows.forEach(r => {
+        const text = r.innerText.toLowerCase();
+        r.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+
+    let chartInstance = null;
+
+    async function viewHistory(studentId, studentName) {
+      document.getElementById('modalStudentName').innerText = studentName;
+      document.getElementById('modalStudentId').innerText = 'ID: ' + studentId;
+      document.getElementById('historyModal').classList.remove('hidden');
+
+      const list = document.getElementById('logEventsList');
+      list.innerHTML = '<div class="text-center text-xs text-gray-500 py-4">Loading drift events...</div>';
+
+      try {
+        const res = await fetch(`/admin/api/drift_history/${encodeURIComponent(studentId)}`);
+        const json = await res.json();
+        
+        if (!json.success || !json.data.length) {
+          list.innerHTML = '<div class="text-center text-xs text-gray-500 py-4">No drift log events captured yet.</div>';
+          if (chartInstance) chartInstance.destroy();
+          return;
+        }
+
+        const events = json.data;
+        
+        // Populate list
+        list.innerHTML = events.slice().reverse().map(e => `
+          <div class="flex items-center justify-between bg-white/5 px-3 py-2 rounded-lg text-xs">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full ${e.pose_accepted ? 'bg-emerald-400' : 'bg-amber-400'}"></span>
+              <span class="text-gray-300 font-mono">${new Date(e.created_at).toLocaleString()}</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-gray-400">Yaw: ${e.pose_yaw}° | Pitch: ${e.pose_pitch}°</span>
+              <span class="font-mono font-bold ${e.pose_accepted ? 'text-blue-300' : 'text-amber-400'}">
+                ${e.pose_accepted ? 'EWMA: ' + (e.ewma_drift ? e.ewma_drift.toFixed(4) : '-') : 'POSE REJECTED'}
+              </span>
+            </div>
+          </div>
+        `).join('');
+
+        // Build Chart
+        const validEvents = events.filter(e => e.pose_accepted && e.ewma_drift !== null);
+        const labels = validEvents.map(e => new Date(e.created_at).toLocaleDateString());
+        const data = validEvents.map(e => e.ewma_drift);
+
+        const ctx = document.getElementById('driftChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+
+        if (validEvents.length > 0) {
+          chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: labels,
+              datasets: [{
+                label: 'EWMA Drift',
+                data: data,
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 4
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: {
+                  min: 0,
+                  max: 0.5,
+                  grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                  ticks: { color: '#9ca3af', font: { size: 10 } }
+                },
+                x: {
+                  grid: { display: false },
+                  ticks: { color: '#9ca3af', font: { size: 10 } }
+                }
+              },
+              plugins: {
+                legend: { display: false }
+              }
+            }
+          });
+        }
+
+      } catch (err) {
+        console.error("Drift history load error:", err);
+        list.innerHTML = `<div class="text-center text-xs text-red-400 py-4">Failed to load drift history logs: ${err.message || err}</div>`;
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('historyModal').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>

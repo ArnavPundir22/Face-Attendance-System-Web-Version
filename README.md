@@ -1,56 +1,108 @@
 <div align="center">
 
-<h1>🤖 BioSecure AI</h1>
-<p><strong>Automated, stateless classroom attendance powered by InsightFace AI and Supabase <code>pgvector</code></strong></p>
+# 🤖 BioSecure AI
+
+**Automated Facial Recognition Attendance System with Proactive Pose-Gated EWMA Embedding Drift Detection**
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-3.1-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 [![InsightFace](https://img.shields.io/badge/InsightFace-Buffalo__L-FF6B35)](https://github.com/deepinsight/insightface)
 [![Supabase](https://img.shields.io/badge/Supabase-pgvector-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-CDN-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Patent Status](https://img.shields.io/badge/Patent_Status-IDF_Filed_2026-1F4E78)](file:///home/dell/Face-Attendance-System-Web-Version/IDF/New%20Patent%20IDF.docx)
 
 </div>
 
 ---
 
-## 📖 What Is This?
+## 📖 Project Overview
 
-**BioSecure AI** is a modern, state-of-the-art web application that completely eliminates manual roll-calls using advanced facial recognition. A teacher uploads a classroom photo (or captures one with a webcam), and the system instantly identifies every student in the image, marking them present in a secure PostgreSQL database.
+**BioSecure AI** is a state-of-the-art, production-ready web application designed to replace traditional manual paper registers and verbal roll calls in educational institutions with an automated, contactless AI facial recognition pipeline. 
 
-Built for the modern web, this application is **100% stateless**. By leveraging **Supabase `pgvector`**, facial embeddings are stored and queried directly inside the database, meaning the application can be hosted anywhere (Vercel, Render, VPS) without worrying about ephemeral file systems wiping out your AI data.
+By taking or uploading a single classroom group photo, the system instantly identifies all registered students, marks them **PRESENT** in a PostgreSQL database powered by Supabase `pgvector`, and provides real-time digital attendance records.
+
+Beyond standard attendance marking, BioSecure AI includes a novel, patent-pending **Biometric Embedding Drift Engine (2026 Patent Application)**. This parallel engine monitors facial template aging over time (beards, hairstyles, weight changes) using **3D Pose-Gated EWMA Accumulation**, proactively notifying administrators before biometric recognition failure occurs.
 
 ---
 
-## 📚 Documentation Index
+## 📜 Intellectual Property & Patent Documentation
 
-To keep this repository clean and easy to navigate, we have split our documentation into focused, in-depth guides. Please select the guide you need from the list below:
+This repository contains the official 2026 Patent Filing Package for COER University, Roorkee:
 
-*   **[📖 Documentation Hub](docs/index.md)**: The central portal/table of contents with component flowcharts.
-*   **[🏗️ Architecture Guide](docs/architecture.md)**: Deep dive into the stateless system flow, modular layouts, and execution sequence diagrams.
-*   **[🗄️ Database Setup](docs/database.md)**: SQL schemas, RLS security configurations, and custom cosine matching RPC functions.
-*   **[🧠 ML & Inference Pipeline](docs/ml_pipeline.md)**: InsightFace model specs, RetinaFace alignment, and ArcFace vector mathematics.
-*   **[🔌 API Reference](docs/api_reference.md)**: Comprehensive manual for authentication, students, and attendance REST endpoints.
-*   **[🌍 Production Deployment & Setup](docs/deployment.md)**: Local configurations, environment vars, Gunicorn tuning, and systemd/Nginx configurations.
-*   **[👨‍💼 User & Admin Guide](docs/user_guide.md)**: Operational manual for student registrations, attendance logging, and exporting reports.
+* 📄 **[Invention Disclosure Form (IDF)](file:///home/dell/Face-Attendance-System-Web-Version/IDF/New%20Patent%20IDF.docx)**: Official patent disclosure document detailing system architecture, traditional attendance replacement context, pose-gated EWMA drift scoring math, and 300 DPI system flowchart.
+* 📄 **[Patent Prior Art & Novelty Search Report](file:///home/dell/Face-Attendance-System-Web-Version/IDF/Patent_Prior_Art_Search_Report.docx)**: Exhaustive search report covering InPASS, Google Patents, Espacenet, WIPO, USPTO, and IEEE Xplore databases up to August 2026, establishing clear novelty and non-obviousness.
+
+---
+
+## 📚 Documentation Hub Index
+
+Explore our comprehensive, detailed sub-documentation guides in the [`docs/`](file:///home/dell/Face-Attendance-System-Web-Version/docs) directory:
+
+* 📖 **[Documentation Hub Index](file:///home/dell/Face-Attendance-System-Web-Version/docs/index.md)**: Central portal and component sequence flowcharts.
+* 🏗️ **[System Architecture Guide](file:///home/dell/Face-Attendance-System-Web-Version/docs/architecture.md)**: Dual-pipeline architecture (Attendance Pipeline + Pose-Gated EWMA Drift Engine).
+* 🗄️ **[Database & pgvector Setup](file:///home/dell/Face-Attendance-System-Web-Version/docs/database.md)**: PostgreSQL schemas, Supabase `pgvector` indexing, and drift tracking tables.
+* 🧠 **[ML & Inference Pipeline](file:///home/dell/Face-Attendance-System-Web-Version/docs/ml_pipeline.md)**: InsightFace `buffalo_l` ArcFace embeddings, RetinaFace landmark alignment, 3D Pose Gate, and EWMA mathematics.
+* 🔌 **[API Reference Guide](file:///home/dell/Face-Attendance-System-Web-Version/docs/api_reference.md)**: REST endpoints for attendance logging, student management, and drift dashboard APIs.
+* 🌍 **[Production Ops & Deployment](file:///home/dell/Face-Attendance-System-Web-Version/docs/deployment.md)**: Gunicorn WSGI tuning, Nginx reverse proxy, systemd services, and `.env` setup.
+* 👨‍💼 **[User & Administrator Guide](file:///home/dell/Face-Attendance-System-Web-Version/docs/user_guide.md)**: Manual for student registrations, attendance uploads, SMTP alerts, and single-click drift resets.
 
 ---
 
 ## ✨ Features at a Glance
 
-| Feature | Description |
-|---|---|
-| 🔍 **AI Face Recognition** | High-accuracy embeddings generated via the `InsightFace buffalo_l` model. |
-| 🚀 **Stateless Architecture** | Embeddings are stored natively in Supabase using `pgvector`. No local `.npy` or `.pkl` files! |
-| 📷 **Auto-Capture Webcam** | Captures and analyzes 5 webcam photos automatically to ensure everyone is caught. |
-| 👥 **Group Photo Support** | Detects and identifies multiple faces in a single photograph simultaneously. |
-| 🛡️ **Re-attendance Cooldown** | Blocks duplicate marks within a configurable time window (e.g., 10 minutes) per student. |
-| 📊 **Real-time Dashboard** | Filterable attendance table with an instant **CSV Download** feature for reporting. |
-| 👨‍💼 **Admin & User Control** | Full user management interface to list, edit roles (`is_admin`), delete accounts, or reset passwords. |
-| 📈 **Live Trend Metrics** | Visual 7-day attendance trend widgets and status counts queried dynamically from the database. |
-| 🖼️ **Image Capture Inspector** | Dedicated view page to inspect processed and bounding-box annotated attendance photos. |
-| 🎨 **Premium BioSecure AI UI/UX** | Stunning dark glassmorphism aesthetic built with TailwindCSS, custom canvas particles, and Lucide Icons. |
-| 🔐 **Secure Supabase Auth** | Fully integrated user authentication backed by Supabase Auth and role-based route protection. |
-| 🧩 **Modular Blueprint Layout** | Refactored into clean Python Flask blueprints (`auth`, `attendance`, `students`, `admin`) for maximum maintainability. |
+| Category | Feature | Technical Description |
+|---|---|---|
+| **Attendance Automation** | 📷 **Classroom Photo Ingestion** | Detects and identifies multiple student faces from classroom group photos or camera frames. |
+| **Biometric AI** | 🧠 **InsightFace ArcFace 512D** | Extracts high-precision 512-dimensional normalized hyperspherical face embeddings. |
+| **Stateless Database** | 🚀 **Supabase pgvector** | Vector indexing and cosine distance queries executed natively in PostgreSQL (`match_face` RPC). |
+| **Patent Novelty** | 🛡️ **3D Pose Gate Validator** | Filters out uncooperative head angles ($|\text{Yaw}| \le 25^\circ, |\text{Pitch}| \le 20^\circ$) to eliminate group-photo noise. |
+| **Patent Novelty** | 📈 **EWMA Drift Accumulator** | Exponentially Weighted Moving Average ($\alpha = 0.30$) tracking facial template aging ($D_t = 1 - S$). |
+| **Patent Novelty** | 🚨 **Multi-Tier Alert Machine** | Classifies template health (`HEALTHY` $<0.15$, `WARNING` $\ge 0.15$, `CRITICAL` $\ge 0.25$, `ALERT` $\ge 0.35$). |
+| **Automation** | 📧 **SMTP Email Dispatcher** | Dispatches real-time Gmail warning emails to administrators upon `CRITICAL` state escalation. |
+| **Management** | 👨‍💼 **Admin Drift Dashboard** | `/admin/drift` management portal featuring single-click re-enrollment template reset functionality. |
+| **Security** | 🛡️ **Re-attendance Cooldown** | Blocks accidental duplicate marks within a configurable window (default: 10 mins per lecture). |
+| **UI/UX** | 🎨 **Dark Glassmorphic UI** | Premium dark-mode interface built with TailwindCSS, Lucide icons, and interactive canvas particles. |
 
 ---
+
+## ⚙️ Key System Configuration Constants (`src/config.py` / `.env`)
+
+```ini
+# Face Matching Threshold (Cosine Similarity: 0.0 - 1.0)
+FACE_MATCH_THRESHOLD=0.40
+
+# Embedding Drift Detection (Patent Idea #3)
+DRIFT_ALPHA=0.30                # EWMA smoothing factor α
+DRIFT_POSE_YAW_MAX=25.0         # Max yaw angle limit (°)
+DRIFT_POSE_PITCH_MAX=20.0       # Max pitch angle limit (°)
+
+# EWMA Alert Thresholds
+DRIFT_WARN_THRESHOLD=0.15       # WARNING state cutoff
+DRIFT_CRITICAL_THRESHOLD=0.25   # CRITICAL state cutoff (Triggers SMTP Email)
+DRIFT_ALERT_THRESHOLD=0.35      # ALERT state cutoff (Triggers Re-Enroll Prompt)
+```
+
+---
+
+## 💻 Quick Start & Running Locally
+
+1. **Clone & Install Dependencies:**
+   ```bash
+   git clone https://github.com/ArnavPundir22/Face-Attendance-System-Web-Version.git
+   cd Face-Attendance-System-Web-Version
+   python3 -m venv .venv && source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
+
+2. **Set Up Environment Variables:**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your Supabase credentials
+   ```
+
+3. **Run Dev Server:**
+   ```bash
+   python app.py
+   ```
+   Access the web app at `http://localhost:5000`.
+
