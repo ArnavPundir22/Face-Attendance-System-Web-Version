@@ -466,16 +466,32 @@
 
     function renderMatrixRegister() {
         const selectedLec = $('#matrixLectureFilter').val();
-        const selectedProg = $('#matrixProgramFilter').val();
-        const selectedBranch = $('#matrixBranchFilter').val();
+        let selectedProg = $('#matrixProgramFilter').val();
+        let selectedBranch = $('#matrixBranchFilter').val();
         const selectedBatch = $('#matrixBatchFilter').val();
         const selectedDate = $('#matrixDateFilter').val();
 
-        if (!selectedLec || !selectedProg || !selectedBranch) {
+        // If no filter is chosen at all and data exists, don't block — show placeholder only if zero raw data
+        if (!rawAttendanceData || rawAttendanceData.length === 0) {
             $('#matrixTableWrapper').addClass('hidden');
             $('#exportMatrixBtn').addClass('hidden');
             $('#matrixPlaceholder').removeClass('hidden');
             return;
+        }
+
+        // If a lecture is selected but program/branch are empty, auto-infer program & branch from lecture logs
+        if (selectedLec && (!selectedProg || !selectedBranch)) {
+            const lecLogs = rawAttendanceData.filter(r => (r[7] || "").toString().toUpperCase() === selectedLec.toUpperCase());
+            if (lecLogs.length > 0) {
+                if (!selectedProg && lecLogs[0][2]) {
+                    selectedProg = lecLogs[0][2].toString().trim();
+                    $('#matrixProgramFilter').val(selectedProg);
+                }
+                if (!selectedBranch && lecLogs[0][3]) {
+                    selectedBranch = lecLogs[0][3].toString().trim();
+                    $('#matrixBranchFilter').val(selectedBranch);
+                }
+            }
         }
 
         $('#matrixPlaceholder').addClass('hidden');
@@ -483,18 +499,20 @@
         $('#exportMatrixBtn').removeClass('hidden');
         $('#addSessionBtn').removeClass('hidden');
 
-        // Filter relevant records by lecture (case-insensitive) and program/branch
-        let filtered = rawAttendanceData.filter(r => 
-            (r[7] || "").toString().toUpperCase() === selectedLec.toUpperCase() &&
-            (r[2] || "").toString().toUpperCase() === selectedProg.toUpperCase() &&
-            (r[3] || "").toString().toUpperCase() === selectedBranch.toUpperCase()
-        );
-
+        // Filter attendance records dynamically based on active filter selections
+        let filtered = rawAttendanceData;
+        if (selectedLec) {
+            filtered = filtered.filter(r => (r[7] || "").toString().toUpperCase() === selectedLec.toUpperCase());
+        }
+        if (selectedProg) {
+            filtered = filtered.filter(r => (r[2] || "").toString().toUpperCase() === selectedProg.toUpperCase());
+        }
+        if (selectedBranch) {
+            filtered = filtered.filter(r => (r[3] || "").toString().toUpperCase() === selectedBranch.toUpperCase());
+        }
         if (selectedBatch) {
             filtered = filtered.filter(r => (r[4] || "").toString() === selectedBatch.toString());
         }
-
-        // Apply optional Date Filter (r[6] is the timestamp formatted as 'YYYY-MM-DD HH:MM:SS')
         if (selectedDate) {
             filtered = filtered.filter(r => r[6].startsWith(selectedDate));
         }
@@ -502,19 +520,29 @@
         // Find unique timestamps and sort them in reverse chronological order (newest first)
         const timestamps = [...new Set(filtered.map(r => r[6]))].sort((a, b) => b.localeCompare(a));
 
-        // Find unique students, details, and sort alphabetically
+        // Build student map matching the active filters
         const studentMap = {};
         rawStudentsData.forEach(s => {
             const sBatch = (s.batch_year || s.enrollment_year || "").toString();
-            // Only add students that belong to the selected program & branch (and batch if selected)
-            if (s.program && s.program.toString().toUpperCase() === selectedProg.toUpperCase() &&
-                s.branch && s.branch.toString().toUpperCase() === selectedBranch.toUpperCase() &&
-                (!selectedBatch || sBatch === selectedBatch.toString())) {
+            const matchesProg = !selectedProg || (s.program && s.program.toString().toUpperCase() === selectedProg.toUpperCase());
+            const matchesBranch = !selectedBranch || (s.branch && s.branch.toString().toUpperCase() === selectedBranch.toUpperCase());
+            const matchesBatch = !selectedBatch || (sBatch === selectedBatch.toString());
+
+            if (matchesProg && matchesBranch && matchesBatch) {
                 studentMap[s.id] = { name: s.name, branch: s.branch || 'N/A' };
             }
         });
+
+        // Also add any student found in the attendance logs themselves so no marked record is missed
+        filtered.forEach(r => {
+            const sId = r[0];
+            if (sId && !studentMap[sId]) {
+                studentMap[sId] = { name: r[1] || sId, branch: r[3] || 'N/A' };
+            }
+        });
+
         const sortedStudentIds = Object.keys(studentMap).sort((a, b) => {
-            return studentMap[a].name.toLowerCase().localeCompare(studentMap[b].name.toLowerCase());
+            return (studentMap[a].name || '').toLowerCase().localeCompare((studentMap[b].name || '').toLowerCase());
         });
 
         // Build Table
@@ -529,7 +557,7 @@
               <th class="py-3 px-4 text-left font-semibold text-white">Branch</th>
         `;
         timestamps.forEach(ts => {
-            const sessionLec = (filtered.find(r => r[6] === ts) || [])[7] || selectedLec;
+            const sessionLec = (filtered.find(r => r[6] === ts) || [])[7] || selectedLec || 'Session';
             const parts = ts.split(' ');
             const dateStr = parts[0] || '';
             const timeStr = parts[1] || '';
