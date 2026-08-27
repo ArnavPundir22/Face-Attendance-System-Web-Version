@@ -123,13 +123,15 @@
       <form id="uploadForm" class="space-y-6 mt-4 relative z-10">
         
         <!-- SESSION DETAILS -->
-        <div class="space-y-2">
-            <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider">Lecture Name</label>
-            <div class="relative">
-                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                    <i data-lucide="book-open" class="w-4 h-4"></i>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Lecture Name</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                        <i data-lucide="book-open" class="w-4 h-4"></i>
+                    </div>
+                    <input type="text" name="lecture" placeholder="e.g. CS101 (Optional)" class="input-dark-glass w-full rounded-xl pl-10 pr-4 py-3 text-sm font-medium"/>
                 </div>
-                <input type="text" name="lecture" required placeholder="e.g. CS101" class="input-dark-glass w-full rounded-xl pl-10 pr-4 py-3.5 text-sm font-medium"/>
             </div>
         </div>
 
@@ -216,6 +218,18 @@
   // Initialize Lucide Icons
   lucide.createIcons();
 
+  // ── Page-Level Screen Wake Lock ─────────────────────────────────────────────
+  // Request wake lock immediately so the screen stays on during mobile camera
+  // upload and AI processing — not just during PC webcam streaming.
+  (async function initPageWakeLock() {
+    try {
+      if ('wakeLock' in navigator) {
+        await navigator.wakeLock.request('screen');
+      }
+    } catch (_) {}
+  })();
+  // ─────────────────────────────────────────────────────────────────────────────
+
   /* ------------------------------
         IMAGE PREVIEWS & FILE HANDLING
   ------------------------------- */
@@ -231,7 +245,7 @@
   let dataTransfer = new DataTransfer();
 
   /* ------------------------------
-        DESKTOP WEBCAM LOGIC
+        DESKTOP WEBCAM LOGIC & SCREEN WAKE LOCK
   ------------------------------- */
   const openWebcamBtn = document.getElementById("openWebcamBtn");
   const desktopCameraBox = document.getElementById("desktopCameraBox");
@@ -241,6 +255,39 @@
   const closeWebcamBtn = document.getElementById("closeWebcamBtn");
   
   let stream = null;
+  let wakeLockSentinel = null;
+
+  async function requestScreenWakeLock() {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLockSentinel = await navigator.wakeLock.request('screen');
+        console.log('Screen Wake Lock active: screen will remain on.');
+        wakeLockSentinel.addEventListener('release', () => {
+          wakeLockSentinel = null;
+        });
+      }
+    } catch (err) {
+      console.log(`Wake Lock Error: ${err.name}, ${err.message}`);
+    }
+  }
+
+  function releaseScreenWakeLock() {
+    if (wakeLockSentinel !== null) {
+      wakeLockSentinel.release().catch(() => {});
+      wakeLockSentinel = null;
+    }
+  }
+
+  document.addEventListener('visibilitychange', async () => {
+    if (document.visibilityState === 'visible' && stream) {
+      await requestScreenWakeLock();
+      const videoTracks = stream.getVideoTracks();
+      if (videoTracks.length === 0 || videoTracks.some(t => t.readyState === 'ended' || t.muted)) {
+        console.log('Re-initializing webcam stream after screen wake/visibility restore...');
+        await startWebcam();
+      }
+    }
+  });
 
   async function startWebcam() {
     try {
@@ -248,6 +295,7 @@
         video.srcObject = stream;
         desktopCameraBox.classList.remove("hidden");
         desktopCameraBox.classList.add("flex");
+        await requestScreenWakeLock();
     } catch (err) {
         console.error("Camera error:", err);
         alert("Could not access webcam. Please ensure permissions are granted.");
@@ -259,6 +307,7 @@
         stream.getTracks().forEach(track => track.stop());
         stream = null;
     }
+    releaseScreenWakeLock();
     desktopCameraBox.classList.add("hidden");
     desktopCameraBox.classList.remove("flex");
   }
@@ -314,9 +363,11 @@
     
     updatePreviews();
 
-    // Automatically trigger form submission if lecture and section are valid/filled
-    if (form.reportValidity()) {
-        submitBtn.click();
+    // Automatically trigger photo processing on upload / capture
+    if (typeof form.requestSubmit === 'function') {
+        form.requestSubmit();
+    } else {
+        form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
     }
   }
 
@@ -388,6 +439,7 @@
   let lastSubmittedLecture = "UnknownSub";
   let detectedProgram = "UnknownProgram";
   let detectedBranch = "UnknownBranch";
+  let detectedYear = null;
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -451,12 +503,13 @@
         window.currentSessionAttendance = data.session_attendance || [];
         detectedProgram = data.detected_program || "UnknownProgram";
         detectedBranch = data.detected_branch || "UnknownBranch";
+        detectedYear = data.detected_year || null;
 
         let html = "";
         data.images.forEach((img, idx) => {
           html += `
-            <div class="dark-card p-6 rounded-lg mb-6">
-              <div class="rounded overflow-hidden border border-gray-700">
+            <div class="glass-panel p-6 rounded-2xl mb-6 shadow-xl border border-white/20">
+              <div class="rounded-xl overflow-hidden border border-white/10 shadow-md">
                   <img src="${img.annotated}" class="w-full h-auto object-cover"/>
               </div>
             </div>
@@ -465,6 +518,7 @@
 
         // Add Session Attendance Register
         if (window.currentSessionAttendance.length > 0) {
+            const classYearStr = detectedYear ? ` (Batch ${detectedYear})` : '';
             html += `
               <div class="glass-panel p-6 rounded-2xl shadow-xl mt-8">
                 <div class="flex items-center justify-between gap-2 mb-4 border-b border-white/10 pb-3">
@@ -473,7 +527,7 @@
                     <h3 class="text-lg font-bold font-geist text-white">Session Attendance Register</h3>
                   </div>
                   <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                    Detected Class: ${detectedProgram} - ${detectedBranch}
+                    Class: ${detectedProgram} - ${detectedBranch}${classYearStr} | Lecture: ${lastSubmittedLecture}
                   </span>
                 </div>
                 <div class="overflow-x-auto">
@@ -558,8 +612,12 @@
         if (window.currentStatusInterval) {
             clearInterval(window.currentStatusInterval);
         }
-        // Restore submit button
+        // Restore submit button and re-enable it
         submitBtn.innerHTML = originalBtnHTML;
+        // Re-acquire wake lock if screen was briefly unlocked during processing
+        if (document.visibilityState === 'visible') {
+            requestScreenWakeLock();
+        }
     }
   });
 
@@ -585,8 +643,9 @@
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const yearSuffix = detectedYear ? `_Batch${detectedYear}` : '';
     
-    const filename = `Attendance_${detectedProgram}_${detectedBranch}_(${lastSubmittedLecture})_${today}.csv`;
+    const filename = `Attendance_${detectedProgram}_${detectedBranch}${yearSuffix}_(${lastSubmittedLecture})_${today}.csv`;
 
     link.setAttribute("href", encodedUri);
     link.setAttribute("download", filename);
@@ -645,8 +704,6 @@
           lucide.createIcons();
       }
   }
-
-  // No dynamic dropdown population required on homepage as Program/Branch/Section are auto-detected
 
   document.addEventListener("click", (e) => {
     // We use closest or id depending on the click target

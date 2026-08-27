@@ -28,6 +28,18 @@ REATTENDANCE_INTERVAL_MINUTES=10
 
 ---
 
+## 🔒 Database Security & RLS Configuration
+
+To prevent unauthorized public access to student biometric embeddings and PII, ensure Row Level Security (RLS) is enabled on your Supabase project (`avznrudspncnjbqersyg`):
+
+1. Log in to [Supabase Dashboard](https://supabase.com/dashboard).
+2. Open your project -> navigate to **SQL Editor**.
+3. Copy and execute the security script located at [`scripts/fix_supabase_security.sql`](file:///home/dell/Face-Attendance-System-Web-Version/scripts/fix_supabase_security.sql).
+4. Verify that **Advisors** -> **Security** shows zero `rls_disabled_in_public` or `sensitive_columns_exposed` warnings.
+
+
+---
+
 ## 🚀 Deployment on a Linux VPS (Gunicorn + Nginx + Systemd)
 
 ### 1. Install System Dependencies

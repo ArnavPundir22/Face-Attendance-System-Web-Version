@@ -918,8 +918,12 @@
 
     /* ── Input auto-focus ── */
     document.getElementById('email').focus();
-    
 
+    /* ── Clean up URL query parameters after display ── */
+    if (window.location.search && window.history.replaceState) {
+      const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+      window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
+    }
   </script>
   <script src="{{ url_for('static', filename='js/offline-detector.js') }}"></script>
 </body>

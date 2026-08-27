@@ -131,12 +131,45 @@ $$;
 
 ## 🛡️ Row Level Security (RLS) Policies
 
-To protect student biometric data, Row Level Security is active on Supabase:
+To protect student biometric data (512D ArcFace embeddings) and sensitive student information (`gmail`, `name`, enrollment details), Row Level Security is active on Supabase:
 
-- **`student_profiles` Table**:
-  - `SELECT`: Enabled for authenticated instructors and admins.
-  - `INSERT`, `UPDATE`, `DELETE`: Restricted to Flask service role / admin context.
-- **`attendance_logs` & `drift_logs` Tables**:
-  - `SELECT`: Enabled for authenticated users.
-  - `INSERT`: Enabled for attendance process logging.
-  - `UPDATE`, `DELETE`: Restricted to administrators.
+### SQL Security Enforcement Script (`scripts/fix_supabase_security.sql`)
+
+```sql
+-- 1. Enable RLS on all tables
+ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.embedding_health ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.academic_structure ENABLE ROW LEVEL SECURITY;
+
+-- 2. Revoke default public/anon direct access
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
+
+-- 3. Create RLS Policies
+-- 'students' Table: Authenticated read-only; anon access denied
+CREATE POLICY "Authenticated users view students" 
+    ON public.students FOR SELECT TO authenticated USING (true);
+
+-- 'attendance' Table: Authenticated read-only; anon access denied
+CREATE POLICY "Authenticated users view attendance" 
+    ON public.attendance FOR SELECT TO authenticated USING (true);
+
+-- 'academic_structure' Table: Authenticated read-only
+CREATE POLICY "Authenticated read academic_structure" 
+    ON public.academic_structure FOR SELECT TO authenticated USING (true);
+
+-- 'embedding_health' Table: Restricted exclusively to service_role (bypasses RLS)
+```
+
+### Policy Matrix & Service Role Privileges
+
+| Table | `anon` Access | `authenticated` Access | `service_role` (Flask Backend) |
+|---|---|---|---|
+| `students` | **DENIED** | `SELECT` | **FULL (ALL)** |
+| `attendance` | **DENIED** | `SELECT` | **FULL (ALL)** |
+| `embedding_health` | **DENIED** | **DENIED** | **FULL (ALL)** |
+| `academic_structure` | **DENIED** | `SELECT` | **FULL (ALL)** |
+
+> [!NOTE]
+> The Flask application uses `SUPABASE_SERVICE_ROLE_KEY` (`supabase_admin` in `src/utils/db.py`), which natively bypasses RLS in Supabase. Backend operations continue operating with full access while public REST API endpoints are fully secured.
+

@@ -200,6 +200,9 @@
             <select id="matrixBranchFilter" class="input-dark-glass px-4 py-2 rounded-lg text-sm min-w-[140px] w-full sm:w-auto">
               <option value="">Select Branch</option>
             </select>
+            <select id="matrixBatchFilter" class="input-dark-glass px-4 py-2 rounded-lg text-sm min-w-[140px] w-full sm:w-auto">
+              <option value="">All Batches</option>
+            </select>
             <input type="date" id="matrixDateFilter" class="input-dark-glass px-4 py-2 rounded-lg text-sm w-full sm:w-auto" title="Filter by Date (Optional)" />
           </div>
           
@@ -251,6 +254,10 @@
                 <option value="Already Marked">Already Marked</option>
               </select>
 
+              <select id="batchFilter" class="input-dark-glass px-4 py-2 rounded-lg text-sm w-full sm:w-auto">
+                <option value="">Filter by Batch</option>
+              </select>
+
               <select id="lectureFilter" class="input-dark-glass px-4 py-2 rounded-lg text-sm w-full sm:w-auto">
                 <option value="">Filter by Lecture</option>
               </select>
@@ -268,6 +275,7 @@
               <th class="py-3 px-4 text-left">Name</th>
               <th class="py-3 px-4 text-left">Program</th>
               <th class="py-3 px-4 text-left">Branch</th>
+              <th class="py-3 px-4 text-left">Batch</th>
               <th class="py-3 px-4 text-left">Status</th>
               <th class="py-3 px-4 text-left">Timestamp</th>
               <th class="py-3 px-4 text-left">Lecture</th>
@@ -321,7 +329,12 @@
         { data: 1 },
         { data: 2 },
         { data: 3 },
-        { data: 4, 
+        { data: 4,
+          "render": function(data) {
+             return data ? `<span class="px-2 py-0.5 rounded text-xs font-mono bg-blue-500/10 text-blue-400 border border-blue-500/20">Batch ${data}</span>` : '<span class="text-gray-500 text-xs">N/A</span>';
+          }
+        },
+        { data: 5, 
           "render": function (data, type, row) {
                 if (type === 'display') {
                     let className = 'font-semibold px-2.5 py-1 rounded-full text-xs transition duration-200';
@@ -335,13 +348,13 @@
                         label = 'Absent';
                     }
                     let nextStatus = (data === 'Present' || data === 'Already Marked') ? 'Absent' : 'Present';
-                    return `<button type="button" onclick="toggleLogStatus('${row[0]}', '${row[6]}', '${row[5]}', '${nextStatus}', this)" title="Click to toggle status" class="transform hover:scale-105 active:scale-95 transition-all"><span class="${className}">${label}</span></button>`;
+                    return `<button type="button" onclick="toggleLogStatus('${row[0]}', '${row[7]}', '${row[6]}', '${nextStatus}', this)" title="Click to toggle status" class="transform hover:scale-105 active:scale-95 transition-all"><span class="${className}">${label}</span></button>`;
                 }
                 return data;
             }
         },
-        { data: 5 },
-        { data: 6 }
+        { data: 6 },
+        { data: 7 }
       ],
       responsive: false,
       scrollX: true,
@@ -360,27 +373,36 @@
         let lectureSet = new Set();
         let programSet = new Set();
         let branchSet = new Set();
+        let batchSet = new Set();
 
         // Load created options directly from our academic lookup API first
         try {
             const res = await fetch('/api/academic_options');
             const acadData = await res.json();
-            (acadData.programs || []).forEach(p => programSet.add(p));
-            (acadData.branches || []).forEach(b => branchSet.add(b));
+            (acadData.programs || []).forEach(p => { if (p) programSet.add(p.toString().trim()); });
+            (acadData.branches || []).forEach(b => { if (b) branchSet.add(b.toString().trim()); });
+            (acadData.years || []).forEach(y => { if (y) batchSet.add(y.toString().trim()); });
         } catch (err) {
             console.error("Failed to read academic options:", err);
         }
 
-        // Add options found in the last logs
+        // Add options found in logs and registered students
         data.forEach(row => {
-            if (row[6]) lectureSet.add(row[6]);
+            if (row[7]) lectureSet.add(row[7].toString().trim());
+            if (row[4]) batchSet.add(row[4].toString().trim());
+        });
+        rawStudentsData.forEach(s => {
+            const yr = s.batch_year || s.enrollment_year;
+            if (yr) batchSet.add(yr.toString().trim());
         });
 
         // Clear existing, keep placeholder
         $("#lectureFilter").html('<option value="">Filter by Lecture</option>');
+        $("#batchFilter").html('<option value="">Filter by Batch</option>');
         $("#matrixLectureFilter").html('<option value="">Select Lecture</option>');
         $("#matrixProgramFilter").html('<option value="">Select Program</option>');
         $("#matrixBranchFilter").html('<option value="">Select Branch</option>');
+        $("#matrixBatchFilter").html('<option value="">All Batches</option>');
 
         lectureSet.forEach(l => {
             $("#lectureFilter").append(`<option value="${l}">${l}</option>`);
@@ -391,6 +413,10 @@
         });
         branchSet.forEach(b => {
             $("#matrixBranchFilter").append(`<option value="${b}">${b}</option>`);
+        });
+        Array.from(batchSet).sort((a, b) => b - a).forEach(y => {
+            $("#batchFilter").append(`<option value="${y}">${y}</option>`);
+            $("#matrixBatchFilter").append(`<option value="${y}">Batch ${y}</option>`);
         });
 
         // Auto-select first lecture/program/branch on initial load
@@ -407,7 +433,7 @@
     }
 
     // Trigger matrix rendering on filters change, reloading fresh logs first
-    $('#matrixLectureFilter, #matrixProgramFilter, #matrixBranchFilter, #matrixDateFilter').on('change input', async function() {
+    $('#matrixLectureFilter, #matrixProgramFilter, #matrixBranchFilter, #matrixBatchFilter, #matrixDateFilter').on('change input', async function() {
         try {
             const res = await fetch("/get_attendance_data");
             const json = await res.json();
@@ -423,6 +449,7 @@
         const selectedLec = $('#matrixLectureFilter').val();
         const selectedProg = $('#matrixProgramFilter').val();
         const selectedBranch = $('#matrixBranchFilter').val();
+        const selectedBatch = $('#matrixBatchFilter').val();
         const selectedDate = $('#matrixDateFilter').val();
 
         if (!selectedLec || !selectedProg || !selectedBranch) {
@@ -439,25 +466,31 @@
 
         // Filter relevant records by lecture (case-insensitive) and program/branch
         let filtered = rawAttendanceData.filter(r => 
-            (r[6] || "").toString().toUpperCase() === selectedLec.toUpperCase() &&
+            (r[7] || "").toString().toUpperCase() === selectedLec.toUpperCase() &&
             (r[2] || "").toString().toUpperCase() === selectedProg.toUpperCase() &&
             (r[3] || "").toString().toUpperCase() === selectedBranch.toUpperCase()
         );
 
-        // Apply optional Date Filter (r[5] is the timestamp formatted as 'YYYY-MM-DD HH:MM:SS')
+        if (selectedBatch) {
+            filtered = filtered.filter(r => (r[4] || "").toString() === selectedBatch.toString());
+        }
+
+        // Apply optional Date Filter (r[6] is the timestamp formatted as 'YYYY-MM-DD HH:MM:SS')
         if (selectedDate) {
-            filtered = filtered.filter(r => r[5].startsWith(selectedDate));
+            filtered = filtered.filter(r => r[6].startsWith(selectedDate));
         }
 
         // Find unique timestamps and sort them in reverse chronological order (newest first)
-        const timestamps = [...new Set(filtered.map(r => r[5]))].sort((a, b) => b.localeCompare(a));
+        const timestamps = [...new Set(filtered.map(r => r[6]))].sort((a, b) => b.localeCompare(a));
 
         // Find unique students, details, and sort alphabetically
         const studentMap = {};
         rawStudentsData.forEach(s => {
-            // Only add students that belong to the selected program & branch (case-insensitive)
+            const sBatch = (s.batch_year || s.enrollment_year || "").toString();
+            // Only add students that belong to the selected program & branch (and batch if selected)
             if (s.program && s.program.toString().toUpperCase() === selectedProg.toUpperCase() &&
-                s.branch && s.branch.toString().toUpperCase() === selectedBranch.toUpperCase()) {
+                s.branch && s.branch.toString().toUpperCase() === selectedBranch.toUpperCase() &&
+                (!selectedBatch || sBatch === selectedBatch.toString())) {
                 studentMap[s.id] = { name: s.name, branch: s.branch || 'N/A' };
             }
         });
@@ -477,9 +510,15 @@
               <th class="py-3 px-4 text-left font-semibold text-white">Branch</th>
         `;
         timestamps.forEach(ts => {
-            // Display date and time split into two lines for cleaner header
+            const sessionLec = (filtered.find(r => r[6] === ts) || [])[7] || selectedLec;
             const parts = ts.split(' ');
-            html += `<th class="py-3 px-4 text-center font-semibold text-white min-w-[120px]">${parts[0]}<br><span class="text-xs text-gray-500 font-normal">${parts[1]}</span></th>`;
+            const dateStr = parts[0] || '';
+            const timeStr = parts[1] || '';
+            html += `<th class="py-3 px-4 text-center font-semibold text-white min-w-[130px]">
+                <div class="text-sm font-bold text-blue-400">${sessionLec}</div>
+                <div class="text-xs text-gray-300 font-normal mt-0.5">${dateStr}</div>
+                <div class="text-[10px] text-gray-400 font-mono">${timeStr}</div>
+              </th>`;
         });
         html += `</tr></thead><tbody>`;
 
@@ -496,8 +535,8 @@
             timestamps.forEach(ts => {
                  const isPresent = filtered.some(r => 
                      (r[0] || "").toString().trim().toUpperCase() === sId.toString().trim().toUpperCase() && 
-                     r[5] === ts && 
-                     (r[4] === 'Present' || r[4] === 'Already Marked')
+                     r[6] === ts && 
+                     (r[5] === 'Present' || r[5] === 'Already Marked')
                  );
                  const status = isPresent ? 'Present' : 'Absent';
                  let badgeClass = 'flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition';
@@ -536,10 +575,8 @@
       if (!tableData || !tableData.length) {
         alert("No attendance records to download in the current filter.");
         return;
-      }
-
-      let csvContent = "data:text/csv;charset=utf-8,";
-      csvContent += "Student_ID,Name,Program,Branch,Status,Timestamp,Lecture\n";
+      }      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += "Student_ID,Name,Program,Branch,Batch,Status,Timestamp,Lecture\n";
       
       tableData.forEach(row => {
           let formattedRow = row.map(e => `"${e}"`).join(",");
@@ -557,13 +594,17 @@
       document.body.removeChild(link);
     });
 
-    $("#statusFilter, #lectureFilter").on("change", function () {
+    $("#statusFilter, #batchFilter, #lectureFilter").on("change", function () {
         $(this).addClass('border-4 border-yellow-300');
         setTimeout(() => $(this).removeClass('border-4 border-yellow-300'), 500);
     });
 
     $("#statusFilter").on("change", function () {
       attendanceTable.column(5).search(this.value).draw();
+    });
+
+    $("#batchFilter").on("change", function () {
+      attendanceTable.column(4).search(this.value).draw();
     });
 
     $("#lectureFilter").on("change", function () {
@@ -609,9 +650,9 @@
           const result = await response.json();
           if (result.success) {
               // Sync local DataTable datasource
-              const matchedRow = rawAttendanceData.find(r => r[0] === studentId && r[6] === lecture && r[5] === timestamp);
+              const matchedRow = rawAttendanceData.find(r => r[0] === studentId && r[7] === lecture && r[6] === timestamp);
               if (matchedRow) {
-                  matchedRow[4] = newStatus;
+                  matchedRow[5] = newStatus;
               }
               attendanceTable.clear().rows.add(rawAttendanceData).draw(false);
           } else {
@@ -651,12 +692,12 @@
           const result = await response.json();
           if (result.success) {
               // Find and update matched record in local cache
-              let matchedRow = rawAttendanceData.find(r => r[0] === studentId && r[6] === lecture && r[5] === timestamp);
+              let matchedRow = rawAttendanceData.find(r => r[0] === studentId && r[7] === lecture && r[6] === timestamp);
               if (matchedRow) {
-                  matchedRow[4] = newStatus;
+                  matchedRow[5] = newStatus;
               } else {
                   // If no record existed (e.g. N/A or new absent record), insert into cache
-                  rawAttendanceData.push([studentId, '', '', '', newStatus, timestamp, lecture]);
+                  rawAttendanceData.push([studentId, '', '', '', '', newStatus, timestamp, lecture]);
               }
 
               // Update cell styling dynamically
@@ -706,10 +747,12 @@
       // Insert default absent logs for all students belonging to this class into local cache
       let addedAny = false;
       rawStudentsData.forEach(s => {
+          const sBatch = (s.batch_year || s.enrollment_year || "").toString();
           if (s.program && s.program.toString().toUpperCase() === selectedProg.toUpperCase() &&
-              s.branch && s.branch.toString().toUpperCase() === selectedBranch.toUpperCase()) {
+              s.branch && s.branch.toString().toUpperCase() === selectedBranch.toUpperCase() &&
+              (!selectedBatch || sBatch === selectedBatch.toString())) {
               rawAttendanceData.push([
-                  s.id, s.name, s.program, s.branch, '', 'Absent', newTimestamp, selectedLec
+                  s.id, s.name, s.program, s.branch, sBatch, 'Absent', newTimestamp, selectedLec
               ]);
               addedAny = true;
           }

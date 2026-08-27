@@ -123,6 +123,11 @@ def oauth_login(provider):
                 "redirect_to": redirect_url
             }
         })
+        # Save code_verifier to Flask session for multi-process Gunicorn worker support (PKCE flow)
+        storage_key = getattr(supabase.auth, "_storage_key", "supabase.auth.token")
+        code_verifier = supabase.auth._storage.get_item(f"{storage_key}-code-verifier")
+        if code_verifier:
+            session['code_verifier'] = code_verifier
         return redirect(res.url)
     except Exception as e:
         return redirect(url_for('auth.login', error=str(e)))
@@ -139,7 +144,12 @@ def callback():
         
     if code:
         try:
-            res = supabase.auth.exchange_code_for_session({"auth_code": code})
+            code_verifier = session.pop('code_verifier', None)
+            exchange_params = {"auth_code": code}
+            if code_verifier:
+                exchange_params["code_verifier"] = code_verifier
+
+            res = supabase.auth.exchange_code_for_session(exchange_params)
             user = res.user
             metadata = user.user_metadata or {}
 

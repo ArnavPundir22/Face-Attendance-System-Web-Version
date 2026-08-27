@@ -16,11 +16,45 @@ import cv2
 import numpy as np
 from flask import Blueprint, jsonify, render_template, request
 
+import re
+
 from src import config
 from src.utils.db import supabase, is_valid_email
 from src.utils.face import model, normalize_embedding
 
 attendance_bp = Blueprint('attendance', __name__)
+
+
+def extract_student_year(student_dict: dict):
+    """Extract or derive the 4-digit enrollment/batch year for a student."""
+    if not student_dict:
+        return None
+    
+    # 1. Derive from student ID prefix (e.g. Cu240251013 -> 2024, CU26250073 / Ci26250070 -> 2026)
+    sid = str(student_dict.get('id', '')).strip()
+    if sid:
+        match = re.match(r'(?i)^(?:cu|ci)?(\d{2})', sid)
+        if match:
+            two_digit = match.group(1)
+            val = int(two_digit)
+            if 15 <= val <= 35:
+                return int(f"20{two_digit}")
+
+    # 2. Check enrollment_year column
+    ey = student_dict.get('enrollment_year')
+    if ey is not None and str(ey).strip().isdigit():
+        val = int(str(ey).strip())
+        if 1900 <= val <= 2100:
+            return val
+
+    # 3. Check academic_year column
+    ay = student_dict.get('academic_year')
+    if ay:
+        match = re.search(r'\b(20\d{2})\b', str(ay))
+        if match:
+            return int(match.group(1))
+
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -179,30 +213,40 @@ def viewer():
 @attendance_bp.route('/get_attendance_data')
 def get_attendance_data():
     try:
-        # Fetch logs from the last 7 days to ensure query size is under payload caps
-        seven_days_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
+        # Fetch all registered students to map student ID to batch/enrollment year
+        students_resp = supabase.table('students').select('id, name, branch, program, enrollment_year, academic_year').execute()
+        stus = students_resp.data or []
+        student_year_map = {}
+        students_list = []
+        for s in stus:
+            s_dict = dict(s)
+            y = extract_student_year(s_dict)
+            s_dict['batch_year'] = y
+            students_list.append(s_dict)
+            if s.get('id'):
+                student_year_map[str(s.get('id')).strip().upper()] = str(y) if y else ''
+
+        # Fetch up to 4000 most recent attendance records ordered by timestamp descending
         response = supabase.table('attendance')\
             .select('student_id, name, program, branch, status, timestamp, lecture')\
-            .gte('timestamp', seven_days_ago)\
             .order('timestamp', desc=True)\
             .limit(4000)\
             .execute()
         data = []
         for row in response.data:
+            sid = str(row.get('student_id', '')).strip().upper()
+            batch_yr = student_year_map.get(sid, '')
             data.append([
                 row.get('student_id', ''),
                 row.get('name', ''),
                 row.get('program', ''),
                 row.get('branch', ''),
+                batch_yr,
                 row.get('status', ''),
                 row.get('timestamp', ''),
                 row.get('lecture', '')
             ])
             
-        # Fetch all registered students
-        students_resp = supabase.table('students').select('id, name, branch, program').execute()
-        students_list = students_resp.data or []
-        
         return jsonify({
             "attendance": data,
             "students": students_list
@@ -217,9 +261,12 @@ def get_attendance_data():
 @attendance_bp.route('/upload_photo', methods=['POST'])
 def upload_photo():
     if 'images' not in request.files:
-        return jsonify({"images": [], "session_attendance": [], "detected_program": None, "detected_branch": None})
+        return jsonify({"images": [], "session_attendance": [], "detected_program": None, "detected_branch": None, "detected_year": None})
 
     lecture = request.form.get('lecture', '').strip()
+    if not lecture:
+        lecture = f"Session {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+
     files   = request.files.getlist('images')
 
     now       = datetime.now()
@@ -328,44 +375,77 @@ def upload_photo():
             "annotated": f"data:image/jpeg;base64,{encoded_img}",
         })
 
-    # Auto-detect program and branch based on recognized student IDs
+    # Auto-detect program, branch, and batch year (enrollment_year) based on recognized student IDs
     detected_program = None
-    detected_branch = None
-    all_students = []
+    detected_branch  = None
+    detected_year    = None
+    all_students     = []
+    rec_students     = []
 
     if recognized_ids:
         try:
-            rec_students_resp = supabase.table('students').select('id, program, branch').in_('id', list(recognized_ids)).execute()
+            rec_students_resp = supabase.table('students').select('*').in_('id', list(recognized_ids)).execute()
             rec_students = rec_students_resp.data or []
             
             from collections import Counter
-            combinations = []
+            pb_list = []
+            year_list = []
             for s in rec_students:
                 p = s.get('program')
                 b = s.get('branch')
+                y = extract_student_year(s)
                 if p and b:
-                    combinations.append((p, b))
+                    pb_list.append((p, b))
+                if y is not None:
+                    year_list.append(y)
             
-            if combinations:
-                most_common = Counter(combinations).most_common(1)[0][0]
-                detected_program = most_common[0]
-                detected_branch = most_common[1]
+            if pb_list:
+                most_common_pb = Counter(pb_list).most_common(1)[0][0]
+                detected_program = most_common_pb[0]
+                detected_branch  = most_common_pb[1]
+
+            if year_list:
+                detected_year = Counter(year_list).most_common(1)[0][0]
         except Exception as e:
             print(f"Error in class auto-detection: {e}")
 
-    # Fallback to general default values or keep them empty if absolutely no match
-    if not detected_program or not detected_branch:
-        detected_program = request.form.get('program', '').strip()
-        detected_branch  = request.form.get('branch', '').strip()
+    # Fallback to form field inputs if not auto-detected or if explicit form selection provided
+    form_prog = request.form.get('program', '').strip()
+    form_bran = request.form.get('branch', '').strip()
+    form_year = request.form.get('enrollment_year') or request.form.get('year')
+
+    if form_prog and form_prog != 'Auto-Detect':
+        detected_program = form_prog
+    if form_bran and form_bran != 'Auto-Detect':
+        detected_branch = form_bran
+    if form_year and str(form_year).strip().isdigit() and str(form_year).strip() != 'Auto-Detect':
+        detected_year = int(str(form_year).strip())
 
     if detected_program and detected_branch:
         try:
             students_resp = supabase.table('students').select('*').ilike('program', detected_program).ilike('branch', detected_branch).execute()
-            all_students = students_resp.data or []
+            raw_students = students_resp.data or []
+            
+            # If detected_year is still None, derive the most common batch year among raw_students for that program & branch
+            if detected_year is None and raw_students:
+                years_in_raw = [extract_student_year(s) for s in raw_students if extract_student_year(s) is not None]
+                if years_in_raw:
+                    from collections import Counter
+                    detected_year = Counter(years_in_raw).most_common(1)[0][0]
+
+            # ALWAYS strictly filter by detected_year so students of different batch years are NEVER mixed together
+            if detected_year is not None:
+                all_students = [s for s in raw_students if extract_student_year(s) == detected_year]
+            else:
+                all_students = raw_students
         except Exception as e:
             print(f"Error fetching students for detected class: {e}")
 
-    # Prepare bulk attendance records for ALL registered students in the auto-detected program & branch
+    # Fallback: If class query yielded no results but we recognized student(s), use recognized list
+    if not all_students and rec_students:
+        all_students = rec_students
+
+    # Prepare bulk attendance records for ALL registered students in the auto-detected program & branch & batch year
     attendance_records = []
     session_attend = []
 
@@ -398,14 +478,15 @@ def upload_photo():
             insert_resp = supabase.table('attendance').insert(attendance_records).execute()
             print("Successfully inserted logs:", len(insert_resp.data or []))
         except Exception as e:
-            print(f"Failed to insert bulk attendance: {e}")
-            raise e
+            import logging
+            logging.getLogger(__name__).error(f"Failed to insert bulk attendance: {e}")
 
     return jsonify({
         "images": all_outputs,
         "session_attendance": session_attend,
         "detected_program": detected_program,
-        "detected_branch": detected_branch
+        "detected_branch": detected_branch,
+        "detected_year": detected_year
     })
 
 
@@ -450,7 +531,7 @@ def update_attendance_status():
 
 @attendance_bp.route('/api/academic_options')
 def get_academic_options():
-    """Return distinct programs and branches registered in DB."""
+    """Return distinct programs, branches, and batch years registered in DB."""
     try:
         struct_resp = supabase.table('academic_structure').select('type, value').execute()
         rows = struct_resp.data or []
@@ -458,15 +539,22 @@ def get_academic_options():
         programs = sorted(list({r.get('value') for r in rows if r.get('type') == 'program'}))
         branches = sorted(list({r.get('value') for r in rows if r.get('type') == 'branch'}))
 
+        # Also fetch distinct batch years from students
+        students_resp = supabase.table('students').select('*').execute()
+        stus = students_resp.data or []
+        years = sorted(list({extract_student_year(s) for s in stus if extract_student_year(s) is not None}), reverse=True)
+
         return jsonify({
             "programs": programs,
-            "branches": branches
+            "branches": branches,
+            "years": years
         })
     except Exception as e:
         print("Error fetching academic options:", e)
         return jsonify({
             "programs": [],
-            "branches": []
+            "branches": [],
+            "years": []
         })
 
 

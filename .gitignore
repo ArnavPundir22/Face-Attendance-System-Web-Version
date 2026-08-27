@@ -1,5 +1,6 @@
 # Secrets & credentials
 .env
+cookies.txt
 
 # SQLite database (contains student PII)
 database.db
