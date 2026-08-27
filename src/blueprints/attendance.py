@@ -226,12 +226,19 @@ def get_attendance_data():
             if s.get('id'):
                 student_year_map[str(s.get('id')).strip().upper()] = str(y) if y else ''
 
-        # Fetch up to 4000 most recent attendance records ordered by timestamp descending
-        response = supabase.table('attendance')\
-            .select('student_id, name, program, branch, status, timestamp, lecture')\
-            .order('timestamp', desc=True)\
-            .limit(4000)\
-            .execute()
+        # Fetch up to 4000 most recent attendance records ordered by att_id and timestamp descending
+        try:
+            response = supabase.table('attendance')\
+                .select('att_id, student_id, name, program, branch, status, timestamp, lecture')\
+                .order('att_id', desc=True)\
+                .limit(4000)\
+                .execute()
+        except Exception:
+            response = supabase.table('attendance')\
+                .select('student_id, name, program, branch, status, timestamp, lecture')\
+                .order('timestamp', desc=True)\
+                .limit(4000)\
+                .execute()
         data = []
         for row in response.data:
             sid = str(row.get('student_id', '')).strip().upper()

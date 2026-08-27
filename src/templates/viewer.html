@@ -358,6 +358,7 @@
       ],
       responsive: false,
       scrollX: true,
+      order: [[6, 'desc']],
       dom: 'Bfrtip',
       buttons: [
         {
@@ -387,8 +388,26 @@
         }
 
         // Add options found in logs and registered students
-        data.forEach(row => {
-            if (row[7]) lectureSet.add(row[7].toString().trim());
+        let latestLec = null;
+        let latestProg = null;
+        let latestBranch = null;
+
+        data.forEach((row, idx) => {
+            if (row[7]) {
+                const lecName = row[7].toString().trim();
+                lectureSet.add(lecName);
+                if (idx === 0) latestLec = lecName;
+            }
+            if (row[2]) {
+                const progName = row[2].toString().trim();
+                programSet.add(progName);
+                if (idx === 0) latestProg = progName;
+            }
+            if (row[3]) {
+                const branchName = row[3].toString().trim();
+                branchSet.add(branchName);
+                if (idx === 0) latestBranch = branchName;
+            }
             if (row[4]) batchSet.add(row[4].toString().trim());
         });
         rawStudentsData.forEach(s => {
@@ -419,14 +438,14 @@
             $("#matrixBatchFilter").append(`<option value="${y}">Batch ${y}</option>`);
         });
 
-        // Auto-select first lecture/program/branch on initial load
+        // Auto-select the most recent lecture, program, and branch on initial load
         if (lectureSet.size > 0 && programSet.size > 0 && branchSet.size > 0 && !window.hasAutoSelected) {
-            const firstLec = Array.from(lectureSet)[0];
-            const firstProg = Array.from(programSet)[0];
-            const firstBranch = Array.from(branchSet)[0];
-            $("#matrixLectureFilter").val(firstLec);
-            $("#matrixProgramFilter").val(firstProg);
-            $("#matrixBranchFilter").val(firstBranch);
+            const selLec = latestLec || Array.from(lectureSet)[0];
+            const selProg = latestProg || Array.from(programSet)[0];
+            const selBranch = latestBranch || Array.from(branchSet)[0];
+            $("#matrixLectureFilter").val(selLec);
+            $("#matrixProgramFilter").val(selProg);
+            $("#matrixBranchFilter").val(selBranch);
             window.hasAutoSelected = true;
             renderMatrixRegister();
         }
