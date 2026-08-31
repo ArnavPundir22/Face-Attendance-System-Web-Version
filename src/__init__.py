@@ -74,6 +74,14 @@ def create_app() -> Flask:
 
     logger.info("All blueprints registered.")
 
+    # Pre-load in-memory face embedding cache for instant BLAS matching (< 1ms)
+    try:
+        from src.utils.face_cache import reload_face_cache
+        reload_face_cache()
+    except Exception as e:
+        logger.warning("Initial face cache pre-load skipped: %s", e)
+
+
     # ------------------------------------------------------------------
     # Global error handlers
     # ------------------------------------------------------------------

@@ -16,8 +16,10 @@ from werkzeug.utils import secure_filename
 from src import config
 from src.utils.db import supabase_admin
 from src.utils.face import normalize_embedding, model
+from src.utils.face_cache import add_student_to_cache
 
 students_bp = Blueprint('students', __name__)
+
 
 @students_bp.route('/students')
 def students():
@@ -120,11 +122,23 @@ def submit_student():
             insert_data["academic_year"] = academic_year
 
         supabase_admin.table('students').insert(insert_data).execute()
+
+        # Update in-memory matrix face cache
+        add_student_to_cache(
+            student_id=student_id,
+            name=name,
+            program=program,
+            branch=branch,
+            embedding=normalized_emb,
+            enrollment_year=int(enrollment_year) if enrollment_year else None,
+            academic_year=academic_year
+        )
     except Exception as e:
         return redirect(url_for(
             'students.add_student', status='error',
             message='Database error while adding student',
         ))
+
 
 
     return redirect(url_for(
