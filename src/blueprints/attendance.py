@@ -19,7 +19,7 @@ from flask import Blueprint, jsonify, render_template, request
 import re
 
 from src import config
-from src.utils.db import supabase, is_valid_email
+from src.utils.db import supabase_admin, is_valid_email
 from src.utils.face import model, normalize_embedding
 
 attendance_bp = Blueprint('attendance', __name__)
@@ -83,7 +83,7 @@ def _send_drift_email_alert(student_id: str, alert_level: str, ewma_drift: float
 
     try:
         # Fetch student & admin contact info
-        stu_resp = supabase.table('students').select('name, program, branch, gmail').eq('id', student_id).maybe_single().execute()
+        stu_resp = supabase_admin.table('students').select('name, program, branch, gmail').eq('id', student_id).maybe_single().execute()
         student = stu_resp.data or {}
         student_name = student.get('name', student_id)
         student_email = student.get('gmail', '')
@@ -145,7 +145,7 @@ def _update_drift(student_id: str, cosine_sim: float, pose_yaw: float, pose_pitc
             drift_score = 1.0 - cosine_sim
 
             # Fetch current EWMA from students table (fast single-row lookup)
-            stu_resp = supabase.table('students') \
+            stu_resp = supabase_admin.table('students') \
                 .select('current_ewma_drift') \
                 .eq('id', student_id) \
                 .maybe_single() \
@@ -156,7 +156,7 @@ def _update_drift(student_id: str, cosine_sim: float, pose_yaw: float, pose_pitc
             alert_level = _compute_drift_level(new_ewma)
 
             # Append event to embedding_health history
-            supabase.table('embedding_health').insert({
+            supabase_admin.table('embedding_health').insert({
                 'student_id':       student_id,
                 'drift_score':      round(drift_score, 6),
                 'ewma_drift':       round(new_ewma,    6),
@@ -168,7 +168,7 @@ def _update_drift(student_id: str, cosine_sim: float, pose_yaw: float, pose_pitc
             }).execute()
 
             # Keep students table in sync for fast dashboard queries
-            supabase.table('students').update({
+            supabase_admin.table('students').update({
                 'current_ewma_drift': round(new_ewma, 6),
                 'drift_alert_level':  alert_level,
             }).eq('id', student_id).execute()
@@ -181,7 +181,7 @@ def _update_drift(student_id: str, cosine_sim: float, pose_yaw: float, pose_pitc
 
         else:
             # Pose rejected — log the event but do NOT touch the EWMA
-            supabase.table('embedding_health').insert({
+            supabase_admin.table('embedding_health').insert({
                 'student_id':       student_id,
                 'drift_score':      None,
                 'ewma_drift':       None,
@@ -192,6 +192,7 @@ def _update_drift(student_id: str, cosine_sim: float, pose_yaw: float, pose_pitc
                 'pose_accepted':    False,
             }).execute()
             return {'pose_accepted': False, 'alert_level': 'POSE_REJECTED', 'ewma_drift': None}
+
 
     except Exception as exc:
         # Drift tracking must never break attendance marking
@@ -214,7 +215,7 @@ def viewer():
 def get_attendance_data():
     try:
         # Fetch all registered students to map student ID to batch/enrollment year
-        students_resp = supabase.table('students').select('id, name, branch, program, enrollment_year, academic_year').execute()
+        students_resp = supabase_admin.table('students').select('id, name, branch, program, enrollment_year, academic_year').execute()
         stus = students_resp.data or []
         student_year_map = {}
         students_list = []
@@ -228,13 +229,13 @@ def get_attendance_data():
 
         # Fetch up to 4000 most recent attendance records ordered by att_id and timestamp descending
         try:
-            response = supabase.table('attendance')\
+            response = supabase_admin.table('attendance')\
                 .select('att_id, student_id, name, program, branch, status, timestamp, lecture')\
                 .order('att_id', desc=True)\
                 .limit(4000)\
                 .execute()
         except Exception:
-            response = supabase.table('attendance')\
+            response = supabase_admin.table('attendance')\
                 .select('student_id, name, program, branch, status, timestamp, lecture')\
                 .order('timestamp', desc=True)\
                 .limit(4000)\
@@ -259,8 +260,10 @@ def get_attendance_data():
             "students": students_list
         })
     except Exception as e:
-        print("Error fetching attendance data:", e)
+        import logging
+        logging.getLogger(__name__).error("Error fetching attendance data: %s", e, exc_info=True)
         return jsonify({"attendance": [], "students": []})
+
 
 
 
@@ -316,7 +319,7 @@ def upload_photo():
                         'filter_branch': None,
                         'filter_section': None
                     }
-                    match_resp = supabase.rpc('match_face', rpc_params).execute()
+                    match_resp = supabase_admin.rpc('match_face', rpc_params).execute()
                     match_data = match_resp.data
 
                     # Fallback: try matching with raw InsightFace embedding (Global scope)
@@ -328,10 +331,11 @@ def upload_photo():
                             'filter_branch': None,
                             'filter_section': None
                         }
-                        match_resp = supabase.rpc('match_face', raw_rpc_params).execute()
+                        match_resp = supabase_admin.rpc('match_face', raw_rpc_params).execute()
                         match_data = match_resp.data
                 except Exception as e:
-                    print(f"Error matching face via pgvector: {e}")
+                    import logging
+                    logging.getLogger(__name__).error("Error matching face via pgvector: %s", e)
                     match_data = []
 
                 if match_data and len(match_data) > 0:
@@ -391,7 +395,7 @@ def upload_photo():
 
     if recognized_ids:
         try:
-            rec_students_resp = supabase.table('students').select('*').in_('id', list(recognized_ids)).execute()
+            rec_students_resp = supabase_admin.table('students').select('*').in_('id', list(recognized_ids)).execute()
             rec_students = rec_students_resp.data or []
             
             from collections import Counter
@@ -414,7 +418,8 @@ def upload_photo():
             if year_list:
                 detected_year = Counter(year_list).most_common(1)[0][0]
         except Exception as e:
-            print(f"Error in class auto-detection: {e}")
+            import logging
+            logging.getLogger(__name__).error("Error in class auto-detection: %s", e)
 
     # Fallback to form field inputs if not auto-detected or if explicit form selection provided
     form_prog = request.form.get('program', '').strip()
@@ -430,7 +435,7 @@ def upload_photo():
 
     if detected_program and detected_branch:
         try:
-            students_resp = supabase.table('students').select('*').ilike('program', detected_program).ilike('branch', detected_branch).execute()
+            students_resp = supabase_admin.table('students').select('*').ilike('program', detected_program).ilike('branch', detected_branch).execute()
             raw_students = students_resp.data or []
             
             # If detected_year is still None, derive the most common batch year among raw_students for that program & branch
@@ -446,11 +451,20 @@ def upload_photo():
             else:
                 all_students = raw_students
         except Exception as e:
-            print(f"Error fetching students for detected class: {e}")
+            import logging
+            logging.getLogger(__name__).error("Error fetching students for detected class: %s", e)
 
     # Fallback: If class query yielded no results but we recognized student(s), use recognized list
     if not all_students and rec_students:
         all_students = rec_students
+
+    # CRITICAL FIX: Ensure ALL recognized students are ALWAYS included in all_students so their Present mark is never lost
+    existing_student_ids = {str(s.get('id')).strip().upper() for s in all_students if s.get('id')}
+    for rs in rec_students:
+        rs_id = str(rs.get('id')).strip().upper() if rs.get('id') else None
+        if rs_id and rs_id not in existing_student_ids:
+            all_students.append(rs)
+            existing_student_ids.add(rs_id)
 
     # Prepare bulk attendance records for ALL registered students in the auto-detected program & branch & batch year
     attendance_records = []
@@ -482,11 +496,12 @@ def upload_photo():
     # Bulk insert attendance records
     if attendance_records:
         try:
-            insert_resp = supabase.table('attendance').insert(attendance_records).execute()
-            print("Successfully inserted logs:", len(insert_resp.data or []))
+            insert_resp = supabase_admin.table('attendance').insert(attendance_records).execute()
+            import logging
+            logging.getLogger(__name__).info("Successfully inserted logs: %d", len(insert_resp.data or []))
         except Exception as e:
             import logging
-            logging.getLogger(__name__).error(f"Failed to insert bulk attendance: {e}")
+            logging.getLogger(__name__).error("Failed to insert bulk attendance: %s", e, exc_info=True)
 
     return jsonify({
         "images": all_outputs,
@@ -510,16 +525,16 @@ def update_attendance_status():
         
     try:
         # Check if record already exists
-        existing = supabase.table('attendance').select('att_id').eq('student_id', student_id).eq('lecture', lecture).eq('timestamp', timestamp).execute()
+        existing = supabase_admin.table('attendance').select('att_id').eq('student_id', student_id).eq('lecture', lecture).eq('timestamp', timestamp).execute()
         
         if existing.data:
-            supabase.table('attendance').update({"status": status}).eq('student_id', student_id).eq('lecture', lecture).eq('timestamp', timestamp).execute()
+            supabase_admin.table('attendance').update({"status": status}).eq('student_id', student_id).eq('lecture', lecture).eq('timestamp', timestamp).execute()
         else:
             # Fetch student details for a complete attendance insert
-            student_resp = supabase.table('students').select('*').eq('id', student_id).execute()
+            student_resp = supabase_admin.table('students').select('*').eq('id', student_id).execute()
             if student_resp.data:
                 student = student_resp.data[0]
-                supabase.table('attendance').insert({
+                supabase_admin.table('attendance').insert({
                     "student_id": student_id,
                     "name": student.get('name'),
                     "program": student.get('program'),
@@ -532,7 +547,8 @@ def update_attendance_status():
                 return jsonify({"success": False, "error": "Student not found in directory"}), 404
         return jsonify({"success": True})
     except Exception as e:
-        print(f"Error updating/inserting attendance status: {e}")
+        import logging
+        logging.getLogger(__name__).error("Error updating/inserting attendance status: %s", e, exc_info=True)
         return jsonify({"success": False, "error": str(e)}), 500
 
 
@@ -540,14 +556,14 @@ def update_attendance_status():
 def get_academic_options():
     """Return distinct programs, branches, and batch years registered in DB."""
     try:
-        struct_resp = supabase.table('academic_structure').select('type, value').execute()
+        struct_resp = supabase_admin.table('academic_structure').select('type, value').execute()
         rows = struct_resp.data or []
         
         programs = sorted(list({r.get('value') for r in rows if r.get('type') == 'program'}))
         branches = sorted(list({r.get('value') for r in rows if r.get('type') == 'branch'}))
 
         # Also fetch distinct batch years from students
-        students_resp = supabase.table('students').select('*').execute()
+        students_resp = supabase_admin.table('students').select('*').execute()
         stus = students_resp.data or []
         years = sorted(list({extract_student_year(s) for s in stus if extract_student_year(s) is not None}), reverse=True)
 
@@ -557,12 +573,14 @@ def get_academic_options():
             "years": years
         })
     except Exception as e:
-        print("Error fetching academic options:", e)
+        import logging
+        logging.getLogger(__name__).error("Error fetching academic options: %s", e, exc_info=True)
         return jsonify({
             "programs": [],
             "branches": [],
             "years": []
         })
+
 
 
 

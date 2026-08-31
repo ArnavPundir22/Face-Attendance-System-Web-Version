@@ -14,7 +14,7 @@ from flask import Blueprint, redirect, render_template, request, url_for
 from werkzeug.utils import secure_filename
 
 from src import config
-from src.utils.db import supabase
+from src.utils.db import supabase_admin
 from src.utils.face import normalize_embedding, model
 
 students_bp = Blueprint('students', __name__)
@@ -23,7 +23,7 @@ students_bp = Blueprint('students', __name__)
 def students():
     try:
         # Fetch students from Supabase
-        response = supabase.table('students').select('id, name, program, branch, enrollment_year, gmail').execute()
+        response = supabase_admin.table('students').select('id, name, program, branch, enrollment_year, gmail').execute()
         data = response.data
         return render_template('students.html', students=data)
     except Exception as e:
@@ -56,7 +56,7 @@ def submit_student():
     # Check for existing student
     try:
         # Check by exact ID only to allow same-name students
-        existing = supabase.table('students').select('id').eq('id', student_id).execute()
+        existing = supabase_admin.table('students').select('id').eq('id', student_id).execute()
         if existing.data:
             return redirect(url_for(
                 'students.add_student', status='error',
@@ -119,12 +119,13 @@ def submit_student():
         if academic_year:
             insert_data["academic_year"] = academic_year
 
-        supabase.table('students').insert(insert_data).execute()
+        supabase_admin.table('students').insert(insert_data).execute()
     except Exception as e:
         return redirect(url_for(
             'students.add_student', status='error',
             message='Database error while adding student',
         ))
+
 
     return redirect(url_for(
         'students.add_student', status='success',

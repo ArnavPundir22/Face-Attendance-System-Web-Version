@@ -10,8 +10,13 @@ if exist .venv\Scripts\activate.bat (
 ) else (
     echo [WARNING] .venv virtual environment not found. Running using system Python.
 )
+:: Run using Waitress WSGI server (Production multi-threaded server for Windows)
+python -c "import waitress" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [INFO] Installing Waitress WSGI production server for Windows...
+    pip install waitress
+)
 
-:: Run using Flask development server (Gunicorn is not supported natively on Windows)
-echo Starting BioSecure AI server...
-flask --app app:app run --debug
+echo Starting BioSecure AI server with Waitress on http://0.0.0.0:5000 ...
+waitress-serve --host=0.0.0.0 --port=5000 app:app
 pause
