@@ -54,3 +54,13 @@ To record attendance for a classroom:
 1. Navigate to the **Attendance Viewer** tab.
 2. Filter attendance entries dynamically by Date, Student Name, or Roll Number.
 3. Click the **Export to CSV** button to download the filtered logs directly into a spreadsheet-ready format.
+
+---
+
+## 🛠️ Troubleshooting & Storage Handling
+
+* **Automatic Folder Initialization**:
+  - Uploaded enrollment photos are stored in `known_faces/` (configurable via `KNOWN_FACES_DIR`). The system automatically provisions this folder on first upload to prevent file write errors.
+* **500 Server Connection Errors**:
+  - If a 500 internal server error page is encountered, check application logs for database or dependency connectivity. API requests with standard JSON request headers (`Accept: application/json`) will receive structured JSON error bodies instead of HTML pages.
+

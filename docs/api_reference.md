@@ -101,3 +101,18 @@ Registers a new student profile and generates their base 512D ArcFace facial emb
   - `roll_number` (string): Unique roll number.
   - `file` (file binary): Enrollment portrait photo.
 - **Success Response**: Redirects to `/students`.
+
+---
+
+## ⚠️ Error Handling & Status Codes
+
+BioSecure AI includes built-in error handlers for standard HTTP error statuses (`403`, `404`, `500`):
+
+* **API Requests** (`Accept: application/json` or `X-Requested-With: XMLHttpRequest`):
+  - Returns structured JSON payloads (e.g., `{"error": "Internal server error"}`) with the appropriate HTTP status code.
+* **Browser Requests**:
+  - Renders custom glassmorphic HTML error pages (`error_404.html`, `error_403.html`, `error_500.html`).
+
+### File Upload & Storage Safeguards
+- **Auto-Directory Provisioning**: The server automatically initializes and creates the designated face photo directory (`config.KNOWN_FACES_DIR` / `known_faces/`) using `os.makedirs(..., exist_ok=True)` prior to saving uploaded student enrollment portraits, preventing missing directory `FileNotFoundError` (HTTP 500) failures during student registration (`/submit_student`) and profile updates.
+

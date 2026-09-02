@@ -147,6 +147,7 @@ def admin_edit_student(student_id):
             safe_id = secure_filename(student_id)
             if safe_id:
                 filename = f"{safe_id}.jpg"
+                os.makedirs(config.KNOWN_FACES_DIR, exist_ok=True)
                 filepath = os.path.join(config.KNOWN_FACES_DIR, filename)
                 photo.save(filepath)
 

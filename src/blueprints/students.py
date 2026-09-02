@@ -78,6 +78,7 @@ def submit_student():
             message='Student ID contains invalid characters',
         ))
     filename = f"{safe_id}.jpg"
+    os.makedirs(config.KNOWN_FACES_DIR, exist_ok=True)
     filepath = os.path.join(config.KNOWN_FACES_DIR, filename)
     photo.save(filepath)
 
