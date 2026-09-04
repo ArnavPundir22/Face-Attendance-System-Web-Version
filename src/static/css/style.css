@@ -389,3 +389,79 @@ input.input-dark-glass,
 select.input-dark-glass {
     color: var(--text-primary) !important;
 }
+
+/* ==========================================
+   GUIDED PHOTO FRAME & AUTO-CAPTURE STYLES
+   ========================================== */
+.guided-frame-wrapper {
+    position: relative;
+    overflow: hidden;
+    border-radius: 1rem;
+    background: #090d16;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
+}
+
+.guided-oval-stencil {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 62%;
+    height: 72%;
+    border-radius: 50% / 46%;
+    pointer-events: none;
+    box-sizing: border-box;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* State: Searching / Default */
+.guided-oval-stencil.state-searching {
+    border: 3px dashed rgba(59, 130, 246, 0.7);
+    box-shadow: 0 0 25px rgba(59, 130, 246, 0.2), inset 0 0 20px rgba(59, 130, 246, 0.1);
+    animation: stencil-pulse-blue 2s ease-in-out infinite;
+}
+
+/* State: Warning / Misaligned */
+.guided-oval-stencil.state-warning {
+    border: 3px solid #ef4444;
+    box-shadow: 0 0 30px rgba(239, 68, 68, 0.4), inset 0 0 25px rgba(239, 68, 68, 0.15);
+}
+
+/* State: Perfect Alignment / Capturing */
+.guided-oval-stencil.state-success {
+    border: 3.5px solid #10b981;
+    box-shadow: 0 0 35px rgba(16, 185, 129, 0.6), inset 0 0 30px rgba(16, 185, 129, 0.25);
+    animation: stencil-pulse-green 1s ease-in-out infinite;
+}
+
+@keyframes stencil-pulse-blue {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.85; }
+    50% { transform: translate(-50%, -50%) scale(1.02); opacity: 1; }
+}
+
+@keyframes stencil-pulse-green {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.03); }
+}
+
+.shutter-flash-overlay {
+    position: absolute;
+    inset: 0;
+    background-color: #ffffff;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 40;
+    transition: opacity 0.05s ease-out;
+}
+
+.shutter-flash-overlay.active {
+    opacity: 0.95;
+}
+
+/* Progress Circle Animation */
+.progress-ring-circle {
+    transition: stroke-dashoffset 0.1s linear, stroke 0.3s ease;
+    transform: rotate(-90deg);
+    transform-origin: 50% 50%;
+}
+

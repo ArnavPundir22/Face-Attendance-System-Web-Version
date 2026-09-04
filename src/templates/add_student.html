@@ -23,6 +23,7 @@
     </div>
 
     <nav class="flex-1 flex flex-col gap-2">
+      {% if session_username %}
       <a href="/" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all text-gray-300 hover:bg-white/5">
         <i data-lucide="home" class="w-5 h-5"></i>
         <span>Home</span>
@@ -35,6 +36,7 @@
         <i data-lucide="users" class="w-5 h-5"></i>
         <span>All Students</span>
       </a>
+      {% endif %}
       <a href="/add_student" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all bg-blue-500/10 text-blue-400 border border-blue-500/20">
         <i data-lucide="user-plus" class="w-5 h-5"></i>
         <span>Add Student</span>
@@ -48,6 +50,7 @@
     </nav>
 
     <div class="pt-6 border-t border-white/10 flex flex-col gap-4">
+      {% if session_username %}
       <div class="flex flex-col">
         <span class="text-xs text-gray-500">Logged in as</span>
         <span class="text-sm font-semibold text-gray-200">{{ session_username }}</span>
@@ -55,6 +58,15 @@
       <a href="/logout" class="btn-danger-glass w-full py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2">
         <i data-lucide="log-out" class="w-4 h-4"></i> Logout
       </a>
+      {% else %}
+      <div class="flex flex-col">
+        <span class="text-xs text-gray-500">Public Access</span>
+        <span class="text-sm font-semibold text-gray-200">Guest Student</span>
+      </div>
+      <a href="/login" class="bg-blue-600 hover:bg-blue-500 text-white w-full py-2.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-md">
+        <i data-lucide="log-in" class="w-4 h-4"></i> Staff Login
+      </a>
+      {% endif %}
     </div>
   </aside>
 
@@ -66,14 +78,21 @@
     </div>
     
     <div class="flex items-center gap-4">
+      {% if session_username %}
       <a href="/logout" class="btn-danger-glass px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2">
         <i data-lucide="log-out" class="w-4 h-4"></i> Logout
       </a>
+      {% else %}
+      <a href="/login" class="bg-blue-600/80 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all">
+        <i data-lucide="log-in" class="w-4 h-4"></i> Staff Login
+      </a>
+      {% endif %}
     </div>
   </header>
 
   <!-- BottomNavBar (Mobile Only) -->
   <nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe md:hidden h-16 bg-[#131b2e]/85 backdrop-blur-lg border-t border-white/10 shadow-2xl">
+    {% if session_username %}
     <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/">
       <i data-lucide="home" class="w-5 h-5 mb-0.5"></i>
       <span>Home</span>
@@ -86,14 +105,20 @@
       <i data-lucide="users" class="w-5 h-5 mb-0.5"></i>
       <span>Students</span>
     </a>
+    {% endif %}
     <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-blue-400" href="/add_student">
       <i data-lucide="user-plus" class="w-5 h-5 mb-0.5"></i>
-      <span>Add</span>
+      <span>Register</span>
     </a>
     {% if session_is_admin %}
     <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/admin">
       <i data-lucide="settings" class="w-5 h-5 mb-0.5"></i>
       <span>Admin</span>
+    </a>
+    {% elif not session_username %}
+    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/login">
+      <i data-lucide="log-in" class="w-5 h-5 mb-0.5"></i>
+      <span>Login</span>
     </a>
     {% endif %}
   </nav>
@@ -113,30 +138,114 @@
 
       <form id="studentForm" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-8">
         
-        <!-- Left Column: Photo upload & guidelines -->
+        <!-- Left Column: Photo upload & Guided Camera -->
         <div class="space-y-5">
-          <div class="p-4 rounded-xl bg-blue-500/5 border border-blue-500/20">
-              <h3 class="text-xs font-bold text-blue-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                  <i data-lucide="info" class="w-4 h-4"></i> Photo Reference Guidelines
-              </h3>
-              <ul class="list-disc list-inside text-xs text-gray-400 space-y-1.5 ml-1">
-                  <li>Use a clear, high-resolution portrait shot.</li>
-                  <li>Ensure the student is facing directly forward with clear lighting.</li>
-                  <li>Only one person should be in the photo reference.</li>
+          <!-- Photo Mode Selector Tabs -->
+          <div class="flex bg-white/5 p-1 rounded-xl border border-white/10 text-xs font-semibold">
+            <button type="button" id="tabLiveCam" class="flex-1 py-2 rounded-lg bg-blue-600 text-white flex items-center justify-center gap-1.5 shadow-md transition-all">
+              <i data-lucide="camera" class="w-4 h-4"></i> Guided Live Camera
+            </button>
+            <button type="button" id="tabFileUpload" class="flex-1 py-2 rounded-lg text-gray-400 hover:text-white flex items-center justify-center gap-1.5 transition-all">
+              <i data-lucide="upload" class="w-4 h-4"></i> Upload File
+            </button>
+          </div>
+
+          <!-- Section A: Guided Live Camera Container -->
+          <div id="guidedCamSection" class="space-y-3">
+            <div class="guided-frame-wrapper relative w-full h-80 sm:h-96 rounded-2xl overflow-hidden border border-white/15 bg-black flex items-center justify-center">
+              
+              <!-- Live Video Stream -->
+              <video id="guidedVideo" class="w-full h-full object-cover scale-x-[-1]" autoplay playsinline muted></video>
+              <canvas id="guidedCanvas" class="hidden"></canvas>
+
+              <!-- Shutter Flash Effect Overlay -->
+              <div id="shutterFlash" class="shutter-flash-overlay"></div>
+
+              <!-- Guided Face Oval Stencil -->
+              <div id="guidedStencil" class="guided-oval-stencil state-searching flex items-center justify-center">
+                <!-- Inner Crosshair Center Indicator -->
+                <div class="w-3 h-3 rounded-full border border-white/40 bg-white/20 animate-pulse"></div>
+              </div>
+
+              <!-- Guidance Status Badge at Top -->
+              <div class="absolute top-3 inset-x-0 flex justify-center z-30 px-3">
+                <div id="guidanceStatusBadge" class="px-4 py-1.5 rounded-full backdrop-blur-md bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs font-semibold flex items-center gap-2 shadow-lg transition-all duration-300">
+                  <i id="guidanceStatusIcon" data-lucide="scan" class="w-4 h-4"></i>
+                  <span id="guidanceStatusText">Position face inside oval</span>
+                </div>
+              </div>
+
+              <!-- Auto-Capture Progress Ring & Countdown (Top Right) -->
+              <div class="absolute top-3 right-3 z-30 flex items-center justify-center w-10 h-10">
+                <svg class="w-10 h-10">
+                  <circle cx="20" cy="20" r="16" stroke="rgba(255,255,255,0.2)" stroke-width="3" fill="transparent" />
+                  <circle id="autoCaptureRing" class="progress-ring-circle" cx="20" cy="20" r="16" stroke="#10b981" stroke-width="3" fill="transparent" stroke-dasharray="100.5" stroke-dashoffset="100.5" />
+                </svg>
+                <span id="autoCaptureCountdownText" class="absolute text-[10px] font-bold text-white"></span>
+              </div>
+
+              <!-- Bottom Controls inside video frame -->
+              <div class="absolute bottom-3 inset-x-3 flex items-center justify-between z-30 gap-2">
+                <!-- Auto-Capture Toggle -->
+                <label class="flex items-center gap-2 cursor-pointer bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 text-xs text-gray-300 hover:bg-black/80 transition-all">
+                  <input type="checkbox" id="autoCaptureToggle" checked class="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-0 cursor-pointer" />
+                  <span>Auto-Capture</span>
+                </label>
+
+                <!-- Camera Select Dropdown -->
+                <select id="cameraSelect" class="hidden bg-black/60 backdrop-blur-md px-2 py-1.5 rounded-lg border border-white/10 text-[11px] text-gray-300 outline-none max-w-[120px] truncate"></select>
+
+                <!-- Manual Snap Button -->
+                <button type="button" id="manualSnapBtn" class="btn-primary-glass px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-md">
+                  <i data-lucide="camera" class="w-3.5 h-3.5"></i> Snap Photo
+                </button>
+              </div>
+            </div>
+
+            <!-- Captured Preview Card (Hidden until photo taken) -->
+            <div id="capturedPreview" class="hidden p-4 bg-white/5 rounded-2xl border border-emerald-500/30 flex flex-col items-center gap-3">
+              <div class="relative w-full max-w-xs rounded-xl overflow-hidden border border-emerald-500/40 shadow-xl">
+                <img id="capturedImg" src="" alt="Captured Photo" class="w-full h-56 object-cover" />
+                <div class="absolute top-2 right-2 px-2.5 py-1 bg-emerald-500 text-white rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-md">
+                  <i data-lucide="check-circle" class="w-3 h-3"></i> Guidelines Verified
+                </div>
+              </div>
+
+              <div class="flex items-center gap-3 w-full max-w-xs">
+                <button type="button" id="retakeBtn" class="flex-1 btn-secondary-glass py-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5">
+                  <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Retake Photo
+                </button>
+              </div>
+            </div>
+
+            <!-- Guidelines Info Box -->
+            <div class="p-3.5 rounded-xl bg-blue-500/5 border border-blue-500/20 text-xs text-gray-400">
+              <span class="font-bold text-blue-400 flex items-center gap-1 mb-1">
+                <i data-lucide="info" class="w-3.5 h-3.5"></i> Auto-Capture Guidelines:
+              </span>
+              <ul class="list-disc list-inside space-y-1 text-[11px]">
+                <li>Fit your face inside the target oval frame.</li>
+                <li>Ensure single face & good lighting.</li>
+                <li>Hold still for 1 second — system auto-snaps!</li>
               </ul>
+            </div>
           </div>
 
-          <div class="space-y-2">
-            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider">Upload Profile Photo</label>
-            <input type="file" name="photo" accept="image/*" required 
-                   class="input-dark-glass w-full rounded-lg px-4 py-2 file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600/20 file:text-blue-400 hover:file:bg-blue-600/30 file:cursor-pointer cursor-pointer text-sm" 
-                   onchange="previewImage(event)">
+          <!-- Section B: Traditional File Upload Container (Hidden by default or toggled) -->
+          <div id="fileUploadSection" class="hidden space-y-3">
+            <div class="space-y-2">
+              <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider">Upload Profile Photo / Snap with Mobile Camera</label>
+              <input type="file" name="photo" accept="image/*" capture="user"
+                     class="input-dark-glass w-full rounded-lg px-4 py-2 file:mr-4 file:py-1 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600/20 file:text-blue-400 hover:file:bg-blue-600/30 file:cursor-pointer cursor-pointer text-sm" 
+                     onchange="previewImage(event)">
+            </div>
+
+            <div class="text-center p-4 bg-white/5 rounded-xl border border-dashed border-white/10 flex flex-col justify-center items-center min-h-[200px]">
+              <img id="imagePreview" src="" alt="Preview" class="max-w-xs max-h-48 rounded-lg shadow-xl hidden border border-white/10 object-cover" />
+              <p id="previewText" class="text-xs text-gray-500 my-2">Photo preview will appear here.</p>
+            </div>
           </div>
 
-          <div class="text-center p-4 bg-white/5 rounded-xl border border-dashed border-white/10 flex flex-col justify-center items-center min-h-[200px]">
-            <img id="imagePreview" src="" alt="Preview" class="max-w-xs max-h-48 rounded-lg shadow-xl hidden border border-white/10 object-cover" />
-            <p id="previewText" class="text-xs text-gray-500 my-2">Photo preview will appear here.</p>
-          </div>
         </div>
 
         <!-- Right Column: Student Metadata Form -->
@@ -194,11 +303,16 @@
     </div>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+  <script src="{{ url_for('static', filename='js/guided-camera.js') }}"></script>
   <script>
     lucide.createIcons();
 
-    // Fetch dynamic academic options on load
+    let guidedCam = null;
+
+    // Fetch dynamic academic options & initialize Guided Camera on load
     document.addEventListener("DOMContentLoaded", async function() {
+      // 1. Fetch Academic Options
       try {
         const res = await fetch('/api/academic_options');
         const data = await res.json();
@@ -214,6 +328,42 @@
         });
       } catch (e) {
         console.error("Error loading academic options:", e);
+      }
+
+      // 2. Initialize Guided Camera System
+      if (window.GuidedCameraEngine) {
+        guidedCam = new window.GuidedCameraEngine();
+        guidedCam.startCamera();
+      }
+
+      // 3. Tab Switching Logic
+      const tabLiveCam = document.getElementById('tabLiveCam');
+      const tabFileUpload = document.getElementById('tabFileUpload');
+      const guidedCamSection = document.getElementById('guidedCamSection');
+      const fileUploadSection = document.getElementById('fileUploadSection');
+
+      if (tabLiveCam && tabFileUpload) {
+        tabLiveCam.addEventListener('click', () => {
+          tabLiveCam.className = "flex-1 py-2 rounded-lg bg-blue-600 text-white flex items-center justify-center gap-1.5 shadow-md transition-all";
+          tabFileUpload.className = "flex-1 py-2 rounded-lg text-gray-400 hover:text-white flex items-center justify-center gap-1.5 transition-all";
+          guidedCamSection.classList.remove('hidden');
+          fileUploadSection.classList.add('hidden');
+
+          if (guidedCam && !guidedCam.stream && !guidedCam.isCaptured) {
+            guidedCam.startCamera();
+          }
+        });
+
+        tabFileUpload.addEventListener('click', () => {
+          tabFileUpload.className = "flex-1 py-2 rounded-lg bg-blue-600 text-white flex items-center justify-center gap-1.5 shadow-md transition-all";
+          tabLiveCam.className = "flex-1 py-2 rounded-lg text-gray-400 hover:text-white flex items-center justify-center gap-1.5 transition-all";
+          fileUploadSection.classList.remove('hidden');
+          guidedCamSection.classList.add('hidden');
+
+          if (guidedCam) {
+            guidedCam.stopCamera();
+          }
+        });
       }
     });
 
@@ -240,6 +390,12 @@
       const form = e.target;
       const formData = new FormData(form);
 
+      const photoFile = formData.get('photo');
+      if (!photoFile || photoFile.size === 0) {
+        showMessage("Please snap a photo using the Guided Camera or upload an image file first.", false);
+        return;
+      }
+
       try {
         const response = await fetch("/submit_student", {
           method: "POST",
@@ -261,11 +417,14 @@
             document.getElementById('imagePreview').classList.add('hidden');
             document.getElementById('imagePreview').src = '';
             document.getElementById('previewText').classList.remove('hidden');
+            if (guidedCam) {
+              guidedCam.resetToLiveStream();
+            }
           }
         } else {
           const text = await response.text();
           const isSuccess = response.ok && !text.toLowerCase().includes("duplicate") && !text.toLowerCase().includes("error");
-          showMessage(isSuccess ? "Student profile successfully created!" : "Registration failed. Please check form details.", isSuccess);
+          showMessage(isSuccess ? "Student profile successfully created and model updated!" : "Registration failed. Please check form details.", isSuccess);
         }
       } catch (err) {
         console.error("Submission error:", err);
