@@ -240,19 +240,37 @@
       const form = e.target;
       const formData = new FormData(form);
 
-      const response = await fetch("/submit_student", {
-        method: "POST",
-        body: formData
-      });
+      try {
+        const response = await fetch("/submit_student", {
+          method: "POST",
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+          body: formData
+        });
 
-      const text = await response.text();
-      showMessage(text.includes("success") ? "Student profile successfully created and model updated!" : text, text.includes("success"));
-      
-      if (text.includes("success")) form.reset();
-      // Reset preview after form reset
-      document.getElementById('imagePreview').classList.add('hidden');
-      document.getElementById('imagePreview').src = '';
-      document.getElementById('previewText').classList.remove('hidden');
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (err) {
+          data = null;
+        }
+
+        if (data && typeof data.success === 'boolean') {
+          showMessage(data.success ? data.message : (data.error || "Registration failed"), data.success);
+          if (data.success) {
+            form.reset();
+            document.getElementById('imagePreview').classList.add('hidden');
+            document.getElementById('imagePreview').src = '';
+            document.getElementById('previewText').classList.remove('hidden');
+          }
+        } else {
+          const text = await response.text();
+          const isSuccess = response.ok && !text.toLowerCase().includes("duplicate") && !text.toLowerCase().includes("error");
+          showMessage(isSuccess ? "Student profile successfully created!" : "Registration failed. Please check form details.", isSuccess);
+        }
+      } catch (err) {
+        console.error("Submission error:", err);
+        showMessage("Network error while submitting registration form.", false);
+      }
     });
 
     function showMessage(msg, success) {

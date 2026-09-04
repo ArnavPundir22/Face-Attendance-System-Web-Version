@@ -40,6 +40,21 @@ def add_student():
 @students_bp.route('/submit_student', methods=['POST'])
 def submit_student():
     """Save a new student record and encode their face embedding."""
+    from flask import jsonify
+
+    def _respond(status: str, message: str, http_code: int = 400):
+        is_ajax = (
+            request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+            or 'application/json' in request.headers.get('Accept', '')
+            or request.is_json
+        )
+        if is_ajax:
+            if status == 'success':
+                return jsonify({"success": True, "message": message}), 200
+            else:
+                return jsonify({"success": False, "error": message}), http_code
+        return redirect(url_for('students.add_student', status=status, message=message))
+
     name       = request.form.get('name', '').strip()
     student_id = request.form.get('id', '').strip()
     program    = request.form.get('program', '').strip()
@@ -50,33 +65,40 @@ def submit_student():
     photo           = request.files.get('photo')
 
     if not name or not student_id or not photo:
-        return redirect(url_for(
-            'students.add_student', status='error',
-            message='Name, ID and Photo are required',
-        ))
+        return _respond('error', 'Name, Student ID, and Photo are required fields.', 400)
 
-    # Check for existing student
+    # Check for existing student by ID
     try:
-        # Check by exact ID only to allow same-name students
-        existing = supabase_admin.table('students').select('id').eq('id', student_id).execute()
+        existing = supabase_admin.table('students').select('id, name').eq('id', student_id).execute()
         if existing.data:
-            return redirect(url_for(
-                'students.add_student', status='error',
-                message='Duplicate Student ID found',
-            ))
+            existing_name = existing.data[0].get('name', 'another student')
+            return _respond(
+                'error',
+                f'Student ID "{student_id}" is already registered in the system (assigned to {existing_name}).',
+                409
+            )
     except Exception as e:
-        return redirect(url_for(
-            'students.add_student', status='error',
-            message='Error checking existing students',
-        ))
+        return _respond('error', f'Error checking database for existing student: {e}', 500)
 
-    # Save photo to known_faces/ — use secure_filename of the student_id to prevent path traversal and name collisions.
+    # Check for existing student by email if provided
+    if gmail:
+        try:
+            existing_email = supabase_admin.table('students').select('id, name, gmail').eq('gmail', gmail).execute()
+            if existing_email.data:
+                existing_id = existing_email.data[0].get('id')
+                return _respond(
+                    'error',
+                    f'Email address "{gmail}" is already registered to Student ID "{existing_id}".',
+                    409
+                )
+        except Exception:
+            pass
+
+    # Save photo to known_faces/ — use secure_filename of the student_id
     safe_id = secure_filename(student_id)
     if not safe_id:
-        return redirect(url_for(
-            'students.add_student', status='error',
-            message='Student ID contains invalid characters',
-        ))
+        return _respond('error', 'Student ID contains invalid characters.', 400)
+    
     filename = f"{safe_id}.jpg"
     os.makedirs(config.KNOWN_FACES_DIR, exist_ok=True)
     filepath = os.path.join(config.KNOWN_FACES_DIR, filename)
@@ -85,27 +107,18 @@ def submit_student():
     # Encode the new face first
     image = cv2.imread(filepath)
     if image is None:
-        return redirect(url_for(
-            'students.add_student', status='error',
-            message='Saved image could not be read',
-        ))
+        return _respond('error', 'Saved photo image could not be read.', 400)
 
     faces = model.get(image)
     if not faces:
-        return redirect(url_for(
-            'students.add_student', status='error',
-            message='No face detected in uploaded image',
-        ))
+        return _respond('error', 'No face detected in uploaded photo. Please ensure clear lighting and position face towards camera.', 400)
 
     face = faces[0]
     new_emb = np.array(face.embedding, dtype=np.float32)
     normalized_emb = normalize_embedding(new_emb)
     
     if normalized_emb is None:
-        return redirect(url_for(
-            'students.add_student', status='error',
-            message='Generated embedding is invalid',
-        ))
+        return _respond('error', 'Generated face embedding is invalid or corrupted.', 400)
 
     # Persist student record and embedding in Supabase
     try:
@@ -135,14 +148,6 @@ def submit_student():
             academic_year=academic_year
         )
     except Exception as e:
-        return redirect(url_for(
-            'students.add_student', status='error',
-            message='Database error while adding student',
-        ))
+        return _respond('error', f'Database insertion error: {e}', 500)
 
-
-
-    return redirect(url_for(
-        'students.add_student', status='success',
-        message=f'{name} added successfully with 1 encoding',
-    ))
+    return _respond('success', f'Student profile for "{name}" (ID: {student_id}) successfully registered!', 200)
