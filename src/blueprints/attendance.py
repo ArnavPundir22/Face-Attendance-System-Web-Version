@@ -31,7 +31,21 @@ def extract_student_year(student_dict: dict):
     if not student_dict:
         return None
     
-    # 1. Derive from student ID prefix (e.g. Cu240251013 -> 2024, CU26250073 / Ci26250070 -> 2026)
+    # 1. Check explicit enrollment_year column first
+    ey = student_dict.get('enrollment_year')
+    if ey is not None and str(ey).strip().isdigit():
+        val = int(str(ey).strip())
+        if 1900 <= val <= 2100:
+            return val
+
+    # 2. Check academic_year column
+    ay = student_dict.get('academic_year')
+    if ay:
+        match = re.search(r'\b(20\d{2})\b', str(ay))
+        if match:
+            return int(match.group(1))
+
+    # 3. Derive from student ID prefix (e.g. CU240251013 -> 2024, CU26250073 -> 2026)
     sid = str(student_dict.get('id', '')).strip()
     if sid:
         match = re.match(r'(?i)^(?:cu|ci)?(\d{2})', sid)
@@ -40,20 +54,6 @@ def extract_student_year(student_dict: dict):
             val = int(two_digit)
             if 15 <= val <= 35:
                 return int(f"20{two_digit}")
-
-    # 2. Check enrollment_year column
-    ey = student_dict.get('enrollment_year')
-    if ey is not None and str(ey).strip().isdigit():
-        val = int(str(ey).strip())
-        if 1900 <= val <= 2100:
-            return val
-
-    # 3. Check academic_year column
-    ay = student_dict.get('academic_year')
-    if ay:
-        match = re.search(r'\b(20\d{2})\b', str(ay))
-        if match:
-            return int(match.group(1))
 
     return None
 
@@ -416,6 +416,9 @@ def upload_photo():
             import logging
             logging.getLogger(__name__).error("Error in class auto-detection: %s", e)
 
+    # Read attendance mode (Combined Class vs Separate Class)
+    is_combined_class = request.form.get('is_combined_class', 'false').lower() == 'true'
+
     # Fallback to form field inputs if not auto-detected or if explicit form selection provided
     form_prog = request.form.get('program', '').strip()
     form_bran = request.form.get('branch', '').strip()
@@ -428,40 +431,102 @@ def upload_photo():
     if form_year and str(form_year).strip().isdigit() and str(form_year).strip() != 'Auto-Detect':
         detected_year = int(str(form_year).strip())
 
-    if detected_program and detected_branch:
-        try:
-            students_resp = supabase_admin.table('students').select('*').ilike('program', detected_program).ilike('branch', detected_branch).execute()
-            raw_students = students_resp.data or []
-            
-            # If detected_year is still None, derive the most common batch year among raw_students for that program & branch
-            if detected_year is None and raw_students:
-                years_in_raw = [extract_student_year(s) for s in raw_students if extract_student_year(s) is not None]
-                if years_in_raw:
-                    from collections import Counter
-                    detected_year = Counter(years_in_raw).most_common(1)[0][0]
+    if is_combined_class:
+        # ── COMBINED CLASS MODE ────────────────────────────────────────────────
+        # Fetch rosters for ALL program & branch combinations represented among recognized students
+        combined_students = []
+        represented_pbs = set()
+        represented_years = set()
 
-            # ALWAYS strictly filter by detected_year so students of different batch years are NEVER mixed together
-            if detected_year is not None:
-                all_students = [s for s in raw_students if extract_student_year(s) == detected_year]
-            else:
-                all_students = raw_students
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).error("Error fetching students for detected class: %s", e)
+        for s in rec_students:
+            p = s.get('program')
+            b = s.get('branch')
+            y = extract_student_year(s)
+            if p and b:
+                represented_pbs.add((p.strip(), b.strip()))
+            if y is not None:
+                represented_years.add(y)
 
-    # Fallback: If class query yielded no results but we recognized student(s), use recognized list
-    if not all_students and rec_students:
-        all_students = rec_students
+        if represented_pbs:
+            for p, b in represented_pbs:
+                try:
+                    resp = supabase_admin.table('students').select('*').ilike('program', p).ilike('branch', b).execute()
+                    raw = resp.data or []
+                    if represented_years:
+                        filtered_raw = [s for s in raw if extract_student_year(s) in represented_years]
+                    else:
+                        filtered_raw = raw
+                    combined_students.extend(filtered_raw if filtered_raw else raw)
+                except Exception as e:
+                    import logging
+                    logging.getLogger(__name__).error("Error fetching roster for combined class (%s, %s): %s", p, b, e)
 
-    # CRITICAL FIX: Ensure ALL recognized students are ALWAYS included in all_students so their Present mark is never lost
-    existing_student_ids = {str(s.get('id')).strip().upper() for s in all_students if s.get('id')}
-    for rs in rec_students:
-        rs_id = str(rs.get('id')).strip().upper() if rs.get('id') else None
-        if rs_id and rs_id not in existing_student_ids:
-            all_students.append(rs)
-            existing_student_ids.add(rs_id)
+        # Remove duplicate students by ID
+        unique_combined = []
+        seen_ids = set()
+        for s in combined_students:
+            sid = str(s.get('id')).strip().upper() if s.get('id') else None
+            if sid and sid not in seen_ids:
+                seen_ids.add(sid)
+                unique_combined.append(s)
 
-    # Prepare bulk attendance records for ALL registered students in the auto-detected program & branch & batch year
+        all_students = unique_combined
+        if not all_students and rec_students:
+            all_students = rec_students
+
+        distinct_branches = sorted(list({s.get('branch') for s in all_students if s.get('branch')}))
+        detected_program = "Combined Class"
+        detected_branch  = ", ".join(distinct_branches) if distinct_branches else "Multi-Branch"
+        detected_year    = "Combined"
+    else:
+        # ── SEPARATE CLASS MODE (Single Group Focus) ─────────────────────────
+        if detected_program and detected_branch:
+            try:
+                students_resp = supabase_admin.table('students').select('*').ilike('program', detected_program).ilike('branch', detected_branch).execute()
+                raw_students = students_resp.data or []
+                
+                # If detected_year is still None, derive the most common batch year among raw_students for that program & branch
+                if detected_year is None and raw_students:
+                    years_in_raw = [extract_student_year(s) for s in raw_students if extract_student_year(s) is not None]
+                    if years_in_raw:
+                        from collections import Counter
+                        detected_year = Counter(years_in_raw).most_common(1)[0][0]
+
+                # ALWAYS strictly filter by detected_year so students of different batch years are NEVER mixed together
+                if detected_year is not None:
+                    all_students = [s for s in raw_students if extract_student_year(s) == detected_year]
+                else:
+                    all_students = raw_students
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error("Error fetching students for detected class: %s", e)
+
+        # Fallback: If class query yielded no results but we recognized student(s), use recognized list
+        if not all_students and rec_students:
+            all_students = rec_students
+
+    if is_combined_class:
+        # In Combined Class Mode, ensure all recognized students are present in all_students
+        existing_student_ids = {str(s.get('id')).strip().upper() for s in all_students if s.get('id')}
+        for rs in rec_students:
+            rs_id = str(rs.get('id')).strip().upper() if rs.get('id') else None
+            if rs_id and rs_id not in existing_student_ids:
+                all_students.append(rs)
+                existing_student_ids.add(rs_id)
+    else:
+        # In Separate Class Mode, strictly enforce class boundary filtering
+        # Ensure only students matching the target program, branch, and batch year are included
+        if detected_program and detected_branch and detected_year is not None:
+            filtered_target = []
+            for s in all_students:
+                prog_match = str(s.get('program', '')).strip().upper() == str(detected_program).strip().upper()
+                bran_match = str(s.get('branch', '')).strip().upper() == str(detected_branch).strip().upper()
+                year_match = extract_student_year(s) == detected_year
+                if prog_match and bran_match and year_match:
+                    filtered_target.append(s)
+            all_students = filtered_target
+
+    # Prepare bulk attendance records for ALL registered students in the detected class / combined rosters
     attendance_records = []
     session_attend = []
 
@@ -503,7 +568,8 @@ def upload_photo():
         "session_attendance": session_attend,
         "detected_program": detected_program,
         "detected_branch": detected_branch,
-        "detected_year": detected_year
+        "detected_year": detected_year,
+        "is_combined_class": is_combined_class
     })
 
 
