@@ -127,9 +127,17 @@ def create_app() -> Flask:
     # ------------------------------------------------------------------
 
     @app.before_request
-    def require_login():
-        """Redirect unauthenticated requests to /login, except public paths."""
+    def configure_cookies_and_require_login():
+        """Configure session cookie security for ngrok/HTTPS and check auth."""
         from flask import request
+
+        is_https = request.is_secure or request.headers.get("X-Forwarded-Proto") == "https"
+        if is_https:
+            app.config['SESSION_COOKIE_SECURE'] = True
+            app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+        else:
+            app.config['SESSION_COOKIE_SECURE'] = False
+            app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
         public_paths = {"/login", "/favicon.ico", "/healthz", "/auth/callback"}
         if (
