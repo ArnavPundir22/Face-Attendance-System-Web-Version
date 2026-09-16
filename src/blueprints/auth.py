@@ -153,17 +153,8 @@ def callback():
             user = res.user
             metadata = user.user_metadata or {}
 
-            # If 'username' is absent in metadata, this user was NOT pre-registered by admin.
-            # Admin always sets 'username' in metadata via /register. Delete & block.
-            if 'username' not in metadata:
-                try:
-                    supabase_admin.auth.admin.delete_user(user.id)
-                except Exception:
-                    pass
-                return redirect(url_for('auth.login', error="Access denied. Your account is not registered in this system."))
-
             is_admin = metadata.get('is_admin', False)
-            username = metadata.get('username', user.email.split('@')[0])
+            username = metadata.get('username') or metadata.get('full_name') or user.email.split('@')[0]
 
             session['logged_in'] = True
             session['username'] = username

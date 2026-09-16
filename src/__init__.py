@@ -58,6 +58,8 @@ def create_app() -> Flask:
             "and add it to your .env file."
         )
     app.secret_key = secret_key
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
 
     # ------------------------------------------------------------------
     # Register blueprints
