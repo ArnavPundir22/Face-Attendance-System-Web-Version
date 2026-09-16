@@ -17,7 +17,7 @@ if %errorlevel% neq 0 (
     pip install waitress
 )
 
-echo Starting BioSecure AI server with Waitress (8 Threads, Dual Xeon Optimized) on http://0.0.0.0:8080 ...
-waitress-serve --host=0.0.0.0 --port=8080 --threads=8 --channel-timeout=120 app:app
+echo Starting BioSecure AI server with Waitress (16 Threads, High-Performance Multi-Core Optimized) on http://0.0.0.0:8080 ...
+waitress-serve --host=0.0.0.0 --port=8080 --threads=16 --channel-timeout=120 app:app
 pause
 
