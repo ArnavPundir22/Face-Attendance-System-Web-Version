@@ -28,6 +28,25 @@ REATTENDANCE_INTERVAL_MINUTES=10
 
 ---
 
+## 🔑 Supabase Auth Redirect URL Configuration
+
+To ensure OAuth / Magic link / Session callback redirects work when running on Windows (Port `8066`), configure the allowed redirect URLs in your Supabase Dashboard:
+
+1. Log in to [Supabase Dashboard](https://supabase.com/dashboard) and select your project.
+2. Navigate to **Authentication** -> **URL Configuration**.
+3. Set **Site URL** to:
+   ```text
+   http://localhost:8066
+   ```
+4. Under **Redirect URLs**, click **Add URL** and add:
+   - `http://localhost:8066/*`
+   - `http://localhost:8066/callback`
+   - `http://127.0.0.1:8066/*`
+   - `http://127.0.0.1:8066/callback`
+   - `https://*.trycloudflare.com/*` *(if using Cloudflare Tunnel for camera access)*
+
+---
+
 ## 🔒 Database Security & RLS Configuration
 
 To prevent unauthorized public access to student biometric embeddings and PII, ensure Row Level Security (RLS) is enabled on your Supabase project (`avznrudspncnjbqersyg`):
