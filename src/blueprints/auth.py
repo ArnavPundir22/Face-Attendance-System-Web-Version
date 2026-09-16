@@ -123,6 +123,8 @@ def oauth_login(provider):
     # Maps 'linkedin' to 'linkedin_oidc' if needed by Supabase
     prov = 'linkedin_oidc' if provider == 'linkedin' else provider
     redirect_url = url_for('auth.callback', _external=True)
+    if (request.is_secure or request.headers.get("X-Forwarded-Proto") == "https" or "ngrok" in request.host) and redirect_url.startswith("http://"):
+        redirect_url = "https://" + redirect_url[7:]
     try:
         res = supabase.auth.sign_in_with_oauth({
             "provider": prov,
