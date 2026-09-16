@@ -10,6 +10,7 @@ Blueprint layout:
 
 from __future__ import annotations
 
+from datetime import timedelta
 import logging
 import os
 
@@ -58,6 +59,7 @@ def create_app() -> Flask:
             "and add it to your .env file."
         )
     app.secret_key = secret_key
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['SESSION_COOKIE_HTTPONLY'] = True
 
