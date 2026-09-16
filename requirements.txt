@@ -1,6 +1,7 @@
 # Core web framework & server
 Flask>=3.1.0
 gunicorn>=23.0.0
+waitress>=3.0.0
 Werkzeug>=3.1.0
 
 # Environment & config

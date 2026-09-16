@@ -90,8 +90,15 @@ DRIFT_ALERT_THRESHOLD=0.35      # ALERT state cutoff (Triggers Re-Enroll Prompt)
    ```bash
    git clone https://github.com/ArnavPundir22/Face-Attendance-System-Web-Version.git
    cd Face-Attendance-System-Web-Version
+
+   # On Linux / macOS:
    python3 -m venv .venv && source .venv/bin/activate
    pip install -r requirements.txt
+
+   # On Windows (PowerShell / Command Prompt):
+   python -m venv .venv
+   .venv\Scripts\activate
+   pip install -r requirements-windows.txt
    ```
 
 2. **Set Up Environment Variables:**
