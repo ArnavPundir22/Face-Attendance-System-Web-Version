@@ -13,8 +13,8 @@ if not exist cloudflared.exe (
     exit /b
 )
 
-echo Starting Cloudflare HTTPS Tunnel for http://localhost:5000 ...
+echo Starting Cloudflare HTTPS Tunnel for http://localhost:8066 ...
 echo Share the generated https://*.trycloudflare.com link with remote users for camera access!
 echo.
-cloudflared.exe tunnel --url http://localhost:5000
+cloudflared.exe tunnel --url http://localhost:8066
 pause
