@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # InsightFace model (loaded once at import time)
 # ---------------------------------------------------------------------------
+model = insightface.app.FaceAnalysis(name='buffalo_l')
+
 try:
     model.prepare(ctx_id=config.INSIGHTFACE_CTX_ID)
     logger.info(f"InsightFace model initialized with ctx_id={config.INSIGHTFACE_CTX_ID}")
