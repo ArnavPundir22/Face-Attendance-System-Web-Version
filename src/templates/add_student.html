@@ -136,6 +136,54 @@
 
       <div id="messageBox" class="hidden p-4 mb-6 rounded-lg font-medium text-center shadow-md"></div>
 
+      <!-- Student ID Card OCR Auto-Fill Panel (Clean File Upload Only) -->
+      <div class="mb-8 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-900/30 via-indigo-900/20 to-purple-900/30 border border-blue-500/30 shadow-xl relative overflow-hidden">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400">
+            <i data-lucide="scan-line" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              Auto-Fill Entries from Student ID Card
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Pretrained Neural OCR</span>
+            </h3>
+            <p class="text-xs text-gray-400">Upload photo of student ID card to automatically populate form entries.</p>
+          </div>
+        </div>
+
+        <div class="space-y-4 pt-2">
+          <!-- Main Upload File Input -->
+          <div class="space-y-2">
+            <input type="file" id="idCardFileInput" accept="image/*" class="input-dark-glass w-full rounded-xl px-4 py-2.5 file:mr-4 file:py-1.5 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600/20 file:text-blue-400 hover:file:bg-blue-600/30 cursor-pointer text-sm">
+          </div>
+
+          <!-- Image Preview & Extraction Trigger -->
+          <div id="idImagePreviewBox" class="hidden text-center p-4 bg-white/5 rounded-xl border border-white/10 space-y-3">
+            <img id="idImagePreview" src="" alt="ID Preview" class="max-h-56 mx-auto rounded-xl shadow-lg border border-white/10 object-contain" />
+            <button type="button" id="processUploadedIdBtn" class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs inline-flex items-center justify-center gap-2 shadow-lg transition-all hover:shadow-emerald-500/25">
+              <i data-lucide="cpu" class="w-4 h-4"></i> Extract Details & Auto-Fill Form
+            </button>
+          </div>
+
+          <!-- Scan Progress Status Bar -->
+          <div id="idScanStatusBox" class="hidden p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300 flex items-center gap-3">
+            <div class="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+            <span id="idScanStatusText">Running Pretrained Neural OCR...</span>
+          </div>
+
+          <!-- Raw OCR Text Collapsible Accordion -->
+          <div id="rawOcrAccordion" class="hidden p-3 rounded-xl bg-black/40 border border-white/10 text-xs">
+            <div class="flex items-center justify-between cursor-pointer" id="toggleRawOcrHeader">
+              <span class="font-semibold text-gray-300 flex items-center gap-1.5">
+                <i data-lucide="file-text" class="w-3.5 h-3.5 text-blue-400"></i> Raw Extracted OCR Text
+              </span>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
+            </div>
+            <pre id="rawOcrContent" class="hidden mt-2 p-2 bg-black/60 rounded border border-white/5 text-[11px] text-gray-400 overflow-x-auto whitespace-pre-wrap max-h-36"></pre>
+          </div>
+        </div>
+      </div>
+
       <form id="studentForm" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-8">
         
         <!-- Left Column: Photo upload & Guided Camera -->
@@ -304,11 +352,14 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   <script src="{{ url_for('static', filename='js/guided-camera.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/id-scanner.js') }}"></script>
   <script>
     lucide.createIcons();
 
     let guidedCam = null;
+    let idScanner = null;
 
     // Fetch dynamic academic options & initialize Guided Camera on load
     document.addEventListener("DOMContentLoaded", async function() {
@@ -336,7 +387,7 @@
         guidedCam.startCamera();
       }
 
-      // 3. Tab Switching Logic
+      // 3. Tab Switching Logic for Guided Face Cam vs File Upload
       const tabLiveCam = document.getElementById('tabLiveCam');
       const tabFileUpload = document.getElementById('tabFileUpload');
       const guidedCamSection = document.getElementById('guidedCamSection');
@@ -365,7 +416,163 @@
           }
         });
       }
+
+      // 4. Initialize ID Card Scanner Controls (File Upload & Pretrained Neural OCR)
+      const idCardFileInput = document.getElementById('idCardFileInput');
+      const idImagePreviewBox = document.getElementById('idImagePreviewBox');
+      const idImagePreview = document.getElementById('idImagePreview');
+      const processUploadedIdBtn = document.getElementById('processUploadedIdBtn');
+      const idScanStatusBox = document.getElementById('idScanStatusBox');
+      const idScanStatusText = document.getElementById('idScanStatusText');
+      const rawOcrAccordion = document.getElementById('rawOcrAccordion');
+      const rawOcrContent = document.getElementById('rawOcrContent');
+      const toggleRawOcrHeader = document.getElementById('toggleRawOcrHeader');
+
+      const runScanProcess = async (imageSrc) => {
+        if (!idScanner && window.IDCardScanner) {
+          idScanner = new window.IDCardScanner();
+        }
+        if (!idScanner) return;
+
+        idScanStatusBox.classList.remove('hidden');
+        
+        const updateStatus = (msg, percent) => {
+          idScanStatusText.textContent = `${msg} (${percent}%)`;
+        };
+
+        try {
+          const result = await idScanner.scanImageSource(imageSrc, updateStatus);
+          idScanStatusBox.classList.add('hidden');
+
+          if (result.raw_text) {
+            rawOcrContent.textContent = result.raw_text;
+            rawOcrAccordion.classList.remove('hidden');
+          }
+
+          const filledFields = [];
+          if (result.parsed) {
+            if (result.parsed.name) filledFields.push('Name');
+            if (result.parsed.id) filledFields.push('Student ID');
+            if (result.parsed.program) filledFields.push('Program');
+            if (result.parsed.branch) filledFields.push('Branch');
+            if (result.parsed.enrollment_year) filledFields.push('Year');
+          }
+
+          if (filledFields.length > 0) {
+            populateFormFromOCR(result.parsed);
+            showMessage(`Student ID card scanned! Extracted (${filledFields.join(', ')}).`, true);
+          } else {
+            rawOcrContent.classList.remove('hidden');
+            showMessage("OCR complete, but could not detect specific fields automatically. Check Raw Extracted OCR Text below.", false);
+          }
+        } catch (err) {
+          console.error("Scan process error:", err);
+          idScanStatusBox.classList.add('hidden');
+          showMessage("Failed to scan ID card image.", false);
+        }
+      };
+
+      if (idCardFileInput) {
+        idCardFileInput.addEventListener('change', (e) => {
+          const file = e.target.files[0];
+          if (file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+              idImagePreview.src = reader.result;
+              idImagePreviewBox.classList.remove('hidden');
+              runScanProcess(reader.result);
+            };
+            reader.readAsDataURL(file);
+          }
+        });
+      }
+
+      if (processUploadedIdBtn) {
+        processUploadedIdBtn.addEventListener('click', () => {
+          if (idImagePreview.src) {
+            runScanProcess(idImagePreview.src);
+          }
+        });
+      }
+
+      if (toggleRawOcrHeader) {
+        toggleRawOcrHeader.addEventListener('click', () => {
+          rawOcrContent.classList.toggle('hidden');
+        });
+      }
     });
+
+    function populateFormFromOCR(parsed) {
+      if (parsed.name) {
+        const el = document.querySelector('input[name="name"]');
+        if (el) { el.value = parsed.name; highlightAutoFilledField(el); }
+      }
+      if (parsed.id) {
+        const el = document.querySelector('input[name="id"]');
+        if (el) { el.value = parsed.id; highlightAutoFilledField(el); }
+      }
+      if (parsed.email) {
+        const el = document.querySelector('input[name="email"]');
+        if (el) { el.value = parsed.email; highlightAutoFilledField(el); }
+      }
+      if (parsed.enrollment_year) {
+        const el = document.querySelector('input[name="enrollment_year"]');
+        if (el) { el.value = parsed.enrollment_year; highlightAutoFilledField(el); }
+      }
+
+      if (parsed.program) {
+        const select = document.getElementById('programSelect');
+        if (select) {
+          let found = false;
+          for (let opt of select.options) {
+            if (opt.value && (opt.value.toLowerCase() === parsed.program.toLowerCase() || opt.value.toLowerCase().includes(parsed.program.toLowerCase()))) {
+              select.value = opt.value;
+              found = true;
+              highlightAutoFilledField(select);
+              break;
+            }
+          }
+          if (!found && parsed.program.trim()) {
+            const newOpt = document.createElement('option');
+            newOpt.value = parsed.program.trim();
+            newOpt.text = `${parsed.program.trim()} (New Auto-Added)`;
+            newOpt.selected = true;
+            select.appendChild(newOpt);
+            highlightAutoFilledField(select);
+          }
+        }
+      }
+
+      if (parsed.branch) {
+        const select = document.getElementById('branchSelect');
+        if (select) {
+          let found = false;
+          for (let opt of select.options) {
+            if (opt.value && (opt.value.toLowerCase() === parsed.branch.toLowerCase() || opt.value.toLowerCase().includes(parsed.branch.toLowerCase()))) {
+              select.value = opt.value;
+              found = true;
+              highlightAutoFilledField(select);
+              break;
+            }
+          }
+          if (!found && parsed.branch.trim()) {
+            const newOpt = document.createElement('option');
+            newOpt.value = parsed.branch.trim();
+            newOpt.text = `${parsed.branch.trim()} (New Auto-Added)`;
+            newOpt.selected = true;
+            select.appendChild(newOpt);
+            highlightAutoFilledField(select);
+          }
+        }
+      }
+    }
+
+    function highlightAutoFilledField(elem) {
+      elem.classList.add('ring-2', 'ring-emerald-500', 'border-emerald-500', 'bg-emerald-500/10');
+      setTimeout(() => {
+        elem.classList.remove('ring-2', 'ring-emerald-500', 'border-emerald-500', 'bg-emerald-500/10');
+      }, 5000);
+    }
 
     function previewImage(event) {
       const preview = document.getElementById('imagePreview');
@@ -449,3 +656,4 @@
   <script src="{{ url_for('static', filename='js/offline-detector.js') }}"></script>
 </body>
 </html>
+

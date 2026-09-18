@@ -17,6 +17,12 @@ if %errorlevel% neq 0 (
     pip install waitress
 )
 
+python -c "import rapidocr_onnxruntime" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [INFO] Installing RapidOCR neural engine for ID card OCR...
+    pip install rapidocr_onnxruntime
+)
+
 echo Starting BioSecure AI server with Waitress (16 Threads, High-Performance Multi-Core Optimized) on http://0.0.0.0:8066 ...
 waitress-serve --host=0.0.0.0 --port=8066 --threads=16 --channel-timeout=120 app:app
 pause

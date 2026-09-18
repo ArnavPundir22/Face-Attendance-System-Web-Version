@@ -137,6 +137,23 @@ def submit_student():
 
         supabase_admin.table('students').insert(insert_data).execute()
 
+        # Auto-register new Program & Branch into academic_structure if not present
+        if program:
+            try:
+                ex_p = supabase_admin.table('academic_structure').select('id').eq('type', 'program').eq('value', program).execute()
+                if not ex_p.data:
+                    supabase_admin.table('academic_structure').insert({"type": "program", "value": program}).execute()
+            except Exception:
+                pass
+
+        if branch:
+            try:
+                ex_b = supabase_admin.table('academic_structure').select('id').eq('type', 'branch').eq('value', branch).execute()
+                if not ex_b.data:
+                    supabase_admin.table('academic_structure').insert({"type": "branch", "value": branch}).execute()
+            except Exception:
+                pass
+
         # Update in-memory matrix face cache
         add_student_to_cache(
             student_id=student_id,
@@ -151,3 +168,62 @@ def submit_student():
         return _respond('error', f'Database insertion error: {e}', 500)
 
     return _respond('success', f'Student profile for "{name}" (ID: {student_id}) successfully registered!', 200)
+
+
+@students_bp.route('/api/ocr_id_card', methods=['POST'])
+def api_ocr_id_card():
+    """
+    Process student ID card photo or OCR text payload.
+    Accepts base64 image_data, uploaded id_card_image, or raw_text string.
+    Returns parsed student details (name, id, program, branch, enrollment_year, email).
+    """
+    import base64
+    from flask import jsonify
+    from src.utils.ocr_helpers import perform_python_ocr, parse_student_id_text
+
+    raw_text = ""
+    image_bytes = None
+
+    # 1. Parse JSON payload
+    if request.is_json:
+        req_json = request.get_json() or {}
+        raw_text = req_json.get('raw_text', '').strip()
+        image_data = req_json.get('image_data', '').strip()
+
+        if image_data:
+            try:
+                if ',' in image_data:
+                    image_data = image_data.split(',', 1)[1]
+                image_bytes = base64.b64decode(image_data)
+            except Exception as e:
+                print(f"Base64 image decode error: {e}")
+
+    # 2. Parse Multipart File Upload
+    if not image_bytes and 'id_card_image' in request.files:
+        image_file = request.files['id_card_image']
+        if image_file and image_file.filename:
+            image_bytes = image_file.read()
+
+    # 3. Form data raw_text
+    if not raw_text and request.form.get('raw_text'):
+        raw_text = request.form.get('raw_text', '').strip()
+
+    # 4. Perform Python OCR on image if bytes available
+    python_text = ""
+    if image_bytes:
+        python_text = perform_python_ocr(image_bytes)
+
+    # Combine text from both client Tesseract.js and Python OCR
+    combined_raw_text = "\n".join([t for t in [raw_text, python_text] if t])
+
+    parsed_data = {}
+    if combined_raw_text:
+        parsed_data = parse_student_id_text(combined_raw_text)
+
+    return jsonify({
+        "success": True,
+        "parsed_data": parsed_data,
+        "raw_text": combined_raw_text or "No text recognized. Ensure image has good lighting and legible text."
+    })
+
+

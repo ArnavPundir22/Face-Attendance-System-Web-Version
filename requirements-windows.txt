@@ -56,6 +56,7 @@ numpy>=1.26.0
 pillow>=11.3.0
 pillow-heif>=1.5.0
 albumentations>=2.0.0
+rapidocr_onnxruntime>=1.3.0
 
 # Document Generation & HTTP Utilities
 python-docx>=1.2.0
