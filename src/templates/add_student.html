@@ -166,9 +166,17 @@
           </div>
 
           <!-- Scan Progress Status Bar -->
-          <div id="idScanStatusBox" class="hidden p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300 flex items-center gap-3">
-            <div class="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
-            <span id="idScanStatusText">Running Pretrained Neural OCR...</span>
+          <div id="idScanStatusBox" class="hidden p-4 rounded-xl bg-gradient-to-r from-blue-900/50 via-indigo-900/40 to-purple-900/50 border border-blue-400/40 text-xs text-blue-200 shadow-xl space-y-2">
+            <div class="flex items-center justify-between">
+              <span id="idScanStatusText" class="font-bold flex items-center gap-2 text-white">
+                <i data-lucide="sparkles" class="w-4 h-4 text-emerald-400 animate-spin"></i>
+                ⚡ Neural AI Reading ID Card...
+              </span>
+              <span id="idScanPercentText" class="font-mono text-emerald-300 font-bold text-xs">0%</span>
+            </div>
+            <div class="w-full h-2 bg-black/50 rounded-full overflow-hidden border border-white/10">
+              <div id="idScanProgressBar" class="h-full bg-gradient-to-r from-blue-500 via-indigo-400 to-emerald-400 transition-all duration-300 w-[10%]"></div>
+            </div>
           </div>
 
           <!-- Raw OCR Text Collapsible Accordion -->
@@ -424,6 +432,8 @@
       const processUploadedIdBtn = document.getElementById('processUploadedIdBtn');
       const idScanStatusBox = document.getElementById('idScanStatusBox');
       const idScanStatusText = document.getElementById('idScanStatusText');
+      const idScanPercentText = document.getElementById('idScanPercentText');
+      const idScanProgressBar = document.getElementById('idScanProgressBar');
       const rawOcrAccordion = document.getElementById('rawOcrAccordion');
       const rawOcrContent = document.getElementById('rawOcrContent');
       const toggleRawOcrHeader = document.getElementById('toggleRawOcrHeader');
@@ -435,14 +445,30 @@
         if (!idScanner) return;
 
         idScanStatusBox.classList.remove('hidden');
+        idScanStatusBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         
+        if (idImagePreview) {
+          idImagePreview.classList.add('ring-2', 'ring-blue-500', 'animate-pulse');
+        }
+
         const updateStatus = (msg, percent) => {
-          idScanStatusText.textContent = `${msg} (${percent}%)`;
+          if (idScanStatusText) idScanStatusText.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4 text-emerald-400 inline-block animate-spin"></i> ${msg}`;
+          if (idScanPercentText) idScanPercentText.textContent = `${percent}%`;
+          if (idScanProgressBar) idScanProgressBar.style.width = `${percent}%`;
+          if (window.lucide) lucide.createIcons();
         };
 
         try {
+          updateStatus("⚡ Neural AI Reading ID Card...", 15);
           const result = await idScanner.scanImageSource(imageSrc, updateStatus);
-          idScanStatusBox.classList.add('hidden');
+          
+          if (idImagePreview) {
+            idImagePreview.classList.remove('ring-2', 'ring-blue-500', 'animate-pulse');
+          }
+          
+          setTimeout(() => {
+            idScanStatusBox.classList.add('hidden');
+          }, 1200);
 
           if (result.raw_text) {
             rawOcrContent.textContent = result.raw_text;
@@ -460,13 +486,20 @@
 
           if (filledFields.length > 0) {
             populateFormFromOCR(result.parsed);
-            showMessage(`Student ID card scanned! Extracted (${filledFields.join(', ')}).`, true);
+            showMessage(`⚡ Student ID Card Processed! Extracted (${filledFields.join(', ')}).`, true);
+            
+            // Scroll to Name field so user sees filled form on mobile
+            const nameInput = document.querySelector('input[name="name"]');
+            if (nameInput) {
+              nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
           } else {
             rawOcrContent.classList.remove('hidden');
             showMessage("OCR complete, but could not detect specific fields automatically. Check Raw Extracted OCR Text below.", false);
           }
         } catch (err) {
           console.error("Scan process error:", err);
+          if (idImagePreview) idImagePreview.classList.remove('ring-2', 'ring-blue-500', 'animate-pulse');
           idScanStatusBox.classList.add('hidden');
           showMessage("Failed to scan ID card image.", false);
         }
