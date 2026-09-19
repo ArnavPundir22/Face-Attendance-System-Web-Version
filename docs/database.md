@@ -1,113 +1,155 @@
 # 🗄️ Database & pgvector Guide
 
-BioSecure AI relies on **Supabase (PostgreSQL)** for identity, student records, face embeddings storage, attendance logging, and individual **Biometric Embedding Drift Tracking (2026 Patent Application)**.
+BioSecure AI relies on **Supabase (PostgreSQL)** for identity, student records, 512D ArcFace embeddings storage, attendance logging, academic structures, and individual **Biometric Embedding Drift Tracking (2026 Patent Application)**.
 
 ---
 
-## 📊 Database Schema Layout
+## 📊 Database Entity-Relationship Diagram
 
-Below is the entity-relationship diagram illustrating the schema relations:
+Below is the entity-relationship diagram illustrating the schema relations across all tables:
 
 ```mermaid
 erDiagram
-    profiles ||--o{ student_profiles : registers
-    student_profiles ||--o{ attendance_logs : has
-    student_profiles ||--o{ drift_logs : tracks
-    profiles {
-        uuid id PK
-        varchar email
-        varchar role
+    students ||--o{ attendance : "records"
+    students ||--o{ embedding_health : "tracks drift"
+    academic_structure ||--o{ students : "defines"
+    
+    students {
+        text id PK "Student ID / Roll Number"
+        text name "Full Name"
+        text program "e.g. B.Tech, BCA"
+        text branch "e.g. CSE, IT, ECE"
+        text gmail "Student Email"
+        int enrollment_year "4-Digit Batch Year"
+        text academic_year "Academic Year String"
+        vector embedding "512-dimensional ArcFace Vector"
+        float current_ewma_drift "Running EWMA Drift Score"
+        text drift_alert_level "HEALTHY / WARNING / CRITICAL / ALERT"
+        timestamp created_at "Registration Timestamp"
     }
-    student_profiles {
-        uuid id PK
-        varchar name
-        varchar roll_number
-        vector embedding "512-dimensional"
-        float current_ewma_drift
-        varchar drift_alert_level "HEALTHY / WARNING / CRITICAL / ALERT"
-        timestamp created_at
+
+    attendance {
+        bigint att_id PK "Auto-increment ID"
+        text student_id FK "References students(id)"
+        text name "Student Name"
+        text program "Program Name"
+        text branch "Branch Name"
+        text status "Present / Absent"
+        text timestamp "Formatted YYYY-MM-DD HH:MM:SS"
+        text lecture "Lecture Title / Session Name"
     }
-    attendance_logs {
-        bigint id PK
-        uuid student_id FK
-        timestamp timestamp
-        varchar status "Present / Absent"
+
+    embedding_health {
+        bigint id PK "Auto-increment Log ID"
+        text student_id FK "References students(id)"
+        float drift_score "Instantaneous Drift (1 - Similarity)"
+        float ewma_drift "Calculated EWMA Drift Score"
+        float match_confidence "Cosine Similarity S"
+        text alert_level "HEALTHY / WARNING / CRITICAL / ALERT / POSE_REJECTED"
+        float pose_yaw "3D Yaw Angle (°)"
+        float pose_pitch "3D Pitch Angle (°)"
+        boolean pose_accepted "True if within Pose Gate"
+        timestamp created_at "Event Timestamp"
     }
-    drift_logs {
-        bigint id PK
-        uuid student_id FK
-        timestamp timestamp
-        float instantaneous_drift
-        float ewma_drift
-        float yaw_angle
-        float pitch_angle
-        varchar status "OK / POSE_REJECTED / CRITICAL_SENT / ALERT"
+
+    academic_structure {
+        bigint id PK "Auto-increment ID"
+        text type "program / branch"
+        text value "Academic Value String"
     }
 ```
 
 ---
 
-## 🛠️ PostgreSQL Table Definitions
+## 🛠️ Complete PostgreSQL Schema Statements
 
-Here are the complete SQL schema statements:
+Below are the complete DDL scripts for table initialization, HNSW vector indexing, and foreign key constraints:
 
 ```sql
 -- 1. Enable pgvector extension
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- 2. Create student profiles table with EWMA drift tracking
-CREATE TABLE public.student_profiles (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    roll_number VARCHAR(100) UNIQUE NOT NULL,
-    embedding VECTOR(512),                           -- ArcFace 512D facial embedding
-    current_ewma_drift FLOAT DEFAULT 0.0,            -- Running EWMA drift score (Patent #3)
-    drift_alert_level VARCHAR(50) DEFAULT 'HEALTHY',  -- HEALTHY / WARNING / CRITICAL / ALERT
+-- 2. Create Student Profiles Table
+CREATE TABLE public.students (
+    id TEXT PRIMARY KEY,                             -- Student Roll / ID (e.g., CU240251013)
+    name TEXT NOT NULL,                              -- Full Student Name
+    program TEXT,                                    -- Academic Program (e.g., B.Tech)
+    branch TEXT,                                     -- Academic Branch (e.g., CSE)
+    gmail TEXT,                                      -- Student Email Address
+    enrollment_year INT,                             -- Enrollment / Batch Year (e.g., 2024)
+    academic_year TEXT,                              -- Academic Session String
+    embedding VECTOR(512),                           -- ArcFace 512D facial embedding vector
+    current_ewma_drift DOUBLE PRECISION DEFAULT 0.0, -- Current EWMA Drift Score (Patent #3)
+    drift_alert_level TEXT DEFAULT 'HEALTHY',        -- Alert level: HEALTHY/WARNING/CRITICAL/ALERT
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create HNSW Index for cosine distance calculations
-CREATE INDEX ON public.student_profiles 
+-- Create HNSW Index for ultra-fast Cosine similarity queries
+CREATE INDEX IF NOT EXISTS idx_students_embedding_hnsw 
+ON public.students 
 USING hnsw (embedding vector_cosine_ops);
 
--- 3. Create attendance logs table
-CREATE TABLE public.attendance_logs (
-    id BIGSERIAL PRIMARY KEY,
-    student_id UUID NOT NULL REFERENCES public.student_profiles(id) ON DELETE CASCADE,
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    status VARCHAR(50) NOT NULL DEFAULT 'Present'
+-- 3. Create Attendance Logs Table
+CREATE TABLE public.attendance (
+    att_id BIGSERIAL PRIMARY KEY,
+    student_id TEXT NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+    name TEXT,
+    program TEXT,
+    branch TEXT,
+    status TEXT NOT NULL DEFAULT 'Present',
+    timestamp TEXT NOT NULL,                         -- Date/Time string: YYYY-MM-DD HH:MM:SS
+    lecture TEXT NOT NULL                            -- Lecture / Session identifier
 );
 
--- 4. Create drift logs history table (Patent #3 Engine)
-CREATE TABLE public.drift_logs (
+-- Index attendance table for fast date and student queries
+CREATE INDEX IF NOT EXISTS idx_attendance_student_id ON public.attendance(student_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_timestamp ON public.attendance(timestamp);
+
+-- 4. Create Embedding Health & Drift Logs History Table (Patent #3)
+CREATE TABLE public.embedding_health (
     id BIGSERIAL PRIMARY KEY,
-    student_id UUID NOT NULL REFERENCES public.student_profiles(id) ON DELETE CASCADE,
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    instantaneous_drift FLOAT NOT NULL,
-    ewma_drift FLOAT NOT NULL,
-    yaw_angle FLOAT,
-    pitch_angle FLOAT,
-    status VARCHAR(50) NOT NULL DEFAULT 'OK'
+    student_id TEXT NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
+    drift_score DOUBLE PRECISION,                    -- Instantaneous drift score (1.0 - S)
+    ewma_drift DOUBLE PRECISION,                     -- Running EWMA score
+    match_confidence DOUBLE PRECISION,               -- Cosine similarity match score S
+    alert_level TEXT NOT NULL,                       -- HEALTHY / WARNING / CRITICAL / ALERT / POSE_REJECTED
+    pose_yaw DOUBLE PRECISION,                       -- Head Yaw Angle (degrees)
+    pose_pitch DOUBLE PRECISION,                     -- Head Pitch Angle (degrees)
+    pose_accepted BOOLEAN DEFAULT TRUE,             -- True if passed 3D Pose Gate
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_embedding_health_student_id ON public.embedding_health(student_id);
+
+-- 5. Create Academic Structure Reference Table
+CREATE TABLE public.academic_structure (
+    id BIGSERIAL PRIMARY KEY,
+    type TEXT NOT NULL,                              -- 'program' or 'branch'
+    value TEXT NOT NULL,                             -- e.g. 'B.Tech', 'CSE'
+    CONSTRAINT unique_academic_type_value UNIQUE (type, value)
 );
 ```
 
 ---
 
-## 🔍 Vector Similarity RPC Function (`FACE_MATCH_THRESHOLD = 0.40`)
+## 🔍 Cosine Vector Similarity RPC Function
 
-To identify faces in milliseconds, the Flask backend executes a custom PostgreSQL RPC function performing Cosine distance lookups:
+To execute fallback in-database vector searches, the Flask backend calls a custom PostgreSQL Stored Procedure:
 
 ```sql
 CREATE OR REPLACE FUNCTION public.match_face(
     query_embedding VECTOR(512),
-    match_threshold FLOAT DEFAULT 0.40,
-    match_count INT DEFAULT 1
+    match_threshold DOUBLE PRECISION DEFAULT 0.40,
+    filter_program TEXT DEFAULT NULL,
+    filter_branch TEXT DEFAULT NULL,
+    filter_section TEXT DEFAULT NULL
 )
 RETURNS TABLE (
-    id UUID,
-    name VARCHAR(255),
-    roll_number VARCHAR(100),
-    similarity FLOAT
+    id TEXT,
+    name TEXT,
+    program TEXT,
+    branch TEXT,
+    similarity DOUBLE PRECISION
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -115,55 +157,52 @@ AS $$
 BEGIN
     RETURN QUERY
     SELECT 
-        sp.id, 
-        sp.name, 
-        sp.roll_number, 
-        1 - (sp.embedding <=> query_embedding) AS similarity
-    FROM public.student_profiles sp
-    WHERE 1 - (sp.embedding <=> query_embedding) >= match_threshold
-    ORDER BY sp.embedding <=> query_embedding ASC
-    LIMIT match_count;
+        s.id, 
+        s.name, 
+        s.program, 
+        s.branch, 
+        (1.0 - (s.embedding <=> query_embedding))::DOUBLE PRECISION AS similarity
+    FROM public.students s
+    WHERE s.embedding IS NOT NULL
+      AND (1.0 - (s.embedding <=> query_embedding)) >= match_threshold
+      AND (filter_program IS NULL OR s.program ILIKE filter_program)
+      AND (filter_branch IS NULL OR s.branch ILIKE filter_branch)
+    ORDER BY s.embedding <=> query_embedding ASC
+    LIMIT 1;
 END;
 $$;
 ```
 
 ---
 
-## 🛡️ Row Level Security (RLS) Policies
+## 🛡️ Row-Level Security (RLS) Configuration (`scripts/fix_supabase_security.sql`)
 
-To protect student biometric data (512D ArcFace embeddings) and sensitive student information (`gmail`, `name`, enrollment details), Row Level Security is active on Supabase:
-
-### SQL Security Enforcement Script (`scripts/fix_supabase_security.sql`)
+To protect student biometric data (512D embeddings) and student PII, Row-Level Security is active on Supabase:
 
 ```sql
--- 1. Enable RLS on all tables
+-- Enable RLS on all tables
 ALTER TABLE public.students ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.embedding_health ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.academic_structure ENABLE ROW LEVEL SECURITY;
 
--- 2. Revoke default public/anon direct access
+-- Revoke default public direct access
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
 
--- 3. Create RLS Policies
--- 'students' Table: Authenticated read-only; anon access denied
+-- Create RLS Read Policies for authenticated users
 CREATE POLICY "Authenticated users view students" 
     ON public.students FOR SELECT TO authenticated USING (true);
 
--- 'attendance' Table: Authenticated read-only; anon access denied
 CREATE POLICY "Authenticated users view attendance" 
     ON public.attendance FOR SELECT TO authenticated USING (true);
 
--- 'academic_structure' Table: Authenticated read-only
 CREATE POLICY "Authenticated read academic_structure" 
     ON public.academic_structure FOR SELECT TO authenticated USING (true);
-
--- 'embedding_health' Table: Restricted exclusively to service_role (bypasses RLS)
 ```
 
-### Policy Matrix & Service Role Privileges
+### Policy Access Matrix
 
-| Table | `anon` Access | `authenticated` Access | `service_role` (Flask Backend) |
+| Table | `anon` Role | `authenticated` Role | `service_role` (Flask Backend) |
 |---|---|---|---|
 | `students` | **DENIED** | `SELECT` | **FULL (ALL)** |
 | `attendance` | **DENIED** | `SELECT` | **FULL (ALL)** |
@@ -171,5 +210,4 @@ CREATE POLICY "Authenticated read academic_structure"
 | `academic_structure` | **DENIED** | `SELECT` | **FULL (ALL)** |
 
 > [!NOTE]
-> The Flask application uses `SUPABASE_SERVICE_ROLE_KEY` (`supabase_admin` in `src/utils/db.py`), which natively bypasses RLS in Supabase. Backend operations continue operating with full access while public REST API endpoints are fully secured.
-
+> The Flask backend uses `SUPABASE_SERVICE_ROLE_KEY` (`supabase_admin` in `src/utils/db.py`), which bypasses RLS policies in Supabase. Backend operations continue operating with full administrative permissions while client REST endpoints remain locked down.
