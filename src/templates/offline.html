@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Offline Mode — BioSecure AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0b1326">
+  <script src="{{ url_for('static', filename='js/pwa.js') }}" defer></script>
+</head>
+<body class="bg-[#0b1326] text-slate-100 min-h-screen flex flex-col items-center justify-center p-4 selection:bg-blue-500/30">
+
+  <!-- Radial Background Glow -->
+  <div class="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/20 via-[#0b1326] to-[#080d1a] pointer-events-none"></div>
+
+  <!-- Offline Card -->
+  <div class="relative z-10 max-w-lg w-full bg-slate-900/80 border border-slate-800 backdrop-blur-2xl rounded-3xl p-8 sm:p-10 shadow-2xl shadow-black/80 text-center">
+    
+    <!-- Animated Icon Badge -->
+    <div class="mx-auto w-24 h-24 mb-6 rounded-2xl bg-gradient-to-br from-red-500/10 to-rose-600/5 border border-red-500/20 flex items-center justify-center shadow-inner relative">
+      <div class="absolute inset-0 rounded-2xl bg-red-500/10 animate-ping opacity-25"></div>
+      <i data-lucide="wifi-off" class="w-12 h-12 text-red-500 relative z-10"></i>
+    </div>
+
+    <!-- Title & Subtitle -->
+    <h1 class="text-3xl font-bold tracking-tight text-white mb-3">You are Offline</h1>
+    <p class="text-slate-400 text-sm sm:text-base leading-relaxed mb-8">
+      BioSecure AI lost connection to the server. Don't worry — previously loaded pages and core application shell resources remain accessible offline.
+    </p>
+
+    <!-- Connection Diagnostic Status -->
+    <div class="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-4 mb-8 text-left space-y-3">
+      <div class="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-400">
+        <span>System Status</span>
+        <span id="pwa-net-badge" class="flex items-center gap-1.5 text-red-400">
+          <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+          Disconnected
+        </span>
+      </div>
+      
+      <div class="border-t border-slate-800/60 pt-3 flex items-center justify-between text-xs">
+        <span class="text-slate-400">App Cache (Service Worker)</span>
+        <span class="text-emerald-400 font-mono flex items-center gap-1">
+          <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> Active (v1)
+        </span>
+      </div>
+
+      <div class="flex items-center justify-between text-xs">
+        <span class="text-slate-400">Cached Features</span>
+        <span class="text-blue-400 font-medium">App Shell & Local Storage</span>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex flex-col sm:flex-row items-center gap-3">
+      <button onclick="window.location.reload()" class="w-full sm:w-1/2 py-3.5 px-6 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm transition-all duration-200 shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2">
+        <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+        Retry Connection
+      </button>
+
+      <a href="/" class="w-full sm:w-1/2 py-3.5 px-6 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm transition-all duration-200 border border-slate-700/60 flex items-center justify-center gap-2">
+        <i data-lucide="home" class="w-4 h-4"></i>
+        Go to Home
+      </a>
+    </div>
+  </div>
+
+  <!-- Bottom Brand Footer -->
+  <footer class="mt-8 relative z-10 text-center text-xs text-slate-400 flex items-center gap-2">
+    <i data-lucide="scan-face" class="w-4 h-4 text-blue-500"></i>
+    <span>BioSecure AI — Offline Resilient PWA Mode</span>
+  </footer>
+
+  <script>
+    lucide.createIcons();
+
+    // Dynamically update status when network comes back online
+    window.addEventListener('online', () => {
+      const badge = document.getElementById('pwa-net-badge');
+      if (badge) {
+        badge.className = 'flex items-center gap-1.5 text-emerald-400';
+        badge.innerHTML = '<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Reconnected!';
+      }
+      setTimeout(() => window.location.reload(), 1200);
+    });
+  </script>
+</body>
+</html>

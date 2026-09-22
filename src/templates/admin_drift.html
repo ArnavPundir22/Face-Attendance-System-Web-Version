@@ -8,6 +8,7 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% include 'includes/pwa_head.html' %}
 </head>
 <body class="pb-24 md:pb-8 flex flex-col md:flex-row bg-[#0b1326] text-gray-100 min-h-screen">
 
@@ -371,5 +372,7 @@
       document.getElementById('historyModal').classList.add('hidden');
     }
   </script>
+  <script src="{{ url_for('static', filename='js/offline-detector.js') }}"></script>
+  {% include 'includes/pwa_install_modal.html' %}
 </body>
 </html>

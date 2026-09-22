@@ -7,10 +7,11 @@ Routes:
   POST /submit_student  — process the form, save photo, encode face
 """
 
+import base64
 import os
 import cv2
 import numpy as np
-from flask import Blueprint, redirect, render_template, request, url_for
+from flask import Blueprint, jsonify, redirect, render_template, request, send_from_directory, url_for
 from werkzeug.utils import secure_filename
 
 from src import config
@@ -25,11 +26,45 @@ students_bp = Blueprint('students', __name__)
 def students():
     try:
         # Fetch students from Supabase
-        response = supabase_admin.table('students').select('id, name, program, branch, enrollment_year, gmail').execute()
-        data = response.data
+        response = supabase_admin.table('students').select('id, name, program, branch, enrollment_year, gmail, current_ewma_drift, drift_alert_level').execute()
+        data = response.data or []
         return render_template('students.html', students=data)
     except Exception as e:
         return render_template('students.html', students=[], error="Could not load students.")
+
+
+@students_bp.route('/student/photo/<student_id>')
+def student_photo(student_id):
+    """Serve student photo from known_faces directory."""
+    safe_id = secure_filename(student_id)
+    if not safe_id:
+        return jsonify({"error": "Invalid student ID"}), 400
+    
+    filename = f"{safe_id}.jpg"
+    filepath = os.path.join(config.KNOWN_FACES_DIR, filename)
+    if os.path.exists(filepath):
+        return send_from_directory(config.KNOWN_FACES_DIR, filename)
+    
+    # Return 404 if no image exists
+    return jsonify({"error": "Photo not found"}), 404
+
+
+@students_bp.route('/api/student/<student_id>')
+def api_get_student(student_id):
+    """Fetch single student details for viewing/editing modal."""
+    try:
+        resp = supabase_admin.table('students').select('id, name, program, branch, enrollment_year, gmail, current_ewma_drift, drift_alert_level').eq('id', student_id).execute()
+        if not resp.data:
+            return jsonify({"success": False, "error": "Student not found"}), 404
+        
+        student = resp.data[0]
+        safe_id = secure_filename(student_id)
+        photo_exists = os.path.exists(os.path.join(config.KNOWN_FACES_DIR, f"{safe_id}.jpg"))
+        student['has_photo'] = photo_exists
+        student['photo_url'] = f"/student/photo/{student_id}" if photo_exists else None
+        return jsonify({"success": True, "student": student})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @students_bp.route('/add_student')
@@ -40,7 +75,6 @@ def add_student():
 @students_bp.route('/submit_student', methods=['POST'])
 def submit_student():
     """Save a new student record and encode their face embedding."""
-    from flask import jsonify
 
     def _respond(status: str, message: str, http_code: int = 400):
         is_ajax = (
@@ -170,6 +204,147 @@ def submit_student():
     return _respond('success', f'Student profile for "{name}" (ID: {student_id}) successfully registered!', 200)
 
 
+@students_bp.route('/api/student/update', methods=['POST'])
+@students_bp.route('/student/edit/<student_id>', methods=['POST'])
+def update_student(student_id=None):
+    """
+    Update student details (Name, Program, Branch, Year, Gmail) and optional Photo.
+    Processes multipart form or JSON payload. Re-encodes face embedding if a new photo is uploaded/captured.
+    """
+    is_json = request.is_json
+    req_data = request.get_json() if is_json else request.form
+
+    sid = student_id or req_data.get('id') or req_data.get('student_id')
+    if not sid:
+        return jsonify({"success": False, "error": "Student ID is required."}), 400
+
+    name = req_data.get('name', '').strip()
+    program = req_data.get('program', '').strip()
+    branch = req_data.get('branch', '').strip()
+    gmail = req_data.get('gmail') or req_data.get('email', '').strip()
+    enrollment_year = req_data.get('enrollment_year', '').strip()
+
+    if not name:
+        return jsonify({"success": False, "error": "Student Name is required."}), 400
+
+    # Prepare update payload for Supabase
+    update_payload = {
+        'name': name,
+        'program': program,
+        'branch': branch,
+        'gmail': gmail
+    }
+    if enrollment_year:
+        try:
+            update_payload['enrollment_year'] = int(enrollment_year)
+        except ValueError:
+            pass
+
+    safe_id = secure_filename(sid)
+    if not safe_id:
+        return jsonify({"success": False, "error": "Invalid Student ID."}), 400
+
+    new_embedding = None
+    photo_file = request.files.get('photo')
+    photo_base64 = req_data.get('photo_base64') if is_json else request.form.get('photo_base64')
+
+    filepath = os.path.join(config.KNOWN_FACES_DIR, f"{safe_id}.jpg")
+    os.makedirs(config.KNOWN_FACES_DIR, exist_ok=True)
+
+    # Process file upload or base64 image data if provided
+    if photo_file and photo_file.filename:
+        photo_file.save(filepath)
+    elif photo_base64:
+        try:
+            if ',' in photo_base64:
+                photo_base64 = photo_base64.split(',', 1)[1]
+            img_bytes = base64.b64decode(photo_base64)
+            with open(filepath, 'wb') as f:
+                f.write(img_bytes)
+        except Exception as e:
+            return jsonify({"success": False, "error": f"Failed to decode photo: {e}"}), 400
+
+    # If photo was provided (or saved), read and re-encode face
+    if (photo_file and photo_file.filename) or photo_base64:
+        image = cv2.imread(filepath)
+        if image is None:
+            return jsonify({"success": False, "error": "Uploaded photo could not be read."}), 400
+
+        faces = model.get(image)
+        if not faces:
+            return jsonify({"success": False, "error": "No face detected in new photo. Please upload a clear face photo."}), 400
+
+        face = faces[0]
+        new_emb = np.array(face.embedding, dtype=np.float32)
+        normalized_emb = normalize_embedding(new_emb)
+        if normalized_emb is None:
+            return jsonify({"success": False, "error": "Generated face embedding is invalid."}), 400
+
+        new_embedding = normalized_emb
+        update_payload['embedding'] = normalized_emb.tolist()
+        update_payload['current_ewma_drift'] = 0.0
+        update_payload['drift_alert_level'] = 'HEALTHY'
+
+        # Optional drift health log event
+        try:
+            supabase_admin.table('embedding_health').insert({
+                'student_id': sid,
+                'drift_score': 0.0,
+                'ewma_drift': 0.0,
+                'match_confidence': 1.0,
+                'alert_level': 'RE_ENROLLED',
+                'pose_yaw': 0.0,
+                'pose_pitch': 0.0,
+                'pose_accepted': True
+            }).execute()
+        except Exception:
+            pass
+
+    # Update database
+    try:
+        supabase_admin.table('students').update(update_payload).eq('id', sid).execute()
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Database update failed: {e}"}), 500
+
+    # Update in-memory face cache
+    if new_embedding is not None:
+        add_student_to_cache(
+            student_id=sid,
+            name=name,
+            program=program,
+            branch=branch,
+            embedding=new_embedding,
+            enrollment_year=int(enrollment_year) if enrollment_year and enrollment_year.isdigit() else None
+        )
+    else:
+        # If no new photo, update metadata in cache
+        try:
+            from src.utils.face_cache import _student_metadata, _cache_lock
+            with _cache_lock:
+                if sid in _student_metadata:
+                    _student_metadata[sid]['name'] = name
+                    _student_metadata[sid]['program'] = program
+                    _student_metadata[sid]['branch'] = branch
+                    if enrollment_year and enrollment_year.isdigit():
+                        _student_metadata[sid]['enrollment_year'] = int(enrollment_year)
+        except Exception:
+            pass
+
+    return jsonify({
+        "success": True,
+        "message": f"Student profile for {name} ({sid}) successfully updated!",
+        "student": {
+            "id": sid,
+            "name": name,
+            "program": program,
+            "branch": branch,
+            "enrollment_year": enrollment_year,
+            "gmail": gmail,
+            "photo_url": f"/student/photo/{sid}"
+        }
+    })
+
+
 @students_bp.route('/api/ocr_id_card', methods=['POST'])
 def api_ocr_id_card():
     """
@@ -177,8 +352,6 @@ def api_ocr_id_card():
     Accepts base64 image_data, uploaded id_card_image, or raw_text string.
     Returns parsed student details (name, id, program, branch, enrollment_year, email).
     """
-    import base64
-    from flask import jsonify
     from src.utils.ocr_helpers import perform_python_ocr, parse_student_id_text
 
     raw_text = ""
@@ -225,5 +398,3 @@ def api_ocr_id_card():
         "parsed_data": parsed_data,
         "raw_text": combined_raw_text or "No text recognized. Ensure image has good lighting and legible text."
     })
-
-

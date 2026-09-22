@@ -310,6 +310,100 @@ div.dt-button-collection button.dt-button:hover {
     nav.fixed.bottom-0 a:nth-child(5) { order: 6 !important; }
 }
 
+/* ==========================================
+   MOBILE UI OVERHAUL & TOUCH OPTIMIZATIONS
+   ========================================== */
+
+/* Disabled Tap Highlight for app feel */
+* {
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Mobile Top App Bar */
+header.fixed.top-0 {
+    height: 60px !important;
+    background: rgba(11, 19, 38, 0.88) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Floating / Dock-Style Mobile Bottom Navbar */
+@media (max-width: 767px) {
+    nav.fixed.bottom-0 {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        height: 72px !important;
+        background: rgba(15, 23, 42, 0.92) !important;
+        backdrop-filter: blur(25px) !important;
+        -webkit-backdrop-filter: blur(25px) !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 24px 24px 0 0 !important;
+        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.4) !important;
+        padding-bottom: env(safe-area-inset-bottom) !important;
+        z-index: 999 !important;
+    }
+
+    nav.fixed.bottom-0 a {
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 0.7rem !important;
+        font-weight: 600 !important;
+        color: #94a3b8 !important;
+        padding: 6px 10px !important;
+        border-radius: 14px !important;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+
+    nav.fixed.bottom-0 a:active {
+        transform: scale(0.92) !important;
+    }
+
+    nav.fixed.bottom-0 a.text-blue-400 {
+        color: #60a5fa !important;
+        background: rgba(59, 130, 246, 0.15) !important;
+        border: 1px solid rgba(59, 130, 246, 0.25) !important;
+    }
+
+    /* Elevated Center FAB (+) Button */
+    nav.fixed.bottom-0 a[href="/add_student"],
+    nav.fixed.bottom-0 a.mobile-fab-btn {
+        position: relative !important;
+        top: -18px !important;
+        width: 56px !important;
+        height: 56px !important;
+        border-radius: 50% !important;
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important;
+        box-shadow: 0 8px 25px rgba(59, 130, 246, 0.5), 0 0 0 4px #0b1326 !important;
+        color: white !important;
+        padding: 0 !important;
+    }
+    
+    nav.fixed.bottom-0 a[href="/add_student"] i,
+    nav.fixed.bottom-0 a.mobile-fab-btn i {
+        color: white !important;
+        width: 26px !important;
+        height: 26px !important;
+    }
+
+    /* Mobile Sheet Modal Styles */
+    #studentModal > div {
+        border-bottom-left-radius: 0 !important;
+        border-bottom-right-radius: 0 !important;
+        margin-bottom: 0 !important;
+        max-height: 94vh !important;
+    }
+
+    .modal-mobile-bottom-pad {
+        padding-bottom: calc(72px + env(safe-area-inset-bottom)) !important;
+    }
+}
+
 /* Animations helper */
 .animate-fade-in {
     animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;

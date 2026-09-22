@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% include 'includes/pwa_head.html' %}
 </head>
 <body class="pb-24 md:pb-8 flex flex-col md:flex-row">
 
@@ -184,5 +185,6 @@
     lucide.createIcons();
   </script>
   <script src="{{ url_for('static', filename='js/offline-detector.js') }}"></script>
+  {% include 'includes/pwa_install_modal.html' %}
 </body>
 </html>

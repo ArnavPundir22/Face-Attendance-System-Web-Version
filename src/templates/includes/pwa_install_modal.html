@@ -1,0 +1,26 @@
+<!-- BioSecure AI PWA Floating Install Prompt Banner -->
+<div id="pwaInstallBanner" class="hidden fixed bottom-24 md:bottom-6 right-4 left-4 md:left-auto md:max-w-md z-[99999] bg-[#0e172a]/95 border border-blue-500/40 backdrop-blur-2xl rounded-2xl p-4 shadow-2xl shadow-black/90 flex items-center gap-4 animate-in slide-in-from-bottom-5 duration-300">
+  <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-500 p-0.5 flex-shrink-0 shadow-lg shadow-blue-500/30">
+    <div class="w-full h-full bg-[#0b1326] rounded-[10px] flex items-center justify-center">
+      <i data-lucide="scan-face" class="w-6 h-6 text-cyan-400"></i>
+    </div>
+  </div>
+  
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-2">
+      <h4 class="font-bold text-sm text-white truncate">Install BioSecure App</h4>
+      <span class="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">PWA</span>
+    </div>
+    <p class="text-xs text-slate-400 truncate mt-0.5">Quick access & camera acceleration on home screen.</p>
+  </div>
+
+  <div class="flex items-center gap-2 flex-shrink-0">
+    <button onclick="window.installPWA()" class="pwa-install-btn px-3.5 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-semibold text-xs transition-all shadow-md shadow-blue-500/25 flex items-center gap-1.5">
+      <i data-lucide="download" class="w-3.5 h-3.5"></i>
+      Install
+    </button>
+    <button onclick="window.dismissPWABanner()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors" title="Dismiss">
+      <i data-lucide="x" class="w-4 h-4"></i>
+    </button>
+  </div>
+</div>

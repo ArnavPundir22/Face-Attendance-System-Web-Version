@@ -3,13 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Registered Students — BioSecure AI</title>
+  <title>Student Directory & Biometric Registry — BioSecure AI</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css">
   <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
   <link rel="stylesheet" href="https://cdn.datatables.net/responsive/2.4.1/css/responsive.dataTables.min.css">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% include 'includes/pwa_head.html' %}
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
   <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
@@ -20,18 +21,85 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
   <style>
-    /* DataTables Light Mode Custom Styles */
+    /* DataTables Executive Custom Styling */
     .dataTables_wrapper .dataTables_filter input {
-        padding: 6px 12px !important;
-        margin-left: 8px !important;
+        padding: 8px 14px !important;
+        margin-left: 10px !important;
+        border-radius: 12px !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        background: rgba(255, 255, 255, 0.05) !important;
+        color: #fff !important;
+        font-size: 0.8125rem !important;
+    }
+    .dataTables_wrapper .dataTables_filter input:focus {
+        outline: none !important;
+        border-color: rgba(59, 130, 246, 0.5) !important;
+        box-shadow: 0 0 15px rgba(59, 130, 246, 0.2) !important;
     }
     #studentsTable {
         background-color: transparent !important;
-        border-collapse: collapse !important;
+        border-collapse: separate !important;
+        border-spacing: 0 6px !important;
         width: 100% !important;
     }
     #studentsTable thead th {
-        border-bottom: 1px solid rgba(15, 23, 42, 0.1) !important;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+        padding: 14px 16px !important;
+        font-size: 0.75rem !important;
+        letter-spacing: 0.05em !important;
+        text-transform: uppercase !important;
+        color: #94a3b8 !important;
+        font-weight: 700 !important;
+    }
+    #studentsTable tbody tr {
+        background: rgba(255, 255, 255, 0.03) !important;
+        border-radius: 14px !important;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+    #studentsTable tbody tr:hover {
+        background: rgba(255, 255, 255, 0.08) !important;
+        transform: translateY(-1px) !important;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+    }
+    #studentsTable tbody td {
+        padding: 12px 16px !important;
+        vertical-align: middle !important;
+        border: none !important;
+    }
+    .student-avatar-wrapper {
+        position: relative;
+        display: inline-block;
+    }
+    .student-avatar-img {
+        object-fit: cover;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        border: 2px solid rgba(59, 130, 246, 0.5);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .student-avatar-wrapper:hover .student-avatar-img {
+        transform: scale(1.1);
+        border-color: rgba(99, 102, 241, 0.8);
+    }
+    .status-online-dot {
+        position: absolute;
+        bottom: 0;
+        right: 0;
+        width: 12px;
+        height: 12px;
+        background-color: #10b981;
+        border: 2px solid #0b1326;
+        border-radius: 50%;
+    }
+    .tab-btn {
+        transition: all 0.2s ease;
+    }
+    .tab-btn.active {
+        background: rgba(59, 130, 246, 0.15);
+        color: #60a5fa;
+        border-color: rgba(59, 130, 246, 0.3);
     }
   </style>
 </head>
@@ -58,7 +126,7 @@
         <i data-lucide="bar-chart-2" class="w-5 h-5"></i>
         <span>View Records</span>
       </a>
-      <a href="/students" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all bg-blue-500/10 text-blue-400 border border-blue-500/20">
+      <a href="/students" class="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-lg">
         <i data-lucide="users" class="w-5 h-5"></i>
         <span>All Students</span>
       </a>
@@ -86,96 +154,166 @@
   </aside>
 
   <!-- TopAppBar (Mobile Only) -->
-  <header class="fixed top-0 left-0 w-full z-50 flex md:hidden justify-between items-center px-6 py-3 bg-[#0b1326]/70 backdrop-blur-xl border-b border-white/10 shadow-lg">
-    <div class="flex items-center gap-3">
-      <i data-lucide="scan-face" class="w-8 h-8 text-blue-500"></i>
-      <h1 class="font-geist text-xl font-bold text-blue-400 tracking-tight">BioSecure AI</h1>
+  <header class="fixed top-0 left-0 w-full z-50 flex md:hidden justify-between items-center px-4 py-2.5 bg-[#0b1326]/85 backdrop-blur-xl border-b border-white/10 shadow-xl">
+    <div class="flex items-center gap-2.5">
+      <div class="p-1.5 bg-blue-500/20 rounded-xl border border-blue-500/30 text-blue-400">
+        <i data-lucide="scan-face" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <h1 class="font-geist text-base font-extrabold text-white tracking-tight leading-none">BioSecure AI</h1>
+        <span class="text-[10px] font-semibold text-emerald-400 flex items-center gap-1 mt-0.5 uppercase tracking-wider">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Live
+        </span>
+      </div>
     </div>
     
-    <div class="flex items-center gap-4">
-      <a href="/logout" class="btn-danger-glass px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2">
-        <i data-lucide="log-out" class="w-4 h-4"></i> Logout
+    <div class="flex items-center gap-2">
+      <a href="/logout" class="btn-danger-glass px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm active:scale-95 transition-transform">
+        <i data-lucide="log-out" class="w-3.5 h-3.5"></i> Exit
       </a>
     </div>
   </header>
 
-  <!-- BottomNavBar (Mobile Only) -->
-  <nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe md:hidden h-16 bg-[#131b2e]/85 backdrop-blur-lg border-t border-white/10 shadow-2xl">
-    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/">
+  <!-- BottomNavBar Curved Glass Dock (Mobile Only) -->
+  <nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-2 pb-safe md:hidden h-18 bg-[#0b1326]/90 backdrop-blur-2xl border-t border-white/10 shadow-2xl rounded-t-3xl">
+    <a class="flex flex-col items-center justify-center text-[10px] font-semibold transition-all text-gray-400 hover:text-blue-300 active:scale-90" href="/">
       <i data-lucide="home" class="w-5 h-5 mb-0.5"></i>
       <span>Home</span>
     </a>
-    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/viewer">
+    <a class="flex flex-col items-center justify-center text-[10px] font-semibold transition-all text-gray-400 hover:text-blue-300 active:scale-90" href="/viewer">
       <i data-lucide="bar-chart-2" class="w-5 h-5 mb-0.5"></i>
       <span>Records</span>
     </a>
-    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-blue-400" href="/students">
+    
+    <!-- Elevated Center FAB Button -->
+    <a class="mobile-fab-btn flex flex-col items-center justify-center transition-transform active:scale-90" href="/add_student" title="Add New Student">
+      <i data-lucide="user-plus" class="w-6 h-6"></i>
+    </a>
+
+    <a class="flex flex-col items-center justify-center text-[10px] font-semibold transition-all text-blue-400 bg-blue-500/15 border border-blue-500/30 px-3 py-1 rounded-xl active:scale-90" href="/students">
       <i data-lucide="users" class="w-5 h-5 mb-0.5"></i>
       <span>Students</span>
     </a>
-    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/add_student">
-      <i data-lucide="user-plus" class="w-5 h-5 mb-0.5"></i>
-      <span>Add</span>
-    </a>
+
     {% if session_is_admin %}
-    <a class="flex flex-col items-center justify-center text-xs font-medium transition-all text-gray-400 hover:text-blue-300" href="/admin">
+    <a class="flex flex-col items-center justify-center text-[10px] font-semibold transition-all text-gray-400 hover:text-blue-300 active:scale-90" href="/admin">
       <i data-lucide="settings" class="w-5 h-5 mb-0.5"></i>
       <span>Admin</span>
+    </a>
+    {% else %}
+    <a class="flex flex-col items-center justify-center text-[10px] font-semibold transition-all text-gray-400 hover:text-blue-300 active:scale-90" href="/viewer">
+      <i data-lucide="shield" class="w-5 h-5 mb-0.5"></i>
+      <span>Status</span>
     </a>
     {% endif %}
   </nav>
 
-  <main class="w-full flex-1 p-4 sm:p-6 max-w-6xl mx-auto mt-24 space-y-6 md:mt-8 md:pl-72">
+  <main class="w-full flex-1 p-3 sm:p-6 max-w-7xl mx-auto mt-16 space-y-4 sm:space-y-6 md:mt-8 md:pl-72 pb-24 md:pb-8">
     
-    <div class="glass-panel p-6 sm:p-8 rounded-2xl inner-glow shadow-2xl">
-      <div class="flex items-center gap-2 mb-6 border-b border-white/10 pb-4">
-        <i data-lucide="users" class="w-6 h-6 text-blue-500"></i>
-        <h2 class="text-xl font-bold font-geist text-white">Registered Students</h2>
-      </div>
 
-      <!-- Filter Bar -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 p-4 bg-white/5 rounded-xl border border-white/10">
+    <!-- Main Container -->
+    <div class="glass-panel p-6 sm:p-8 rounded-3xl inner-glow shadow-2xl space-y-6 border border-white/15">
+      
+      <!-- Top Title & Controls Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6">
         <div>
-          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Filter Program</label>
-          <select id="filterProgram" class="input-dark-glass w-full rounded-lg px-3 py-2 text-xs">
-            <option value="">All Programs</option>
-          </select>
+          <div class="flex items-center gap-3">
+            <div class="p-2 bg-blue-500/20 rounded-xl border border-blue-500/30">
+              <i data-lucide="users" class="w-6 h-6 text-blue-400"></i>
+            </div>
+            <div>
+              <h2 class="text-2xl font-extrabold font-geist text-white tracking-tight">Student Biometric Registry</h2>
+              <p class="text-xs text-gray-400 mt-0.5">Manage student identities, facial embeddings, and academic data</p>
+            </div>
+          </div>
         </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Filter Branch</label>
-          <select id="filterBranch" class="input-dark-glass w-full rounded-lg px-3 py-2 text-xs">
-            <option value="">All Branches</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Filter Year</label>
-          <select id="filterYear" class="input-dark-glass w-full rounded-lg px-3 py-2 text-xs">
-            <option value="">All Years</option>
-          </select>
+
+        <div class="flex items-center gap-3">
+          <a href="/add_student" class="btn-primary-glass px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg hover:scale-105 transition-transform">
+            <i data-lucide="user-plus" class="w-4 h-4"></i> Register Student Profile
+          </a>
         </div>
       </div>
 
-      <div class="overflow-x-auto w-full">
+      <!-- Advanced Filter Bar -->
+      <div class="p-4 bg-white/5 rounded-2xl border border-white/10 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="filter" class="w-3.5 h-3.5 text-blue-400"></i> Filter Student Directory
+          </span>
+          <button type="button" id="resetFiltersBtn" class="text-xs text-gray-400 hover:text-blue-300 font-semibold transition-colors flex items-center gap-1 hidden">
+            <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Clear Filters
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Academic Program</label>
+            <select id="filterProgram" class="input-dark-glass w-full rounded-xl px-3.5 py-2 text-xs">
+              <option value="">All Programs</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Branch / Major</label>
+            <select id="filterBranch" class="input-dark-glass w-full rounded-xl px-3.5 py-2 text-xs">
+              <option value="">All Branches</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Enrollment Year</label>
+            <select id="filterYear" class="input-dark-glass w-full rounded-xl px-3.5 py-2 text-xs">
+              <option value="">All Years</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Data Table -->
+      <div class="overflow-x-auto w-full pt-2">
         <table id="studentsTable" class="w-full text-sm text-left">
           <thead>
-            <tr class="text-gray-400 border-b border-white/10 uppercase tracking-wider text-xs font-semibold font-geist">
-              <th class="p-4">ID</th>
-              <th class="p-4">Name</th>
+            <tr>
+              <th class="p-4">Full Name</th>
               <th class="p-4">Program</th>
               <th class="p-4">Branch</th>
               <th class="p-4">Year</th>
               <th class="p-4">Email</th>
+              <th class="p-4 text-center">Actions</th>
             </tr>
           </thead>
           <tbody>
             {% for s in students %}
-            <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
-              <td class="p-4 font-semibold text-blue-400 font-geist">{{ s['id'] }}</td>
-              <td class="p-4 font-medium text-white">{{ s['name'] }}</td>
-              <td class="p-4 text-gray-300 font-geist">{{ s['program'] or '-' }}</td>
-              <td class="p-4 text-gray-300 font-geist">{{ s['branch'] or '-' }}</td>
-              <td class="p-4 text-gray-300 font-geist">{{ s['enrollment_year'] or '-' }}</td>
-              <td class="p-4 text-gray-300 font-geist">{{ s['gmail'] or '-' }}</td>
+            <tr id="row-{{ s['id'] }}" class="group">
+              <td class="p-4" data-search="{{ s['name'] }} {{ s['id'] }}" data-filter="{{ s['name'] }} {{ s['id'] }}">
+                <div class="flex flex-col gap-1">
+                  <span class="font-bold text-white text-sm student-name-col group-hover:text-blue-300 transition-colors">{{ s['name'] }}</span>
+                  <span class="text-xs font-mono font-semibold text-blue-400 flex items-center gap-1.5 student-id-col">
+                    <i data-lucide="id-card" class="w-3.5 h-3.5 text-blue-400"></i> {{ s['id'] }}
+                  </span>
+                </div>
+              </td>
+              <td class="p-4" data-search="{{ s['program'] or '-' }}" data-filter="{{ s['program'] or '-' }}">
+                <span class="inline-block bg-white/5 border border-white/10 text-gray-300 text-xs font-medium px-2.5 py-1 rounded-full font-geist student-program-col">
+                  {{ s['program'] or '-' }}
+                </span>
+              </td>
+              <td class="p-4" data-search="{{ s['branch'] or '-' }}" data-filter="{{ s['branch'] or '-' }}">
+                <span class="inline-block bg-white/5 border border-white/10 text-gray-300 text-xs font-medium px-2.5 py-1 rounded-full font-geist student-branch-col">
+                  {{ s['branch'] or '-' }}
+                </span>
+              </td>
+              <td class="p-4 text-gray-300 font-geist text-xs student-year-col" data-search="{{ s['enrollment_year'] or '-' }}" data-filter="{{ s['enrollment_year'] or '-' }}">
+                {{ s['enrollment_year'] or '-' }}
+              </td>
+              <td class="p-4 text-gray-300 font-geist text-xs student-gmail-col">
+                {{ s['gmail'] or '-' }}
+              </td>
+              <td class="p-4 text-center">
+                <button onclick="openStudentEditModal('{{ s['id'] }}')" 
+                        class="btn-primary-glass px-3.5 py-1.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 hover:scale-105 transition-transform shadow-md">
+                  <i data-lucide="edit-3" class="w-3.5 h-3.5 text-blue-400"></i> Edit Profile & Photo
+                </button>
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -184,59 +322,478 @@
     </div>
   </main>
 
+  <!-- Executive Glassmorphism Student Details & Photo Editor Modal -->
+  <div id="studentModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xl hidden p-4 overflow-y-auto">
+    <div class="glass-panel w-full max-w-3xl rounded-3xl border border-white/20 shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between p-6 border-b border-white/10 bg-white/5">
+        <div class="flex items-center gap-3">
+          <div class="p-2.5 bg-blue-500/20 rounded-2xl border border-blue-500/30 text-blue-400 shadow-inner">
+            <i data-lucide="user-check" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h3 class="text-xl font-extrabold text-white font-geist" id="modalTitle">Student Details & Biometric Photo Editor</h3>
+            <p class="text-xs text-gray-400">Update academic details and re-enroll face biometric photo</p>
+          </div>
+        </div>
+        <button onclick="closeStudentModal()" class="p-2 text-gray-400 hover:text-white rounded-xl hover:bg-white/10 transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Tab Navigation -->
+      <div class="flex border-b border-white/10 px-6 pt-3 bg-slate-900/40 gap-2">
+        <button type="button" id="tabBioBtn" onclick="switchModalTab('bio')" class="tab-btn active px-4 py-2.5 rounded-t-xl text-xs font-bold border-b-2 border-transparent flex items-center gap-2">
+          <i data-lucide="user" class="w-4 h-4"></i> Profile Details
+        </button>
+        <button type="button" id="tabPhotoBtn" onclick="switchModalTab('photo')" class="tab-btn px-4 py-2.5 rounded-t-xl text-xs font-bold border-b-2 border-transparent flex items-center gap-2 text-gray-400 hover:text-white">
+          <i data-lucide="camera" class="w-4 h-4"></i> Face Photo & Camera Studio
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 overflow-y-auto space-y-6 flex-1">
+        
+        <!-- Modal Alert Notification Box -->
+        <div id="modalAlert" class="hidden p-4 rounded-2xl text-xs font-semibold flex items-center gap-3 shadow-lg"></div>
+
+        <!-- TAB 1: BIO & ACADEMIC DETAILS -->
+        <div id="tabContentBio" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Student ID (Unique Badge)</label>
+              <input type="text" id="editStudentId" readonly class="input-dark-glass w-full rounded-xl px-4 py-3 text-xs font-mono font-bold text-blue-400 bg-white/5 cursor-not-allowed border border-blue-500/20" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Full Name *</label>
+              <input type="text" id="editStudentName" placeholder="Enter student full name" class="input-dark-glass w-full rounded-xl px-4 py-3 text-xs text-white border border-white/10 focus:border-blue-500/50" required />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Academic Program</label>
+              <input type="text" id="editStudentProgram" placeholder="e.g. B.Tech / M.Tech" class="input-dark-glass w-full rounded-xl px-4 py-3 text-xs text-white border border-white/10" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Branch / Specialisation</label>
+              <input type="text" id="editStudentBranch" placeholder="e.g. Computer Science Engineering" class="input-dark-glass w-full rounded-xl px-4 py-3 text-xs text-white border border-white/10" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Enrollment Year</label>
+              <input type="number" id="editStudentYear" placeholder="e.g. 2024" class="input-dark-glass w-full rounded-xl px-4 py-3 text-xs text-white border border-white/10" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Gmail / Student Email</label>
+              <input type="email" id="editStudentGmail" placeholder="student@university.edu" class="input-dark-glass w-full rounded-xl px-4 py-3 text-xs text-white border border-white/10" />
+            </div>
+          </div>
+
+          <div id="driftStatusContainer" class="p-4 bg-white/5 rounded-2xl border border-white/10 flex items-center justify-between text-xs mt-2">
+            <div class="flex items-center gap-2">
+              <i data-lucide="activity" class="w-4 h-4 text-emerald-400"></i>
+              <span class="text-gray-300 font-medium">Biometric EWMA Drift Health Score:</span>
+            </div>
+            <span id="driftBadge" class="px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+              HEALTHY (0.00)
+            </span>
+          </div>
+        </div>
+
+        <!-- TAB 2: FACE PHOTO & CAMERA STUDIO -->
+        <div id="tabContentPhoto" class="hidden space-y-6">
+          <div class="flex flex-col md:flex-row items-center justify-center gap-6 p-4 bg-white/5 rounded-2xl border border-white/10">
+            
+            <!-- Guided Oval Camera / Photo Box -->
+            <div class="relative guided-frame-wrapper w-64 h-64 flex items-center justify-center bg-slate-950 border-2 border-blue-500/30 rounded-2xl shadow-2xl overflow-hidden">
+              <img id="modalPhotoPreview" 
+                   src="" 
+                   alt="Student Photo" 
+                   class="w-full h-full object-cover"
+                   onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%233b82f6\' stroke-width=\'1.5\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><path d=\'M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2\'/><circle cx=\'12\' cy=\'7\' r=\'4\'/></svg>';" />
+              
+              <video id="modalWebcamVideo" autoplay playsinline class="w-full h-full object-cover hidden"></video>
+
+              <!-- Guided Oval Stencil Overlay -->
+              <div id="cameraStencilOverlay" class="guided-oval-stencil state-searching hidden"></div>
+            </div>
+
+            <!-- Controls Side Column -->
+            <div class="flex-1 space-y-3 w-full">
+              <h4 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="sparkles" class="w-4 h-4 text-blue-400"></i> Photo Capture & Re-Enrollment Studio
+              </h4>
+              <p class="text-xs text-gray-400 leading-relaxed">
+                Provide a clear front-facing photo under good lighting. Re-enrolling will calculate a fresh 512D ArcFace embedding vector.
+              </p>
+
+              <div class="space-y-2.5 pt-2">
+                <label class="btn-primary-glass w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all shadow-md hover:scale-[1.02]">
+                  <i data-lucide="upload" class="w-4 h-4"></i> Browse & Upload Image File
+                  <input type="file" id="modalPhotoFile" accept="image/*" class="hidden" onchange="handleFileSelect(event)" />
+                </label>
+
+                <button type="button" id="startCameraBtn" onclick="startModalCamera()" class="btn-secondary-glass w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-md hover:scale-[1.02]">
+                  <i data-lucide="camera" class="w-4 h-4 text-emerald-400"></i> Activate Live Webcam
+                </button>
+
+                <button type="button" id="capturePhotoBtn" onclick="captureModalSnapshot()" class="hidden bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-xl hover:scale-[1.02] transition-transform">
+                  <i data-lucide="aperture" class="w-4 h-4"></i> Snap Frame & Save Photo
+                </button>
+
+                <input type="hidden" id="modalPhotoBase64" value="" />
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="flex items-center justify-between p-6 border-t border-white/10 bg-white/5">
+        <span class="text-[11px] text-gray-400 font-medium flex items-center gap-1.5">
+          <i data-lucide="shield-check" class="w-4 h-4 text-blue-400"></i> Biometric Data Secured by Supabase pgvector
+        </span>
+
+        <div class="flex items-center gap-3">
+          <button type="button" onclick="closeStudentModal()" class="btn-secondary-glass px-5 py-2.5 rounded-xl text-xs font-semibold">
+            Cancel
+          </button>
+          <button type="button" id="saveStudentBtn" onclick="saveStudentChanges()" class="btn-primary-glass px-6 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-xl">
+            <i data-lucide="check" class="w-4 h-4"></i> Save Profile Changes
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <script>
+    let dataTableInstance = null;
+    let cameraStream = null;
+
     $(document).ready(function () {
       lucide.createIcons();
-      const table = $('#studentsTable').DataTable({
+      dataTableInstance = $('#studentsTable').DataTable({
         responsive: false,
         scrollX: true,
-        order: [[1, 'asc']],
+        order: [[0, 'asc']],
         dom: 'Bfrtip',
         buttons: [
           {
             extend: 'collection',
-            text: 'Export Data',
+            text: 'Export Directory Data',
             buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],
-            className: 'bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-lg font-semibold transition duration-300 transform hover:shadow-lg neon-button'
+            className: 'bg-purple-600 hover:bg-purple-700 text-white px-3.5 py-1.5 rounded-xl font-bold text-xs transition duration-300 transform hover:shadow-lg neon-button'
           }
         ],
         initComplete: function () {
-          // Populate filter dropdowns dynamically from existing table data
-          this.api().columns([2, 3, 4]).every(function (colIdx) {
+          // Helper to strip any inner HTML tags and return clean text
+          function cleanCellText(val) {
+            if (!val) return '';
+            const str = val.toString().trim();
+            if (str.includes('<')) {
+              return $('<div>').html(str).text().trim();
+            }
+            return str;
+          }
+
+          // Populate filter dropdowns dynamically from existing table data (Columns: Program=1, Branch=2, Year=3)
+          const programsSet = new Set();
+          this.api().columns([1, 2, 3]).every(function (colIdx) {
             const column = this;
             let selectId = '#filterProgram';
-            if (colIdx === 3) selectId = '#filterBranch';
-            if (colIdx === 4) selectId = '#filterYear';
+            if (colIdx === 2) selectId = '#filterBranch';
+            if (colIdx === 3) selectId = '#filterYear';
 
             const select = $(selectId);
             const addedValues = new Set();
             
             column.data().unique().sort().each(function (d) {
-              if (d && d !== '-') {
-                const rawVal = d.toString().trim();
-                const upperVal = rawVal.toUpperCase();
+              const textVal = cleanCellText(d);
+              if (textVal && textVal !== '-') {
+                const upperVal = textVal.toUpperCase();
                 if (!addedValues.has(upperVal)) {
                   addedValues.add(upperVal);
                   select.append('<option value="' + upperVal + '">' + upperVal + '</option>');
                 }
+                if (colIdx === 1) programsSet.add(upperVal);
               }
             });
 
             select.on('change', function () {
               const val = $(this).val();
+
+              const pVal = $('#filterProgram').val();
+              const bVal = $('#filterBranch').val();
+              const yVal = $('#filterYear').val();
+
+              if (pVal || bVal || yVal) {
+                $('#resetFiltersBtn').removeClass('hidden');
+              } else {
+                $('#resetFiltersBtn').addClass('hidden');
+              }
+
               if (!val) {
                 column.search('').draw();
               } else {
-                // Custom case-insensitive exact match filtering logic
                 const regexVal = '^' + $.fn.dataTable.util.escapeRegex(val) + '$';
                 column.search(regexVal, true, false, true).draw();
               }
             });
           });
+
+          $('#statProgramsCount').text(programsSet.size || '1');
         }
       });
+
+      $('#resetFiltersBtn').on('click', function () {
+        $('#filterProgram, #filterBranch, #filterYear').val('');
+        dataTableInstance.columns([1, 2, 3]).search('').draw();
+        $(this).addClass('hidden');
+      });
     });
+
+    function switchModalTab(tabName) {
+      if (tabName === 'bio') {
+        $('#tabBioBtn').addClass('active text-blue-400').removeClass('text-gray-400');
+        $('#tabPhotoBtn').removeClass('active text-blue-400').addClass('text-gray-400');
+        $('#tabContentBio').removeClass('hidden');
+        $('#tabContentPhoto').addClass('hidden');
+      } else {
+        $('#tabPhotoBtn').addClass('active text-blue-400').removeClass('text-gray-400');
+        $('#tabBioBtn').removeClass('active text-blue-400').addClass('text-gray-400');
+        $('#tabContentPhoto').removeClass('hidden');
+        $('#tabContentBio').addClass('hidden');
+      }
+    }
+
+    function showModalAlert(message, type = 'info') {
+      const alertEl = $('#modalAlert');
+      alertEl.removeClass('hidden bg-emerald-500/20 text-emerald-300 border-emerald-500/30 bg-rose-500/20 text-rose-300 border-rose-500/30 bg-blue-500/20 text-blue-300 border-blue-500/30');
+      
+      let icon = '<i data-lucide="info" class="w-5 h-5 text-blue-400"></i>';
+      if (type === 'success') {
+        alertEl.addClass('bg-emerald-500/20 text-emerald-300 border border-emerald-500/30');
+        icon = '<i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>';
+      } else if (type === 'error') {
+        alertEl.addClass('bg-rose-500/20 text-rose-300 border border-rose-500/30');
+        icon = '<i data-lucide="alert-triangle" class="w-5 h-5 text-rose-400"></i>';
+      } else {
+        alertEl.addClass('bg-blue-500/20 text-blue-300 border border-blue-500/30');
+      }
+
+      alertEl.html(icon + ' <span>' + message + '</span>');
+      lucide.createIcons();
+    }
+
+    function hideModalAlert() {
+      $('#modalAlert').addClass('hidden');
+    }
+
+    function openStudentEditModal(studentId) {
+      hideModalAlert();
+      stopModalCamera();
+      switchModalTab('bio');
+
+      $('#editStudentId').val(studentId);
+      $('#modalTitle').text('Loading profile details...');
+      $('#modalPhotoBase64').val('');
+      $('#modalPhotoFile').val('');
+      
+      const photoUrl = '/student/photo/' + studentId + '?t=' + new Date().getTime();
+      $('#modalPhotoPreview').attr('src', photoUrl).removeClass('hidden');
+      $('#modalWebcamVideo').addClass('hidden');
+      $('#cameraStencilOverlay').addClass('hidden');
+      $('#startCameraBtn').removeClass('hidden');
+      $('#capturePhotoBtn').addClass('hidden');
+
+      $('#studentModal').removeClass('hidden');
+
+      // Fetch student info via API
+      $.ajax({
+        url: '/api/student/' + studentId,
+        method: 'GET',
+        success: function (res) {
+          if (res.success && res.student) {
+            const s = res.student;
+            $('#modalTitle').text('Edit Details — ' + s.name + ' (' + s.id + ')');
+            $('#editStudentName').val(s.name || '');
+            $('#editStudentProgram').val(s.program || '');
+            $('#editStudentBranch').val(s.branch || '');
+            $('#editStudentYear').val(s.enrollment_year || '');
+            $('#editStudentGmail').val(s.gmail || '');
+
+            const alertLevel = (s.drift_alert_level || 'HEALTHY').toUpperCase();
+            let badgeClass = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+            if (alertLevel === 'WARNING') badgeClass = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+            if (alertLevel === 'CRITICAL' || alertLevel === 'ALERT') badgeClass = 'bg-rose-500/20 text-rose-400 border-rose-500/30';
+            
+            $('#driftBadge')
+              .attr('class', 'px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border ' + badgeClass)
+              .text(alertLevel + ' (0.00)');
+          } else {
+            showModalAlert(res.error || 'Failed to fetch student data.', 'error');
+          }
+        },
+        error: function () {
+          showModalAlert('Error reaching server API.', 'error');
+        }
+      });
+    }
+
+    function closeStudentModal() {
+      stopModalCamera();
+      $('#studentModal').addClass('hidden');
+    }
+
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      if (file) {
+        stopModalCamera();
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          $('#modalPhotoPreview').attr('src', e.target.result).removeClass('hidden');
+          $('#modalWebcamVideo').addClass('hidden');
+          $('#cameraStencilOverlay').addClass('hidden');
+          $('#modalPhotoBase64').val(e.target.result);
+          showModalAlert('New image file loaded! Click "Save Profile Changes" to update.', 'info');
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    async function startModalCamera() {
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' } });
+        const video = document.getElementById('modalWebcamVideo');
+        video.srcObject = cameraStream;
+        video.classList.remove('hidden');
+        $('#modalPhotoPreview').addClass('hidden');
+        $('#cameraStencilOverlay').removeClass('hidden');
+        $('#startCameraBtn').addClass('hidden');
+        $('#capturePhotoBtn').removeClass('hidden');
+        showModalAlert('Live camera activated! Align face inside stencil and click "Snap Frame & Save Photo".', 'info');
+      } catch (err) {
+        showModalAlert('Webcam access error: ' + err.message, 'error');
+      }
+    }
+
+    function captureModalSnapshot() {
+      const video = document.getElementById('modalWebcamVideo');
+      if (!video.srcObject) return;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+
+      $('#modalPhotoPreview').attr('src', dataUrl).removeClass('hidden');
+      $(video).addClass('hidden');
+      $('#cameraStencilOverlay').addClass('hidden');
+      $('#modalPhotoBase64').val(dataUrl);
+
+      stopModalCamera();
+      showModalAlert('Live photo snapshot captured! Click "Save Profile Changes" to re-enroll face.', 'success');
+    }
+
+    function stopModalCamera() {
+      const video = document.getElementById('modalWebcamVideo');
+      if (video && video.srcObject) {
+        video.srcObject.getTracks().forEach(t => t.stop());
+        video.srcObject = null;
+      }
+      cameraStream = null;
+      $('#modalWebcamVideo').addClass('hidden');
+      $('#cameraStencilOverlay').addClass('hidden');
+      $('#startCameraBtn').removeClass('hidden');
+      $('#capturePhotoBtn').addClass('hidden');
+    }
+
+    function saveStudentChanges() {
+      const studentId = $('#editStudentId').val();
+      const name = $('#editStudentName').val().trim();
+      const program = $('#editStudentProgram').val().trim();
+      const branch = $('#editStudentBranch').val().trim();
+      const year = $('#editStudentYear').val().trim();
+      const gmail = $('#editStudentGmail').val().trim();
+      const photoBase64 = $('#modalPhotoBase64').val();
+      const fileInput = document.getElementById('modalPhotoFile');
+
+      if (!name) {
+        showModalAlert('Student Name is required.', 'error');
+        switchModalTab('bio');
+        return;
+      }
+
+      const btn = $('#saveStudentBtn');
+      btn.prop('disabled', true).html('<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Processing & Re-encoding...');
+      lucide.createIcons();
+
+      const formData = new FormData();
+      formData.append('id', studentId);
+      formData.append('name', name);
+      formData.append('program', program);
+      formData.append('branch', branch);
+      formData.append('enrollment_year', year);
+      formData.append('gmail', gmail);
+
+      if (fileInput.files.length > 0) {
+        formData.append('photo', fileInput.files[0]);
+      } else if (photoBase64) {
+        formData.append('photo_base64', photoBase64);
+      }
+
+      $.ajax({
+        url: '/api/student/update',
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function (res) {
+          btn.prop('disabled', false).html('<i data-lucide="check" class="w-4 h-4"></i> Save Profile Changes');
+          lucide.createIcons();
+
+          if (res.success) {
+            showModalAlert(res.message || 'Student profile and face photo updated successfully!', 'success');
+            
+            // Update table row in DataTables
+            const rowId = '#row-' + studentId;
+            const timestamp = new Date().getTime();
+            $('.student-photo-img-' + studentId).attr('src', '/student/photo/' + studentId + '?t=' + timestamp);
+            $(rowId + ' .student-name-col').text(name);
+            $(rowId + ' .student-program-col').text(program || '-');
+            $(rowId + ' .student-branch-col').text(branch || '-');
+            $(rowId + ' .student-year-col').text(year || '-');
+            $(rowId + ' .student-gmail-col').text(gmail || '-');
+
+            setTimeout(function () {
+              closeStudentModal();
+            }, 1200);
+          } else {
+            showModalAlert(res.error || 'Failed to update student profile.', 'error');
+          }
+        },
+        error: function (xhr) {
+          btn.prop('disabled', false).html('<i data-lucide="check" class="w-4 h-4"></i> Save Profile Changes');
+          lucide.createIcons();
+          const errRes = xhr.responseJSON || {};
+          showModalAlert(errRes.error || 'Server error occurred while updating student profile.', 'error');
+        }
+      });
+    }
   </script>
   <script src="{{ url_for('static', filename='js/offline-detector.js') }}"></script>
+  {% include 'includes/pwa_install_modal.html' %}
 </body>
 </html>
+
+

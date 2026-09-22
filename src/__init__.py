@@ -140,7 +140,7 @@ def create_app() -> Flask:
             app.config['SESSION_COOKIE_SECURE'] = False
             app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-        public_paths = {"/login", "/favicon.ico", "/healthz", "/auth/callback"}
+        public_paths = {"/login", "/favicon.ico", "/healthz", "/auth/callback", "/manifest.json", "/sw.js", "/offline"}
         if (
             request.path.startswith("/static/")
             or request.path.startswith("/login/oauth/")
@@ -152,8 +152,25 @@ def create_app() -> Flask:
         return None
 
     # ------------------------------------------------------------------
-    # Health check — used by load balancers / container orchestrators
+    # PWA & Health check routes
     # ------------------------------------------------------------------
+
+    @app.route("/manifest.json")
+    def manifest():
+        from flask import send_from_directory
+        return send_from_directory(app.static_folder, "manifest.json", mimetype="application/manifest+json")
+
+    @app.route("/sw.js")
+    def service_worker():
+        from flask import send_from_directory, make_response
+        response = make_response(send_from_directory(app.static_folder, "js/sw.js", mimetype="application/javascript"))
+        response.headers['Service-Worker-Allowed'] = '/'
+        response.headers['Cache-Control'] = 'no-cache'
+        return response
+
+    @app.route("/offline")
+    def offline():
+        return render_template("offline.html")
 
     @app.route("/healthz")
     def healthz():
