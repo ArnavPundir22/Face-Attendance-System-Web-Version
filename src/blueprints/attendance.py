@@ -576,21 +576,41 @@ def upload_photo():
 @attendance_bp.route('/update_attendance_status', methods=['POST'])
 def update_attendance_status():
     data = request.get_json() or {}
-    student_id = data.get('student_id')
-    lecture = data.get('lecture')
-    timestamp = data.get('timestamp')
-    status = data.get('status')
+    student_id = str(data.get('student_id') or '').strip()
+    lecture = str(data.get('lecture') or '').strip()
+    timestamp = str(data.get('timestamp') or '').strip()
+    status = str(data.get('status') or '').strip()
     
-    if not student_id or not lecture or not timestamp or not status:
+    if not student_id or not timestamp or not status:
         return jsonify({"success": False, "error": "Missing parameters"}), 400
         
     try:
-        # Check if record already exists
-        existing = supabase_admin.table('attendance').select('att_id').eq('student_id', student_id).eq('lecture', lecture).eq('timestamp', timestamp).execute()
+        # Check if record already exists for this student and timestamp
+        query = supabase_admin.table('attendance').select('att_id, lecture').eq('student_id', student_id).eq('timestamp', timestamp)
+        if lecture:
+            query = query.eq('lecture', lecture)
+        existing = query.execute()
         
+        # If not found with specific lecture, try matching by student_id and timestamp only
+        if not existing.data and lecture:
+            existing = supabase_admin.table('attendance').select('att_id, lecture').eq('student_id', student_id).eq('timestamp', timestamp).execute()
+
         if existing.data:
-            supabase_admin.table('attendance').update({"status": status}).eq('student_id', student_id).eq('lecture', lecture).eq('timestamp', timestamp).execute()
+            existing_rec = existing.data[0]
+            eff_lecture = lecture or existing_rec.get('lecture') or 'General'
+            update_payload = {"status": status}
+            if eff_lecture:
+                update_payload["lecture"] = eff_lecture
+            supabase_admin.table('attendance').update(update_payload).eq('att_id', existing_rec['att_id']).execute()
         else:
+            # If lecture wasn't provided, infer lecture from existing logs for the same timestamp session
+            if not lecture:
+                session_logs = supabase_admin.table('attendance').select('lecture').eq('timestamp', timestamp).limit(1).execute()
+                if session_logs.data and session_logs.data[0].get('lecture'):
+                    lecture = session_logs.data[0].get('lecture')
+                else:
+                    lecture = 'General'
+
             # Fetch student details for a complete attendance insert
             student_resp = supabase_admin.table('students').select('*').eq('id', student_id).execute()
             if student_resp.data:

@@ -349,7 +349,10 @@
                         label = 'Absent';
                     }
                     let nextStatus = (data === 'Present' || data === 'Already Marked') ? 'Absent' : 'Present';
-                    return `<button type="button" onclick="toggleLogStatus('${row[0]}', '${row[7]}', '${row[6]}', '${nextStatus}', this)" title="Click to toggle status" class="transform hover:scale-105 active:scale-95 transition-all"><span class="${className}">${label}</span></button>`;
+                    let safeLec = (row[7] || '').replace(/'/g, "\\'");
+                    let safeStuId = (row[0] || '').replace(/'/g, "\\'");
+                    let safeTs = (row[6] || '').replace(/'/g, "\\'");
+                    return `<button type="button" onclick="toggleLogStatus('${safeStuId}', '${safeLec}', '${safeTs}', '${nextStatus}', this)" title="Click to toggle status" class="transform hover:scale-105 active:scale-95 transition-all"><span class="${className}">${label}</span></button>`;
                 }
                 return data;
             }
@@ -546,6 +549,48 @@
             return (studentMap[a].name || '').toLowerCase().localeCompare((studentMap[b].name || '').toLowerCase());
         });
 
+        if (sortedStudentIds.length === 0) {
+            $('#matrixTable').html(`
+              <tbody>
+                <tr>
+                  <td colspan="4" class="py-8 text-center text-gray-400">
+                    <i data-lucide="user-x" class="w-8 h-8 mx-auto mb-2 text-gray-500"></i>
+                    <div>No student records found matching the selected filters.</div>
+                  </td>
+                </tr>
+              </tbody>
+            `);
+            lucide.createIcons();
+            return;
+        }
+
+        if (timestamps.length === 0) {
+            let emptyHtml = `
+              <thead>
+                <tr class="bg-white/5 border-b border-white/10">
+                  <th class="py-3 px-4 text-left font-semibold text-white">Student ID</th>
+                  <th class="py-3 px-4 text-left font-semibold text-white">Name</th>
+                  <th class="py-3 px-4 text-left font-semibold text-white">Branch</th>
+                  <th class="py-3 px-4 text-center font-semibold text-gray-400">Status</th>
+                </tr>
+              </thead>
+              <tbody>`;
+            sortedStudentIds.forEach(sId => {
+                const student = studentMap[sId];
+                emptyHtml += `
+                  <tr class="border-b border-white/5 hover:bg-white/5 transition-colors">
+                    <td class="py-3 px-4 font-mono text-xs text-gray-400">${sId}</td>
+                    <td class="py-3 px-4 font-semibold text-white">${student.name}</td>
+                    <td class="py-3 px-4 text-xs text-gray-400">${student.branch}</td>
+                    <td class="py-3 px-4 text-center text-xs text-gray-500 italic">No Session Logs</td>
+                  </tr>`;
+            });
+            emptyHtml += `</tbody>`;
+            $('#matrixTable').html(emptyHtml);
+            lucide.createIcons();
+            return;
+        }
+
         // Build Table
         let html = '';
         
@@ -581,6 +626,7 @@
             `;
 
             timestamps.forEach(ts => {
+                 const sessionLec = (filtered.find(r => r[6] === ts) || [])[7] || selectedLec || 'Session';
                  const isPresent = filtered.some(r => 
                      (r[0] || "").toString().trim().toUpperCase() === sId.toString().trim().toUpperCase() && 
                      r[6] === ts && 
@@ -597,9 +643,13 @@
                      innerContent = `<i data-lucide="x" class="w-3.5 h-3.5"></i> Absent`;
                  }
 
+                 const safeLec = sessionLec.replace(/'/g, "\\'");
+                 const safeStuId = sId.toString().replace(/'/g, "\\'");
+                 const safeTs = ts.toString().replace(/'/g, "\\'");
+
                  html += `
                    <td class="py-3 px-4 text-center">
-                     <button type="button" onclick="toggleMatrixStatus('${sId}', '${selectedLec}', '${ts}', '${status}', this)" class="transform active:scale-95 transition-all inline-block">
+                     <button type="button" onclick="toggleMatrixStatus('${safeStuId}', '${safeLec}', '${safeTs}', '${status}', this)" class="transform active:scale-95 transition-all inline-block">
                        <span class="${badgeClass}">${innerContent}</span>
                      </button>
                    </td>
@@ -684,6 +734,11 @@
       span.innerHTML = 'Updating...';
       btnElement.disabled = true;
 
+      if (!lecture) {
+          const sessionMatch = rawAttendanceData.find(r => r[6] === timestamp && r[7]);
+          lecture = sessionMatch ? sessionMatch[7] : 'General';
+      }
+
       try {
           const response = await fetch('/update_attendance_status', {
               method: 'POST',
@@ -698,9 +753,10 @@
           const result = await response.json();
           if (result.success) {
               // Sync local DataTable datasource
-              const matchedRow = rawAttendanceData.find(r => r[0] === studentId && r[7] === lecture && r[6] === timestamp);
+              const matchedRow = rawAttendanceData.find(r => r[0] === studentId && r[6] === timestamp);
               if (matchedRow) {
                   matchedRow[5] = newStatus;
+                  if (!matchedRow[7] && lecture) matchedRow[7] = lecture;
               }
               attendanceTable.clear().rows.add(rawAttendanceData).draw(false);
           } else {
@@ -726,6 +782,11 @@
       span.innerText = '...';
       btnElement.disabled = true;
 
+      if (!lecture) {
+          const sessionMatch = rawAttendanceData.find(r => r[6] === timestamp && r[7]);
+          lecture = sessionMatch ? sessionMatch[7] : 'General';
+      }
+
       try {
           const response = await fetch('/update_attendance_status', {
               method: 'POST',
@@ -740,9 +801,10 @@
           const result = await response.json();
           if (result.success) {
               // Find and update matched record in local cache
-              let matchedRow = rawAttendanceData.find(r => r[0] === studentId && r[7] === lecture && r[6] === timestamp);
+              let matchedRow = rawAttendanceData.find(r => r[0] === studentId && r[6] === timestamp);
               if (matchedRow) {
                   matchedRow[5] = newStatus;
+                  if (!matchedRow[7] && lecture) matchedRow[7] = lecture;
               } else {
                   // If no record existed (e.g. N/A or new absent record), insert into cache
                   rawAttendanceData.push([studentId, '', '', '', '', newStatus, timestamp, lecture]);
@@ -761,7 +823,10 @@
               lucide.createIcons();
 
               // Re-bind onclick with updated status
-              btnElement.setAttribute('onclick', `toggleMatrixStatus('${studentId}', '${lecture}', '${timestamp}', '${newStatus}', this)`);
+              const safeLec = (lecture || '').replace(/'/g, "\\'");
+              const safeStuId = (studentId || '').replace(/'/g, "\\'");
+              const safeTs = (timestamp || '').replace(/'/g, "\\'");
+              btnElement.setAttribute('onclick', `toggleMatrixStatus('${safeStuId}', '${safeLec}', '${safeTs}', '${newStatus}', this)`);
 
               // Sync background log DataTable
               if (attendanceTable) {
