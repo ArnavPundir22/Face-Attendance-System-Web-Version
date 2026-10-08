@@ -26,15 +26,6 @@ Beyond standard attendance marking, BioSecure AI features a novel, patent-pendin
 
 ---
 
-## 📜 Intellectual Property & Patent Documentation
-
-This repository contains the official 2026 Patent Filing Package for COER University, Roorkee:
-
-* 📄 **[Invention Disclosure Form (IDF)](file:///home/dell/Face-Attendance-System-Web-Version/IDF/New%20Patent%20IDF.docx)**: Official patent disclosure document detailing system architecture, traditional attendance replacement context, pose-gated EWMA drift scoring math, and 300 DPI system flowcharts.
-* 📄 **[Patent Prior Art & Novelty Search Report](file:///home/dell/Face-Attendance-System-Web-Version/IDF/Patent_Prior_Art_Search_Report.docx)**: Exhaustive search report covering InPASS, Google Patents, Espacenet, WIPO, USPTO, and IEEE Xplore databases up to August 2026, establishing clear novelty and non-obviousness.
-
----
-
 ## 📚 Documentation Hub Index
 
 Explore our comprehensive, detailed technical sub-documentation guides in the [`docs/`](file:///home/dell/Face-Attendance-System-Web-Version/docs) directory:
