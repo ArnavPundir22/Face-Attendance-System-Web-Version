@@ -198,6 +198,35 @@ Resets student EWMA drift score to `0.0` (`HEALTHY`) upon single-click re-enroll
 
 ---
 
+### `GET /api/academic_options`
+Retrieves registered academic degree programs, branches, and active batch enrollment years.
+- **Success Response (200 OK - JSON)**:
+  ```json
+  {
+    "programs": ["B.Tech", "BCA", "M.Tech"],
+    "branches": ["CSE", "ECE", "IT"],
+    "years": [2026, 2025, 2024]
+  }
+  ```
+
+---
+
+## 📱 Progressive Web App (PWA) Endpoints
+
+### `GET /manifest.json`
+Delivers the W3C Web App Manifest containing icons, theme colors, and display configurations.
+- **Success Response (200 OK)**: `application/manifest+json`
+
+### `GET /sw.js`
+Serves the service worker script with `Service-Worker-Allowed: /` header, enabling offline asset caching and network resilience.
+- **Success Response (200 OK)**: `application/javascript`
+
+### `GET /offline`
+Renders the standalone offline fallback screen when network connectivity is disrupted.
+- **Success Response (200 OK)**: Custom HTML offline interface.
+
+---
+
 ## 🏥 Health Monitoring Endpoint
 
 ### `GET /healthz`

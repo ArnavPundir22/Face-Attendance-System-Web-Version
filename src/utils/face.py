@@ -24,10 +24,26 @@ except Exception as e:
     logger.warning(f"Failed to initialize InsightFace with ctx_id={config.INSIGHTFACE_CTX_ID} ({e}). Falling back to CPU (ctx_id=-1).")
     model.prepare(ctx_id=-1)
 
-def normalize_embedding(arr: np.ndarray) -> np.ndarray | None:
-    """Return an L2-normalised copy of *arr*, or ``None`` if the norm is zero."""
-    arr = np.array(arr, dtype=np.float32)
+def normalize_embedding(arr: np.ndarray | list | str) -> np.ndarray | None:
+    """Return an L2-normalised copy of *arr* (float32 ndarray), or ``None`` if invalid or zero norm."""
+    if arr is None:
+        return None
+    if isinstance(arr, str):
+        import json
+        arr = arr.strip()
+        if not arr:
+            return None
+        try:
+            arr = json.loads(arr)
+        except Exception:
+            cleaned = arr.strip('[] \t\n\r')
+            arr = [float(x.strip()) for x in cleaned.split(',') if x.strip()]
+    try:
+        arr = np.array(arr, dtype=np.float32)
+    except Exception:
+        return None
     norm = np.linalg.norm(arr)
-    if norm == 0:
+    if norm == 0 or np.isnan(norm):
         return None
     return arr / norm
+

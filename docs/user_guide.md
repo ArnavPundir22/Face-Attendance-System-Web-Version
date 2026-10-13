@@ -28,17 +28,34 @@ To add a new student profile into the system:
 
 1. Log in with an **Admin** account.
 2. Click **Add Student** in the navigation header (`/add_student`).
-3. Choose your preferred input method:
-   - **Neural OCR ID Card Scanner**:
-     - Upload a photo of the student's physical institutional ID card.
-     - Click **Scan ID Card**. The system runs pretrained **RapidOCR (DBNet + SVTR ONNX)** and PyTesseract to automatically extract and populate **Full Name**, **Student ID**, **Program**, **Branch**, **Batch Year**, and **Email**.
+3. Choose your preferred input method for auto-filling student details:
+   - **Click ID Photo (Mobile Camera Window)**:
+     - On mobile phones, tap **Click ID Photo**. The device's native camera window launches immediately (`capture="environment"`, ChatGPT-style), allowing you to capture a high-resolution snapshot of the physical student ID card directly.
+     - The neural scanner automatically analyzes the captured photo and populates form fields.
+   - **Upload ID Card (Gallery / File)**:
+     - Tap **Upload ID Card** to select an existing digital ID card photo from your phone's photo library or computer files.
+     - The system runs pretrained **RapidOCR (DBNet + SVTR ONNX)** to automatically extract and populate **Full Name**, **Student ID**, **Program**, **Branch**, **Batch Year**, and **Email**.
    - **Manual Input**:
      - Type the student's **Full Name**, **Student ID / Roll Number**, **Program** (e.g., B.Tech), **Branch** (e.g., CSE), and **Enrollment Year** (e.g., 2024).
-4. Upload a clear, front-facing portrait photo. Ensure good lighting and avoid sunglasses, heavy tilt, or face coverings.
+4. Upload or snap a clear, front-facing portrait photo using the **Guided Live Camera** with face oval stencil. Ensure good lighting and avoid sunglasses, heavy tilt, or face coverings.
 5. Click **Submit Student Profile**.
    - The system detects the face using RetinaFace.
    - Extracts a 512-dimensional ArcFace embedding vector.
    - Saves the profile to Supabase and updates the in-memory BLAS matrix cache for instant matching.
+
+---
+
+## 📱 Progressive Web App (PWA) & Offline Usage
+
+BioSecure AI is engineered as a Progressive Web App (PWA) for native mobile and desktop experiences:
+
+1. **Installation**:
+   - **Android Chrome**: Tap the "Add BioSecure AI to Home Screen" prompt or select **Install App** from the browser menu.
+   - **iOS Safari**: Tap the **Share** button $\rightarrow$ **Add to Home Screen**.
+   - **Desktop Chrome / Edge**: Click the install icon in the URL bar.
+2. **Offline Resilience**:
+   - The Service Worker (`/sw.js`) caches the core App Shell (CSS, JS, icons, UI layouts).
+   - If network connectivity drops, the system seamlessly redirects to `/offline`, preserving offline navigation without broken browser screens.
 
 ---
 

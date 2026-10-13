@@ -51,11 +51,8 @@ def reload_face_cache() -> int:
                     continue
 
                 try:
-                    emb_arr = np.array(raw_emb, dtype=np.float32)
-                    if emb_arr.shape != (512,):
-                        continue
-                    norm_emb = normalize_embedding(emb_arr)
-                    if norm_emb is None:
+                    norm_emb = normalize_embedding(raw_emb)
+                    if norm_emb is None or norm_emb.shape != (512,):
                         continue
                     
                     sid_clean = str(sid).strip()
@@ -158,8 +155,10 @@ def add_student_to_cache(student_id: str, name: str, program: str, branch: str, 
     """Dynamically append a new student to the in-memory matrix without reloading full DB."""
     global _student_ids, _student_metadata, _embeddings_matrix
 
+    ensure_cache_initialized()
+
     norm_emb = normalize_embedding(embedding)
-    if norm_emb is None:
+    if norm_emb is None or norm_emb.shape != (512,):
         return
 
     with _cache_lock:

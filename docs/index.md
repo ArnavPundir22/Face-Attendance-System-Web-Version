@@ -12,12 +12,12 @@ Explore the system through our dedicated sub-documentation modules:
 
 | Document | Description | Core Contents |
 | :--- | :--- | :--- |
-| 🏗️ **[System Architecture](architecture.md)** | Dual-pipeline architecture | In-memory BLAS matrix matching, `pgvector` RPC fallback, 3D Pose Gate, EWMA Drift Engine, Sequence Flowcharts |
-| 🗄️ **[Database & pgvector](database.md)** | Storage layer & vector similarity | Supabase PostgreSQL schemas (`students`, `attendance`, `embedding_health`, `academic_structure`), HNSW index, RLS policies |
+| 🏗️ **[System Architecture](architecture.md)** | Dual-pipeline architecture | In-memory BLAS matrix matching, `pgvector` RPC fallback, 3D Pose Gate, EWMA Drift Engine, PWA Service Worker caching |
+| 🗄️ **[Database & pgvector](database.md)** | Storage layer & vector similarity | Supabase PostgreSQL schemas (`students`, `attendance`, `embedding_health`, `academic_structure`), HNSW index, string deserialization |
 | 🧠 **[ML & Inference Pipeline](ml_pipeline.md)** | Facial recognition & neural OCR | InsightFace ArcFace 512D embeddings, RetinaFace alignment, 3D Euler angles, EWMA math ($\alpha=0.30$), RapidOCR ONNX pipeline |
-| 🔌 **[API Reference](api_reference.md)** | REST endpoints manual | Attendance logging, Neural ID Card OCR, student registration, `/admin/drift` APIs, status codes, `/healthz` |
-| 🌍 **[Ops & Deployment](deployment.md)** | Production setup & guidelines | Gunicorn WSGI worker tuning, Nginx reverse proxy, systemd daemons, RLS security scripts, `.env` config |
-| 👤 **[User & Admin Guide](user_guide.md)** | How to use the app | Registering students, Neural OCR ID scanning, classroom photo uploads, SMTP alerts, single-click drift resets |
+| 🔌 **[API Reference](api_reference.md)** | REST endpoints manual | Attendance logging, Neural ID Card OCR, student registration, `/admin/drift` APIs, PWA endpoints, status codes, `/healthz` |
+| 🌍 **[Ops & Deployment](deployment.md)** | Production setup & guidelines | Gunicorn WSGI worker tuning, Nginx reverse proxy, systemd daemons, RLS security scripts, virtualenv linking, automated tests |
+| 👤 **[User & Admin Guide](user_guide.md)** | How to use the app | Registering students, Mobile Camera ID scanning, classroom photo uploads, PWA offline usage, SMTP alerts, drift resets |
 
 ---
 

@@ -151,6 +151,18 @@ server {
         add_header Cache-Control "public, no-transform";
     }
 
+    # Progressive Web App (PWA) Service Worker & Manifest Configuration
+    location = /sw.js {
+        proxy_pass http://127.0.0.1:8000/sw.js;
+        add_header Cache-Control "no-cache";
+        add_header Service-Worker-Allowed "/";
+    }
+
+    location = /manifest.json {
+        proxy_pass http://127.0.0.1:8000/manifest.json;
+        add_header Content-Type "application/manifest+json";
+    }
+
     # Health check endpoint for load balancers
     location /healthz {
         proxy_pass http://127.0.0.1:8000/healthz;
@@ -159,11 +171,51 @@ server {
 }
 ```
 
+> [!IMPORTANT]
+> **HTTPS Requirement for Camera APIs**: Modern mobile browsers and web standards strictly restrict camera hardware access (`navigator.mediaDevices.getUserMedia` and native `<input capture="environment">`) to secure origins (`https://` or `localhost`). Always configure an SSL certificate (e.g. via Let's Encrypt / Certbot) for production domains.
+
 Enable the site configuration and restart Nginx:
 ```bash
 sudo ln -s /etc/nginx/sites-available/biosecure /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl restart nginx
+```
+
+---
+
+## 🧪 Deployment Verification & Automated Test Suite
+
+Before exposing the instance to traffic or after deploying code updates, run the regression test suite to verify ML caching, OCR parsing, and routing:
+
+```bash
+# Activate environment
+source .venv/bin/activate
+
+# Execute unit test suite
+pytest tests/unit -v
+```
+
+Expected test run output:
+```text
+============================= test session starts ==============================
+collected 14 items
+
+tests/unit/test_face_cache.py::test_normalize_embedding_standard PASSED  [  7%]
+tests/unit/test_face_cache.py::test_normalize_embedding_zero_norm PASSED [ 14%]
+tests/unit/test_face_cache.py::test_normalize_embedding_string_input PASSED [ 21%]
+tests/unit/test_face_cache.py::test_add_student_to_cache_uninitialized PASSED [ 28%]
+tests/unit/test_face_cache.py::test_match_face_in_cache_exact PASSED     [ 35%]
+tests/unit/test_face_cache.py::test_match_face_in_cache_empty PASSED     [ 42%]
+tests/unit/test_face_cache.py::test_match_face_in_cache_threshold PASSED [ 50%]
+tests/unit/test_ocr_helpers.py::test_preprocess_id_card_produces_images PASSED [ 57%]
+tests/unit/test_ocr_helpers.py::test_parse_student_id_text_standard PASSED [ 64%]
+tests/unit/test_ocr_helpers.py::test_parse_student_id_text_multiline PASSED [ 71%]
+tests/unit/test_routes.py::test_health_check PASSED                      [ 78%]
+tests/unit/test_routes.py::test_pwa_routes PASSED                        [ 85%]
+tests/unit/test_routes.py::test_academic_options PASSED                  [ 92%]
+tests/unit/test_routes.py::test_unauthenticated_redirect PASSED         [100%]
+
+============================== 14 passed in 0.94s ==============================
 ```
 
 ---
@@ -181,3 +233,4 @@ Content-Type: application/json
 
 {"service":"biosecure-ai-face-attendance","status":"ok"}
 ```
+

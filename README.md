@@ -55,6 +55,8 @@ Explore our comprehensive, detailed technical sub-documentation guides in the [`
 | **Patent Novelty #3** | 🚨 **Multi-Tier Alert Machine** | Classifies biometric health (`HEALTHY` $<0.15$, `WARNING` $\ge 0.15$, `CRITICAL` $\ge 0.25$, `ALERT` $\ge 0.35$). |
 | **Smart Automation** | 📧 **SMTP Email Dispatcher** | Dispatches real-time Gmail warning emails to administrators upon `CRITICAL` or `ALERT` drift escalation. |
 | **ID Card Scanner** | 💳 **RapidOCR Neural ID Card Reader** | Pretrained RapidOCR (DBNet + SVTR ONNX) and PyTesseract scanner (`/api/ocr_id_card`) for student enrollment. |
+| **Mobile Experience** | 📱 **Native Camera Window Capture** | Dedicated mobile camera button launching the OS camera capture window directly (`capture="environment"`, ChatGPT-style). |
+| **PWA & Offline** | ⚡ **Progressive Web App Architecture** | Offline App Shell with Service Worker (`sw.js`), full icon suite, and network-resilient offline status fallback. |
 | **Class Modes** | 🏫 **Separate vs Combined Roster Modes** | Supports single-class roster boundary enforcement and joint multi-branch combined lectures. |
 | **Admin Controls** | 👨‍💼 **Biometric Drift Management Portal** | Dedicated `/admin/drift` dashboard featuring single-click re-enrollment template reset functionality. |
 | **Security** | 🛡️ **Row-Level Security & RBAC** | Supabase Row-Level Security (RLS) policies protecting biometric vectors and student PII with proxy fix middleware. |
@@ -164,6 +166,12 @@ EMAIL_PASS="your-gmail-app-password"
    ```bash
    curl http://localhost:5000/healthz
    # Expected output: {"service":"biosecure-ai-face-attendance","status":"ok"}
+   ```
+
+5. **Run Automated Test Suite:**
+   ```bash
+   pytest tests/unit -v
+   # Runs 14 comprehensive unit tests covering embedding cache, OCR parsing, PWA, and routes.
    ```
 
 ---

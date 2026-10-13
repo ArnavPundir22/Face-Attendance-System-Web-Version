@@ -109,8 +109,10 @@ sequenceDiagram
 ## ⚡ Concurrency, Memory & Scaling Architecture
 
 1. **Thread-Safe In-Memory BLAS Matrix Cache (`src/utils/face_cache.py`)**:
-   Upon application startup (`create_app`), all registered 512D student ArcFace embeddings are loaded into a contiguous NumPy array of shape $(M, 512)$ in memory. When group photos with $N$ detected faces are processed, vector matching executes as a single matrix multiplication $Q_{N \times 512} \cdot M_{512 \times M}^T$, obtaining Cosine similarity scores for all faces in $< 1\text{ ms}$ on CPU.
+   Upon application startup (`create_app`), all registered 512D student ArcFace embeddings are loaded into a contiguous NumPy array of shape $(M, 512)$ in memory. Both JSON string formats and comma-delimited pgvector payloads are automatically deserialized into normalized `float32` vectors. When group photos with $N$ detected faces are processed, vector matching executes as a single batch matrix multiplication $Q_{N \times 512} \cdot M_{512 \times M}^T$, obtaining Cosine similarity scores for all faces in $< 1\text{ ms}$ on CPU.
 2. **Stateless WSGI Worker Model**:
    The Flask application holds no state on local disks. Student profiles, attendance logs, and drift health histories reside in Supabase PostgreSQL. Gunicorn worker processes operate independently, scaling horizontally across available CPU cores.
 3. **Database Connection Efficiency**:
    Backend operations utilize Supabase PostgREST API client instances initialized with `SUPABASE_SERVICE_ROLE_KEY`. This eliminates traditional PostgreSQL socket exhaustion risks during high-concurrency attendance submission events.
+4. **PWA & Service Worker Caching Architecture (`src/static/js/sw.js`)**:
+   The client leverages a cache-first strategy for static App Shell assets (Tailwind CSS, Lucide Icons, UI scripts) and network-first for dynamic endpoints. If network disconnection occurs during mobile navigation, requests seamlessly degrade to `/offline`, ensuring continuous client responsiveness.

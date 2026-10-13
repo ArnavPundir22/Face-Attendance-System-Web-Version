@@ -211,3 +211,43 @@ CREATE POLICY "Authenticated read academic_structure"
 
 > [!NOTE]
 > The Flask backend uses `SUPABASE_SERVICE_ROLE_KEY` (`supabase_admin` in `src/utils/db.py`), which bypasses RLS policies in Supabase. Backend operations continue operating with full administrative permissions while client REST endpoints remain locked down.
+
+---
+
+## 🧮 pgvector Serialization & In-Memory Deserialization
+
+When retrieving biometric records via the Supabase PostgREST client, PostgreSQL `vector(512)` columns are returned over the REST API as JSON-formatted strings (e.g., `"[-0.016254, 0.045612, ...]"`), rather than native Python numeric lists or NumPy arrays.
+
+### Deserialization Pipeline (`src/utils/face.py` & `src/utils/face_cache.py`)
+
+To ensure high-performance BLAS in-memory matrix caching without deserialization failures:
+
+1. **Type Inspection**: The `normalize_embedding()` function tests whether the raw embedding is an instance of `str`.
+2. **JSON Parsing with Fallback**:
+   ```python
+   if isinstance(raw_emb, str):
+       try:
+           emb = json.loads(raw_emb)
+       except Exception:
+           # Clean bracket formatting if raw string representation is present
+           cleaned = raw_emb.strip("[] \t\n\r")
+           emb = [float(x.strip()) for x in cleaned.split(",") if x.strip()]
+   ```
+3. **Floating Point Sanitization**: Embeddings are converted to `np.float32` arrays, replacing non-finite values (NaN / Inf) with zeros.
+4. **L2 Hypersphere Normalization**: The vector is scaled by $\|v\|_2$ with an $\epsilon = 10^{-10}$ guard:
+   \[\hat{v} = \frac{v}{\|v\|_2 + \epsilon}\]
+
+This resilient parsing ensures all enrolled students (e.g., all 844 students) load cleanly into CPU RAM at server startup, enabling sub-millisecond attendance matching.
+
+---
+
+## 🏛️ Academic Structure Reference Table & UI Dynamic Feed
+
+The `academic_structure` table decouples hardcoded college departments from the front-end user interface:
+
+- **Schema**:
+  - `id`: Auto-incrementing primary key.
+  - `type`: String category indicator (`program` or `branch`).
+  - `value`: Academic department or degree title (e.g., `B.Tech`, `BCA`, `CSE`, `ECE`).
+- **Endpoint Integration**: The `/api/academic_options` endpoint serves cached academic structures directly to [`src/templates/add_student.html`](file:///home/dell/Face-Attendance-System-Web-Version/src/templates/add_student.html).
+- **Extensibility**: Administrators can introduce new programs or branches directly in Supabase without modifying application code or redeploying the Flask server.
