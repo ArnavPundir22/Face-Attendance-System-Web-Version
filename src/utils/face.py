@@ -17,12 +17,13 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 model = insightface.app.FaceAnalysis(name='buffalo_l')
 
+det_size = (config.INSIGHTFACE_DET_SIZE, config.INSIGHTFACE_DET_SIZE)
 try:
-    model.prepare(ctx_id=config.INSIGHTFACE_CTX_ID)
-    logger.info(f"InsightFace model initialized with ctx_id={config.INSIGHTFACE_CTX_ID}")
+    model.prepare(ctx_id=config.INSIGHTFACE_CTX_ID, det_size=det_size)
+    logger.info(f"InsightFace model initialized with ctx_id={config.INSIGHTFACE_CTX_ID}, det_size={det_size}")
 except Exception as e:
     logger.warning(f"Failed to initialize InsightFace with ctx_id={config.INSIGHTFACE_CTX_ID} ({e}). Falling back to CPU (ctx_id=-1).")
-    model.prepare(ctx_id=-1)
+    model.prepare(ctx_id=-1, det_size=det_size)
 
 def normalize_embedding(arr: np.ndarray | list | str) -> np.ndarray | None:
     """Return an L2-normalised copy of *arr* (float32 ndarray), or ``None`` if invalid or zero norm."""

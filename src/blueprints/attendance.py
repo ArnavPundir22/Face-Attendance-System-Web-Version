@@ -21,7 +21,7 @@ import re
 from src import config
 from src.utils.db import supabase_admin, is_valid_email
 from src.utils.face import model, normalize_embedding
-from src.utils.face_cache import match_faces_batch
+from src.utils.face_cache import match_faces_batch, get_student_ewma, update_cached_student_drift
 
 attendance_bp = Blueprint('attendance', __name__)
 
@@ -126,15 +126,11 @@ def _send_drift_email_alert(student_id: str, alert_level: str, ewma_drift: float
         logging.getLogger(__name__).warning("Failed to send drift email alert: %s", err)
 
 
-def _update_drift(student_id: str, cosine_sim: float, pose_yaw: float, pose_pitch: float) -> dict:
+def _compute_drift_event(student_id: str, cosine_sim: float, pose_yaw: float, pose_pitch: float):
     """
-    Pose-Gated EWMA Drift Tracking (Patent Idea #3).
-
-    If the detected face pose exceeds the configured yaw/pitch thresholds,
-    the EWMA is NOT updated — the event is logged as POSE_REJECTED so that
-    bad-angle photos never inflate the drift signal.
-
-    Returns a dict with keys: pose_accepted, alert_level, ewma_drift.
+    In-memory Pose-Gated EWMA calculation (Patent Idea #3).
+    Runs with ZERO network latency by utilizing cached EWMA values.
+    Returns (drift_info, health_log_dict, student_update_dict, email_tuple).
     """
     pose_accepted = (
         abs(pose_yaw)   <= config.DRIFT_POSE_YAW_MAX and
@@ -144,20 +140,12 @@ def _update_drift(student_id: str, cosine_sim: float, pose_yaw: float, pose_pitc
     try:
         if pose_accepted:
             drift_score = 1.0 - cosine_sim
-
-            # Fetch current EWMA from students table (fast single-row lookup)
-            stu_resp = supabase_admin.table('students') \
-                .select('current_ewma_drift') \
-                .eq('id', student_id) \
-                .maybe_single() \
-                .execute()
-            prev_ewma = (stu_resp.data or {}).get('current_ewma_drift') or 0.0
-
-            new_ewma    = config.DRIFT_ALPHA * drift_score + (1 - config.DRIFT_ALPHA) * prev_ewma
+            prev_ewma = get_student_ewma(student_id)
+            new_ewma = config.DRIFT_ALPHA * drift_score + (1.0 - config.DRIFT_ALPHA) * prev_ewma
             alert_level = _compute_drift_level(new_ewma)
+            update_cached_student_drift(student_id, new_ewma, alert_level)
 
-            # Append event to embedding_health history
-            supabase_admin.table('embedding_health').insert({
+            health_log = {
                 'student_id':       student_id,
                 'drift_score':      round(drift_score, 6),
                 'ewma_drift':       round(new_ewma,    6),
@@ -166,23 +154,16 @@ def _update_drift(student_id: str, cosine_sim: float, pose_yaw: float, pose_pitc
                 'pose_yaw':         round(pose_yaw,    2),
                 'pose_pitch':       round(pose_pitch,  2),
                 'pose_accepted':    True,
-            }).execute()
-
-            # Keep students table in sync for fast dashboard queries
-            supabase_admin.table('students').update({
+            }
+            student_update = {
                 'current_ewma_drift': round(new_ewma, 6),
                 'drift_alert_level':  alert_level,
-            }).eq('id', student_id).execute()
-
-            # Trigger email alert if CRITICAL or ALERT
-            if alert_level in ('CRITICAL', 'ALERT'):
-                _send_drift_email_alert(student_id, alert_level, new_ewma)
-
-            return {'pose_accepted': True, 'alert_level': alert_level, 'ewma_drift': round(new_ewma, 4)}
-
+            }
+            email_tuple = (student_id, alert_level, new_ewma) if alert_level in ('CRITICAL', 'ALERT') else None
+            drift_info = {'pose_accepted': True, 'alert_level': alert_level, 'ewma_drift': round(new_ewma, 4)}
+            return drift_info, health_log, student_update, email_tuple
         else:
-            # Pose rejected — log the event but do NOT touch the EWMA
-            supabase_admin.table('embedding_health').insert({
+            health_log = {
                 'student_id':       student_id,
                 'drift_score':      None,
                 'ewma_drift':       None,
@@ -191,15 +172,34 @@ def _update_drift(student_id: str, cosine_sim: float, pose_yaw: float, pose_pitc
                 'pose_yaw':         round(pose_yaw,   2),
                 'pose_pitch':       round(pose_pitch,  2),
                 'pose_accepted':    False,
-            }).execute()
-            return {'pose_accepted': False, 'alert_level': 'POSE_REJECTED', 'ewma_drift': None}
-
-
+            }
+            drift_info = {'pose_accepted': False, 'alert_level': 'POSE_REJECTED', 'ewma_drift': None}
+            return drift_info, health_log, None, None
     except Exception as exc:
-        # Drift tracking must never break attendance marking
         import logging
-        logging.getLogger(__name__).warning('Drift tracking error for %s: %s', student_id, exc)
-        return {'pose_accepted': pose_accepted, 'alert_level': 'UNKNOWN', 'ewma_drift': None}
+        logging.getLogger(__name__).warning('Drift calculation error for %s: %s', student_id, exc)
+        return {'pose_accepted': pose_accepted, 'alert_level': 'UNKNOWN', 'ewma_drift': None}, None, None, None
+
+
+def _update_drift(student_id: str, cosine_sim: float, pose_yaw: float, pose_pitch: float) -> dict:
+    """Async wrapper for single drift update events (backward compatibility)."""
+    drift_info, health_log, student_update, email_tuple = _compute_drift_event(student_id, cosine_sim, pose_yaw, pose_pitch)
+    import threading
+    def _save():
+        if health_log:
+            try:
+                supabase_admin.table('embedding_health').insert(health_log).execute()
+            except Exception:
+                pass
+        if student_update:
+            try:
+                supabase_admin.table('students').update(student_update).eq('id', student_id).execute()
+            except Exception:
+                pass
+        if email_tuple:
+            _send_drift_email_alert(*email_tuple)
+    threading.Thread(target=_save, daemon=True).start()
+    return drift_info
 
 
 @attendance_bp.route('/')
@@ -286,6 +286,9 @@ def upload_photo():
     recognized_ids = set()
     all_outputs      = []
     confidence_map   = {}
+    pending_health_logs = []
+    pending_student_updates = {}
+    pending_email_alerts = []
 
     for file in files:
         npimg  = np.frombuffer(file.read(), np.uint8)
@@ -353,10 +356,16 @@ def upload_photo():
                     recognized_ids.add(matched_id)
                     confidence_map[matched_id] = best_score
 
-                    # ── Pose-Gated Drift Detection (Patent Idea #3) ──────────────────
+                    # ── Fast In-Memory Pose-Gated Drift (Patent Idea #3) ────────────
                     pose_yaw   = float(face.pose[1]) if (hasattr(face, 'pose') and face.pose is not None) else 0.0
                     pose_pitch = float(face.pose[0]) if (hasattr(face, 'pose') and face.pose is not None) else 0.0
-                    drift_info = _update_drift(matched_id, best_score, pose_yaw, pose_pitch)
+                    drift_info, h_log, s_update, e_alert = _compute_drift_event(matched_id, best_score, pose_yaw, pose_pitch)
+                    if h_log:
+                        pending_health_logs.append(h_log)
+                    if s_update:
+                        pending_student_updates[matched_id] = s_update
+                    if e_alert:
+                        pending_email_alerts.append(e_alert)
                     # ─────────────────────────────────────────────────────────────────
 
                     results.append({
@@ -562,6 +571,41 @@ def upload_photo():
         except Exception as e:
             import logging
             logging.getLogger(__name__).error("Failed to insert bulk attendance: %s", e, exc_info=True)
+
+    # ── Non-blocking background persistence of drift logs and alert emails ────
+    if pending_health_logs or pending_student_updates or pending_email_alerts:
+        import threading
+        def _async_persist_drift(h_logs, s_updates, emails):
+            # 1. Bulk insert all health logs in 1 single HTTP request
+            if h_logs:
+                try:
+                    supabase_admin.table('embedding_health').insert(h_logs).execute()
+                except Exception as err:
+                    import logging
+                    logging.getLogger(__name__).warning("Async bulk health logs insert failed: %s", err)
+
+            # 2. Update students table drift scores
+            for sid, u_data in s_updates.items():
+                try:
+                    supabase_admin.table('students').update(u_data).eq('id', sid).execute()
+                except Exception as err:
+                    import logging
+                    logging.getLogger(__name__).warning("Async student drift update failed for %s: %s", sid, err)
+
+            # 3. Dispatch alert emails
+            for sid, a_lvl, ewma in emails:
+                try:
+                    _send_drift_email_alert(sid, a_lvl, ewma)
+                except Exception as err:
+                    import logging
+                    logging.getLogger(__name__).warning("Async email alert failed for %s: %s", sid, err)
+
+        threading.Thread(
+            target=_async_persist_drift,
+            args=(pending_health_logs, pending_student_updates, pending_email_alerts),
+            daemon=True
+        ).start()
+    # ─────────────────────────────────────────────────────────────────────────
 
     return jsonify({
         "images": all_outputs,

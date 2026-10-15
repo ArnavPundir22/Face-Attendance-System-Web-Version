@@ -36,7 +36,7 @@ def reload_face_cache() -> int:
         try:
             logger.info("Initializing/Reloading in-memory face embedding cache...")
             response = supabase_admin.table('students') \
-                .select('id, name, program, branch, enrollment_year, academic_year, embedding') \
+                .select('id, name, program, branch, enrollment_year, academic_year, current_ewma_drift, drift_alert_level, embedding') \
                 .execute()
             
             rows = response.data or []
@@ -63,7 +63,9 @@ def reload_face_cache() -> int:
                         'program': r.get('program'),
                         'branch': r.get('branch'),
                         'enrollment_year': r.get('enrollment_year'),
-                        'academic_year': r.get('academic_year')
+                        'academic_year': r.get('academic_year'),
+                        'current_ewma_drift': float(r.get('current_ewma_drift') or 0.0),
+                        'drift_alert_level': r.get('drift_alert_level') or 'HEALTHY'
                     }
                     emb_list.append(norm_emb)
                 except Exception as err:
@@ -182,6 +184,26 @@ def add_student_to_cache(student_id: str, name: str, program: str, branch: str, 
             'program': program,
             'branch': branch,
             'enrollment_year': enrollment_year,
-            'academic_year': academic_year
+            'academic_year': academic_year,
+            'current_ewma_drift': 0.0,
+            'drift_alert_level': 'HEALTHY'
         }
         logger.info("Added/updated student %s in memory face cache (Total: %d).", sid_clean, len(_student_ids))
+
+
+def get_student_ewma(student_id: str) -> float:
+    """Get the cached EWMA drift score for a student without database queries."""
+    ensure_cache_initialized()
+    sid = str(student_id).strip()
+    with _cache_lock:
+        meta = _student_metadata.get(sid, {})
+        return float(meta.get('current_ewma_drift') or 0.0)
+
+
+def update_cached_student_drift(student_id: str, new_ewma: float, alert_level: str):
+    """Update in-memory EWMA drift score and alert level for a student."""
+    sid = str(student_id).strip()
+    with _cache_lock:
+        if sid in _student_metadata:
+            _student_metadata[sid]['current_ewma_drift'] = new_ewma
+            _student_metadata[sid]['drift_alert_level'] = alert_level

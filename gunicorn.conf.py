@@ -27,7 +27,7 @@ worker_class = "sync"  # sync is fine; use gthread if you need threading
 # Timeouts
 # ---------------------------------------------------------------
 # InsightFace model loading + group-photo inference can be slow.
-timeout = int(os.environ.get("GUNICORN_TIMEOUT", 120))
+timeout = int(os.environ.get("GUNICORN_TIMEOUT", 300))
 graceful_timeout = 30
 keepalive = 5
 

@@ -37,7 +37,7 @@ fi
 exec gunicorn wsgi:app \
     --workers 2 \
     --bind 0.0.0.0:8000 \
-    --timeout 120 \
+    --timeout ${GUNICORN_TIMEOUT:-300} \
     --access-logfile - \
     --error-logfile -
 

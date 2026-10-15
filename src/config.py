@@ -65,6 +65,8 @@ REATTENDANCE_INTERVAL_MINUTES: int = int(
 )
 # InsightFace model: ctx_id=0 → GPU, ctx_id=-1 → CPU
 INSIGHTFACE_CTX_ID: int = int(os.environ.get("INSIGHTFACE_CTX_ID", "-1"))
+# InsightFace detection resolution (default: 1280 for high-res sheets & group photos)
+INSIGHTFACE_DET_SIZE: int = int(os.environ.get("INSIGHTFACE_DET_SIZE", "1280"))
 
 # -------------------------
 # Embedding Drift Detection  (Patent Idea #3 — Pose-Gated EWMA)
