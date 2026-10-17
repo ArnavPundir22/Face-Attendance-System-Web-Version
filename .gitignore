@@ -50,3 +50,9 @@ Thumbs.db
 
 AI_Task_Force_Status_Report.docx
 
+# Nginx runtime artifacts & tools
+nginx/logs/
+nginx/temp/
+nginx/nginx-runtime.conf
+tools/
+
