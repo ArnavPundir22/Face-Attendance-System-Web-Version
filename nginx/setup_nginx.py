@@ -228,6 +228,58 @@ http {{
     return output_path
 
 
+def ensure_windows_nginx() -> bool:
+    """Ensure portable Nginx is downloaded and extracted on Windows."""
+    tools_dir = PROJECT_ROOT / "tools"
+    nginx_dir = tools_dir / "nginx"
+    nginx_exe = nginx_dir / "nginx.exe"
+
+    if nginx_exe.exists():
+        return True
+
+    tools_dir.mkdir(parents=True, exist_ok=True)
+    zip_path = tools_dir / "nginx.zip"
+    url = "https://nginx.org/download/nginx-1.26.2.zip"
+
+    print("==========================================================", flush=True)
+    print("[INFO] Portable Nginx for Windows not detected.", flush=True)
+    print("Downloading portable Nginx from official nginx.org mirror...", flush=True)
+    print("==========================================================", flush=True)
+    try:
+        import urllib.request
+        import zipfile
+        import shutil
+
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        )
+        with urllib.request.urlopen(req, timeout=60) as response, open(zip_path, "wb") as out_file:
+            shutil.copyfileobj(response, out_file)
+
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            zip_ref.extractall(tools_dir)
+
+        extracted_folder = tools_dir / "nginx-1.26.2"
+        if extracted_folder.exists():
+            if nginx_dir.exists():
+                shutil.rmtree(nginx_dir, ignore_errors=True)
+            extracted_folder.rename(nginx_dir)
+
+        if zip_path.exists():
+            zip_path.unlink()
+
+        if nginx_exe.exists():
+            print("[INFO] Portable Nginx installed successfully.", flush=True)
+            return True
+        else:
+            print("[WARNING] Portable Nginx extraction incomplete.", flush=True)
+            return False
+    except Exception as e:
+        print(f"[WARNING] Automatic Nginx download failed ({e}). Proceeding with direct WSGI fallback.", flush=True)
+        return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="Configure Nginx for BioSecure AI.")
     parser.add_argument("--port", type=int, default=None, help="Nginx frontend listening port")
@@ -243,6 +295,10 @@ def main():
     backend_port = args.backend_port or default_backend_port
 
     upstreams = [s.strip() for s in args.upstreams.split(",")] if args.upstreams else None
+
+    # On Windows, ensure portable Nginx is downloaded if needed
+    if args.os.lower().startswith("win"):
+        ensure_windows_nginx()
 
     out_file = generate_nginx_config(
         nginx_port=nginx_port,
