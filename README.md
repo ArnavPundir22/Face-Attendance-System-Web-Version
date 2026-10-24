@@ -264,19 +264,3 @@ Face-Attendance-System-Web-Version/
 │
 └── known_faces/                # Sample Biometric Test Gallery
 ```
-
----
-
-## 🤝 Citation & Attribution
-
-If you utilize BioSecure AI or the Pose-Gated EWMA Embedding Drift Engine in your research or institutional deployments, please reference:
-
-```bibtex
-@patent{biosecure_ai_2026,
-  title={Automated Facial Recognition Attendance System with Pose-Gated EWMA Biometric Embedding Drift Engine},
-  author={Pundir, Arnav and COER University Patent Team},
-  year={2026},
-  holder={COER University, Roorkee},
-  note={Invention Disclosure Form (IDF) Filed}
-}
-```
