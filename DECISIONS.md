@@ -72,3 +72,11 @@
   2. Ignoring only root symlinks: leaves canonical spreadsheets in `deliverables/trackers/` vulnerable to being pushed.
   3. Comprehensive globbing covering `deliverables/trackers/`, `*.xlsx`, `*.xls`, `*.xlsm`, and root links: eliminates any possibility of pushing spreadsheets while keeping Python tracker generators trackable.
 - **Rationale**: Keeps institutional internal evaluation spreadsheets completely off public/remote repositories while allowing local generation and editing.
+
+### 2026-10-24 — In-Place Incremental Tracker Updating
+- **Decision**: Developed `scripts/generators/update_existing_tracker.py` to update the canonical institutional trackers (`.xlsx` and `.xls`) in-place without regenerating the entire workbook from scratch.
+- **Context**: The user explicitly instructed: "update my tracker filesdon't regenereate the whole file, just update the existing".
+- **Alternatives Considered**: 
+  1. Full file regeneration: would overwrite any external manual styling, notes, or sheet configurations.
+  2. Incremental row appending: reads the existing OpenXML workbook via `openpyxl`, identifies existing row counts, formats and appends only the new verified checks for 24 October 2026, and updates formulas and row count assertions without disturbing earlier rows.
+- **Rationale**: Honors user requirement, maintains workbook integrity, preserves formatting consistency, and smoothly brings the total verified engineering check count to 311 items.
