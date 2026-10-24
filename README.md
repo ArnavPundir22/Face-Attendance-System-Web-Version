@@ -174,6 +174,97 @@ EMAIL_PASS="your-gmail-app-password"
    # Runs 14 comprehensive unit tests covering embedding cache, OCR parsing, PWA, and routes.
    ```
 
+## 📂 Enterprise Project Structure
+
+BioSecure AI adopts a standardized multi-tier enterprise structure separating application logic, verification suites, automated generators, formal deliverables, and production edge routing:
+
+```
+Face-Attendance-System-Web-Version/
+├── app.py                      # Application entry point / local development server
+├── wsgi.py                     # Production WSGI entry point
+├── gunicorn.conf.py            # Gunicorn multi-worker multi-thread configuration
+├── Procfile                    # PaaS / container process contract
+├── requirements.txt            # Production dependencies (Linux / macOS)
+├── requirements-windows.txt    # Windows-optimized dependencies
+├── start_face_attendance.sh    # Production launcher script (Linux / Nginx)
+├── start_face_attendance.bat   # Production launcher script (Windows)
+├── start_with_tunnel.bat       # Remote testing tunnel launcher
+├── README.md                   # Enterprise system documentation
+│
+├── src/                        # Core Application Source Code
+│   ├── __init__.py             # Application factory (create_app)
+│   ├── config.py               # Enterprise configuration & environment variables
+│   ├── blueprints/             # Modular feature controllers
+│   │   ├── admin.py            # Admin analytics, student management & CSV exports
+│   │   ├── attendance.py       # Attendance taking, multi-face verification & EWMA
+│   │   ├── auth.py             # Session authentication, login/logout & password resets
+│   │   └── students.py         # Student registration & ID card OCR ingestion
+│   ├── utils/                  # Domain services, caching, ML & DB utilities
+│   │   ├── auth_helpers.py     # Decorators, password hashing & session guards
+│   │   ├── db.py               # Supabase PostgreSQL client & query helpers
+│   │   ├── face.py             # InsightFace ArcFace 512D model loader & extraction
+│   │   ├── face_cache.py       # In-memory BLAS matrix matcher (<1ms)
+│   │   └── ocr_helpers.py      # RapidOCR ONNX & PyTesseract ID card parser
+│   ├── static/                 # Static assets (CSS, JS, icons, manifest.json, sw.js)
+│   └── templates/              # Jinja2 presentation templates
+│
+├── tests/                      # Automated Testing Framework
+│   ├── conftest.py             # Pytest fixtures & environment setup
+│   ├── unit/                   # Unit test suite (14 passing tests)
+│   ├── e2e/                    # End-to-end integration tests
+│   └── fixtures/               # Test data & mocking fixtures
+│
+├── deliverables/               # Formal Project Deliverables & Reports
+│   ├── trackers/               # Institutional Work Trackers (304 items, full dates)
+│   │   ├── AI_Intern_Work_Tracker_Face_Recognition.xlsx
+│   │   └── AI_Intern_Work_Tracker_Face_Recognition.xls
+│   ├── specifications/         # 10-Page Technical Architecture Specifications
+│   │   ├── BioSecure_AI_Project_Overview.pdf
+│   │   └── BioSecure_AI_Project_Overview.docx
+│   ├── briefs/                 # Executive Overviews & Setup Manuals
+│   │   ├── BioSecure_AI_One_Page_Overview.pdf
+│   │   ├── BioSecure_AI_One_Page_Overview.docx
+│   │   └── BioSecure_AI_Setup_Guide.pdf
+│   └── reports/                # Departmental Submissions & Official Briefs
+│       ├── AI_Task_Force_Official_Representation.docx
+│       └── AI_Task_Force_Status_Report.docx
+│
+├── scripts/                    # Automation, Tooling & Generator Pipeline
+│   ├── launchers/              # Startup scripts for Linux, Windows, & Tunnels
+│   │   ├── start_face_attendance.sh
+│   │   ├── start_face_attendance.bat
+│   │   └── start_with_tunnel.bat
+│   ├── generators/             # Report & document generation engines
+│   │   ├── generate_master_300_tracker.py
+│   │   ├── generate_project_overview_pdf.py
+│   │   ├── generate_project_overview_docx.py
+│   │   ├── generate_one_page_overview.py
+│   │   ├── generate_project_tracker_sheets.py
+│   │   ├── generate_face_recognition_tracker_in_intern_format.py
+│   │   └── generate_pwa_icons.py
+│   ├── tracker_data/           # 7 modular milestone dataset packages (Phase 1-7)
+│   │   ├── tracker_phase1.py ... tracker_phase7.py
+│   │   └── __init__.py
+│   └── archive/                # Archived prototypes and scratch utilities
+│
+├── nginx/                      # Infrastructure & Reverse Proxy Gateway
+│   ├── nginx.conf              # Master template
+│   ├── nginx-runtime.conf      # Generated runtime configuration
+│   ├── mime.types              # MIME mappings
+│   └── setup_nginx.py          # Cross-platform Nginx generator
+│
+├── docs/                       # Technical & Architectural Documentation Hub
+│   ├── index.md                # Portal index & sequence diagrams
+│   ├── architecture.md         # Multi-tier dual pipeline architecture
+│   ├── api_reference.md        # Comprehensive REST API specifications
+│   ├── database.md             # PostgreSQL schema, pgvector & RLS policies
+│   ├── deployment.md           # Production ops, Gunicorn, systemd & Nginx
+│   ├── ml_pipeline.md          # InsightFace, 3D Pose Gate, EWMA math & OCR
+│   └── user_guide.md           # Administrative manual & user workflows
+│
+└── known_faces/                # Sample Biometric Test Gallery
+```
+
 ---
 
 ## 🤝 Citation & Attribution

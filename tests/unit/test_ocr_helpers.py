@@ -52,3 +52,86 @@ def test_preprocess_id_card_image():
     for p in processed:
         assert isinstance(p, np.ndarray)
         assert len(p.shape) == 2  # Grayscale / 2D
+
+
+def test_parse_student_id_text_blood_group_and_watermark_isolation():
+    """Ensure blood group, registrar signature, and camera watermarks are never captured as program."""
+    sample_text = """
+    COER UNIVERSITY
+    STUDENT IDENTITY CARD
+    Name : Rohit Sharma
+    CU-ID : CU240251099
+    Program : B.Pharma
+    Blood Group : O+ve
+    DOB : 12/05/2003
+    Registrar
+    Vivo X60 Pro ZEISS Oct 14, 2026, 13:30
+    """
+    parsed = parse_student_id_text(sample_text)
+    assert parsed["name"] == "Rohit Sharma"
+    assert parsed["id"] == "CU240251099"
+    assert parsed["program"] == "B.Pharma"
+    assert "blood" not in parsed["program"].lower()
+    assert "registrar" not in parsed["program"].lower()
+    assert "vivo" not in parsed["program"].lower()
+    assert parsed["branch"] == ""
+
+
+def test_parse_student_id_text_inline_blood_group_stop_token():
+    """Ensure inline blood group on the same line as program is stopped by the boundary delimiter."""
+    sample_text = """
+    Name : Ananya Singh
+    Roll No : 22010455
+    Course : B.Tech (AI-ML) Blood Group : B+ve Registrar
+    Session : 2022-2026
+    """
+    parsed = parse_student_id_text(sample_text)
+    assert parsed["name"] == "Ananya Singh"
+    assert parsed["id"] == "22010455"
+    assert parsed["program"] == "B.Tech"
+    assert parsed["branch"] in ("AI & ML", "AI-ML", "AIML")
+    assert "blood" not in parsed["program"].lower()
+    assert "registrar" not in parsed["program"].lower()
+
+
+def test_parse_student_id_text_separate_branch_line():
+    """Ensure dedicated Branch / Department line is accurately parsed."""
+    sample_text = """
+    Name : Vikram Patel
+    Roll No : CU23010988
+    Program : B.Tech
+    Branch : Mechanical Engineering
+    Session : 2023-2027
+    """
+    parsed = parse_student_id_text(sample_text)
+    assert parsed["name"] == "Vikram Patel"
+    assert parsed["id"] == "CU23010988"
+    assert parsed["program"] == "B.Tech"
+    assert parsed["branch"] == "ME"
+
+
+def test_parse_student_id_text_dynamic_catalog_and_blacklist_rejection():
+    """Ensure passing DB catalog matches custom programs, and garbage is rejected."""
+    # Custom catalog match
+    custom_text = """
+    Name : Neha Gupta
+    CU-ID : CU25010022
+    Course : B.Com (Hons)
+    """
+    parsed = parse_student_id_text(
+        custom_text,
+        known_programs=["B.Com (Hons)", "BCA", "B.Tech"],
+        known_branches=["Finance", "CSE"]
+    )
+    assert parsed["program"] == "B.Com (Hons)"
+
+    # Garbage candidate containing blacklisted terms must be rejected
+    garbage_text = """
+    Name : Test Student
+    ID : STU12345
+    Program : Blood Group: Onish Registrar
+    """
+    parsed_garbage = parse_student_id_text(garbage_text)
+    assert parsed_garbage["program"] == ""
+    assert "blood" not in parsed_garbage["program"].lower()
+

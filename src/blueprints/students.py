@@ -171,8 +171,9 @@ def submit_student():
 
         supabase_admin.table('students').insert(insert_data).execute()
 
-        # Auto-register new Program & Branch into academic_structure if not present
-        if program:
+        # Auto-register new Program & Branch into academic_structure if not present and sensible
+        is_clean_acad = lambda v: bool(v and len(v.strip()) <= 40 and '\n' not in v and not any(k in v.lower() for k in ['blood', 'registrar', 'zeiss', 'vivo']))
+        if is_clean_acad(program):
             try:
                 ex_p = supabase_admin.table('academic_structure').select('id').eq('type', 'program').eq('value', program).execute()
                 if not ex_p.data:
@@ -180,7 +181,7 @@ def submit_student():
             except Exception:
                 pass
 
-        if branch:
+        if is_clean_acad(branch):
             try:
                 ex_b = supabase_admin.table('academic_structure').select('id').eq('type', 'branch').eq('value', branch).execute()
                 if not ex_b.data:
@@ -391,7 +392,17 @@ def api_ocr_id_card():
 
     parsed_data = {}
     if combined_raw_text:
-        parsed_data = parse_student_id_text(combined_raw_text)
+        known_programs = []
+        known_branches = []
+        try:
+            struct_resp = supabase_admin.table('academic_structure').select('type, value').execute()
+            rows = struct_resp.data or []
+            known_programs = [r['value'] for r in rows if r.get('type') == 'program']
+            known_branches = [r['value'] for r in rows if r.get('type') == 'branch']
+        except Exception as e:
+            print(f"Warning: Could not fetch academic_structure for OCR: {e}")
+
+        parsed_data = parse_student_id_text(combined_raw_text, known_programs, known_branches)
 
     return jsonify({
         "success": True,

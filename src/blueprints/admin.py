@@ -14,6 +14,7 @@ Routes:
   POST       /admin/user/delete/<id>         — delete user
 """
 
+from collections import Counter
 from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
@@ -439,6 +440,23 @@ def admin_reset():
         return redirect(url_for('admin.admin_dashboard', error=str(e)))
 
 
+def _batch_delete_academic_items(item_type, values):
+    """Safely delete academic structure items in chunks of 50 to avoid URL query length limits."""
+    total_deleted = 0
+    if not values:
+        return 0
+    # Deduplicate while preserving order
+    clean_values = [v.strip() for v in values if isinstance(v, str) and v.strip()]
+    seen = set()
+    deduped = [x for x in clean_values if not (x in seen or seen.add(x))]
+    
+    for i in range(0, len(deduped), 50):
+        chunk = deduped[i:i + 50]
+        supabase.table('academic_structure').delete().eq('type', item_type).in_('value', chunk).execute()
+        total_deleted += len(chunk)
+    return total_deleted
+
+
 @admin_bp.route('/academics', methods=['GET', 'POST'])
 def admin_academics():
     denied = _require_admin()
@@ -446,9 +464,28 @@ def admin_academics():
         return denied
 
     if request.method == 'POST':
-        action = request.form.get('action')
-        item_type = request.form.get('type')  # program, branch
-        item_value = request.form.get('value', '').strip()
+        is_json = request.is_json
+        if is_json:
+            data = request.get_json(silent=True) or {}
+            action = data.get('action')
+            item_type = data.get('type')  # program, branch
+            item_value = str(data.get('value', '')).strip()
+            values = data.get('values', [])
+            program_values = data.get('programs') or data.get('program_values') or []
+            branch_values = data.get('branches') or data.get('branch_values') or []
+        else:
+            action = request.form.get('action')
+            item_type = request.form.get('type')  # program, branch
+            item_value = request.form.get('value', '').strip()
+            values = request.form.getlist('values') or request.form.getlist('values[]')
+            program_values = request.form.getlist('programs') or request.form.getlist('program_values') or request.form.getlist('programs[]')
+            branch_values = request.form.getlist('branches') or request.form.getlist('branch_values') or request.form.getlist('branches[]')
+
+        if not values and item_value:
+            values = [item_value]
+
+        deleted_count = 0
+        error_msg = None
 
         if action == 'add' and item_type and item_value:
             try:
@@ -457,15 +494,38 @@ def admin_academics():
                     'value': item_value
                 }, on_conflict='type,value').execute()
             except Exception as e:
+                error_msg = str(e)
                 print("Error adding academic item:", e)
 
-        elif action == 'delete' and item_type and item_value:
+        elif action in ('delete', 'delete_multiple', 'bulk_delete'):
             try:
-                # First delete matching rows from academic_structure table
-                supabase.table('academic_structure').delete().eq('type', item_type).eq('value', item_value).execute()
-            except Exception as e:
-                print("Error deleting academic item from academic_structure:", e)
+                # 1. Multi-category bulk delete (programs and/or branches)
+                if program_values:
+                    deleted_count += _batch_delete_academic_items('program', program_values)
+                if branch_values:
+                    deleted_count += _batch_delete_academic_items('branch', branch_values)
 
+                # 2. Single-category bulk or single delete
+                if item_type and values and not (program_values or branch_values):
+                    deleted_count += _batch_delete_academic_items(item_type, values)
+            except Exception as e:
+                error_msg = str(e)
+                print("Error deleting academic items:", e)
+
+        # Return JSON if requested via AJAX
+        if is_json or request.headers.get('Accept') == 'application/json':
+            if error_msg:
+                return jsonify({'success': False, 'error': error_msg}), 400
+            return jsonify({
+                'success': True,
+                'deleted_count': deleted_count,
+                'message': f"Successfully removed {deleted_count} item(s)." if deleted_count > 0 else "Success"
+            })
+
+        if error_msg:
+            return redirect(url_for('admin.admin_academics', error=error_msg))
+        if deleted_count > 0:
+            return redirect(url_for('admin.admin_academics', msg=f"Successfully removed {deleted_count} item(s)."))
         return redirect(url_for('admin.admin_academics'))
 
     # Fetch academic structure from table
@@ -475,13 +535,29 @@ def admin_academics():
     except Exception:
         rows = []
 
-    programs = sorted(list({r['value'] for r in rows if r.get('type') == 'program'}))
-    branches = sorted(list({r['value'] for r in rows if r.get('type') == 'branch'}))
+    # Fetch enrolled student counts per program and branch
+    try:
+        stus_resp = supabase.table('students').select('program, branch').execute()
+        stus = stus_resp.data or []
+        p_counts = Counter(s.get('program') for s in stus if s.get('program'))
+        b_counts = Counter(s.get('branch') for s in stus if s.get('branch'))
+    except Exception as e:
+        print("Error fetching student counts for academic structure:", e)
+        p_counts = Counter()
+        b_counts = Counter()
+
+    sorted_p_values = sorted(list({r['value'] for r in rows if r.get('type') == 'program'}))
+    sorted_b_values = sorted(list({r['value'] for r in rows if r.get('type') == 'branch'}))
+
+    programs = [{'value': p, 'count': p_counts.get(p, 0)} for p in sorted_p_values]
+    branches = [{'value': b, 'count': b_counts.get(b, 0)} for b in sorted_b_values]
 
     return render_template(
         'admin_academics.html',
         programs=programs,
-        branches=branches
+        branches=branches,
+        msg=request.args.get('msg'),
+        error=request.args.get('error')
     )
 
 

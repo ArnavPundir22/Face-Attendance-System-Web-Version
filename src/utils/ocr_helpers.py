@@ -36,6 +36,12 @@ PROGRAM_KEYWORDS = {
     r'\bM\.?\s*Sc\b': 'M.Sc',
     r'\bBBA\b': 'BBA',
     r'\bMBA\b': 'MBA',
+    r'\bB\.?\s*Pharm(?:a)?\b': 'B.Pharma',
+    r'\bD\.?\s*Pharm(?:a)?\b': 'D.Pharma',
+    r'\bB\.?\s*Com(?:\s*\([^\)]*\))?\b': 'B.Com',
+    r'\bBA\s*LLB\b': 'BA LLB',
+    r'\bBBA\s*LLB\b': 'BBA LLB',
+    r'\bLL\.?B\b': 'LL.B',
     r'\bPh\.?D\b': 'Ph.D',
     r'\bDiploma\b': 'Diploma'
 }
@@ -51,8 +57,63 @@ BRANCH_KEYWORDS = {
     r'\b(Artificial\s*Intelligence|AI\s*(&|\+)?\s*ML|AIML|AI)\b': 'AI & ML',
     r'\b(Data\s*Science|DS)\b': 'Data Science',
     r'\b(Cyber\s*Security)\b': 'Cyber Security',
-    r'\b(Biotechnology|BT)\b': 'Biotechnology'
+    r'\b(Biotechnology|BT)\b': 'Biotechnology',
+    r'\b(Pharmacy|Pharmaceutics)\b': 'Pharmacy',
+    r'\b(Management|Marketing|HR|Finance|Business\s*Analytics)\b': 'Management',
+    r'\b(General)\b': 'General'
 }
+
+# Common ID card stop-labels to prevent regexes from overflowing into next fields
+STOP_LABELS_PATTERN = (
+    r'(?:\bBlood(?:\s*Group)?\b|\bBG\b|\bDOB\b|\bDate\s*of\s*Birth\b|'
+    r'\bFather(?:\'?s)?(?:\s*Name)?\b|\bMother(?:\'?s)?(?:\s*Name)?\b|'
+    r'\bSession\b|\bBatch\b|\bRoll(?:\s*No)?\b|\bCU[\-_]?ID\b|\bCU\b|\bStudent\s*ID\b|\bID\b|'
+    r'\bProgram\b|\bCourse\b|\bBranch\b|\bDepartment\b|'
+    r'\bValid(?:\s*Upto|\s*Through|\s*Till)?\b|\bRegistrar\b|\bDean\b|\bDirector\b|'
+    r'\bSign(?:ature)?\b|\bPhone\b|\bMobile\b|\bContact\b|\bEmergency\b|'
+    r'\bAddress\b|\bHostel\b|\bLibrary\b|\bTransport\b|\bDay\s*Scholar\b)'
+)
+
+# Reject strings containing non-academic keywords
+ACADEMIC_BLACKLIST = {
+    'blood', 'group', 'o+ve', 'a+ve', 'b+ve', 'ab+ve', 'o-ve', 'a-ve', 'b-ve', 'ab-ve',
+    'registrar', 'director', 'principal', 'dean', 'proctor', 'coordinator', 'authorized',
+    'signature', 'sign', 'dob', 'date of birth', 'father', 'mother', 'address', 'phone',
+    'mobile', 'contact', 'emergency', 'valid', 'validity', 'session', 'batch', 'roll',
+    'identity', 'card', 'student', 'university', 'college', 'campus', 'hostel',
+    'vivo', 'zeiss', 'oppo', 'redmi', 'samsung', 'iphone', 'xiaomi', 'realme', 'oneplus',
+    'shot on', 'camera', 'dual camera', 'quad camera', 'megapixels'
+}
+
+
+def is_valid_academic_string(text: str) -> bool:
+    """Check if candidate text is plausibly a legitimate academic program or branch."""
+    if not text or not isinstance(text, str):
+        return False
+    t_clean = text.strip()
+    if len(t_clean) < 2 or len(t_clean) > 35:
+        return False
+    if '\n' in t_clean or '\r' in t_clean:
+        return False
+    t_lower = t_clean.lower()
+    for bl in ACADEMIC_BLACKLIST:
+        if re.search(r'\b' + re.escape(bl) + r'\b', t_lower):
+            return False
+    return True
+
+
+def sanitize_ocr_text(text: str) -> str:
+    """Clean common phone camera watermarks and scanner artifacts before parsing."""
+    cleaned_lines = []
+    for line in text.splitlines():
+        line_str = line.strip()
+        if not line_str:
+            continue
+        lower_line = line_str.lower()
+        if any(brand in lower_line for brand in ['vivo x', 'zeiss', 'shot on', 'ai dual camera', 'redmi note', 'quad camera', 'megapixels']):
+            continue
+        cleaned_lines.append(line_str)
+    return "\n".join(cleaned_lines)
 
 
 def preprocess_id_card_image(image_bytes: bytes) -> list:
@@ -134,16 +195,19 @@ def perform_python_ocr(image_bytes: bytes) -> str:
     return "\n".join(combined_texts)
 
 
-def parse_student_id_text(text: str) -> dict:
+def parse_student_id_text(text: str, known_programs: list = None, known_branches: list = None) -> dict:
     """
     Parses OCR text output to extract structured student attributes based on university ID format:
     1. enrollment_year: 1st 4 digits of Session (e.g., '2024-2028' -> '2024')
-    2. program: text before brackets in Program line (e.g., 'B.Tech (CSE)' -> 'B.Tech')
-    3. branch: text inside brackets after program (e.g., 'B.Tech (CSE)' -> 'CSE')
-    4. id: value after CU-ID / Roll No / ID
-    5. name: value after Name :
-    6. email: standard email if present
+    2. program: validated academic program (e.g., 'B.Tech', 'B.Pharma', 'BCA')
+    3. branch: validated branch/specialization (e.g., 'CSE', 'AI-ML', 'ME')
+    4. id: student roll number or institutional ID
+    5. name: student name
+    6. email: institutional or personal email
     """
+    # 0. Sanitize text by stripping camera watermarks and EXIF timestamps
+    text = sanitize_ocr_text(text)
+
     # 1. Normalize full-width unicode punctuation & brackets
     text = re.sub(r'[\uFF1A\uFF1B\u2010\u2013\u2014]', ':', text)
     text = re.sub(r'[\uFF08\u3010]', '(', text)
@@ -179,18 +243,29 @@ def parse_student_id_text(text: str) -> dict:
         match = re.search(pattern, raw_full, re.IGNORECASE)
         if match:
             candidate = match.group(1).strip()
-            if not (len(candidate) == 4 and candidate.isdigit()):
-                parsed["id"] = candidate.upper()
+            # Stop candidate before stop-labels if joined
+            candidate_clean = re.split(STOP_LABELS_PATTERN, candidate, flags=re.IGNORECASE)[0].strip()
+            if candidate_clean and not (len(candidate_clean) == 4 and candidate_clean.isdigit()):
+                parsed["id"] = candidate_clean.upper()
                 break
 
-    # 3. Extract Name
-    name_match = re.search(r'(?:Student\s*Name|Name\s*of\s*Student|Name|Candidate)\s*[:;\-\.\s|!]+\s*([A-Za-z\s\.]{2,30})', raw_full, re.IGNORECASE)
-    if name_match:
-        candidate_name = name_match.group(1).strip()
-        clean_name = re.split(r'\b(CU|ID|Session|Program|Roll|DOB|Blood)\b', candidate_name, flags=re.IGNORECASE)[0].strip()
+    # 3. Extract Name (Line-first, then full text fallback)
+    name_line_match = re.search(r'(?:Student\s*Name|Name\s*of\s*Student|Name|Candidate)\s*[:;\-\.\s|!]+\s*([^\n\r]+)', text, re.IGNORECASE)
+    if name_line_match:
+        candidate_name = name_line_match.group(1).strip()
+        clean_name = re.split(STOP_LABELS_PATTERN, candidate_name, flags=re.IGNORECASE)[0].strip()
         clean_name = re.sub(r'[^A-Za-z\s\.]', '', clean_name).strip()
         if len(clean_name) > 2 and clean_name.upper() not in ["STUDENT", "CARD", "IDENTITY", "COLLEGE", "UNIVERSITY", "DAY", "SCHOLAR", "BLOOD", "GROUP"]:
             parsed["name"] = clean_name.title()
+
+    if not parsed["name"]:
+        name_match = re.search(r'(?:Student\s*Name|Name\s*of\s*Student|Name|Candidate)\s*[:;\-\.\s|!]+\s*([A-Za-z\s\.]{2,40})', raw_full, re.IGNORECASE)
+        if name_match:
+            candidate_name = name_match.group(1).strip()
+            clean_name = re.split(STOP_LABELS_PATTERN, candidate_name, flags=re.IGNORECASE)[0].strip()
+            clean_name = re.sub(r'[^A-Za-z\s\.]', '', clean_name).strip()
+            if len(clean_name) > 2 and clean_name.upper() not in ["STUDENT", "CARD", "IDENTITY", "COLLEGE", "UNIVERSITY", "DAY", "SCHOLAR", "BLOOD", "GROUP"]:
+                parsed["name"] = clean_name.title()
 
     # Fallback Name heuristics if label not found
     if not parsed["name"]:
@@ -198,7 +273,7 @@ def parse_student_id_text(text: str) -> dict:
             words = line.split()
             if 2 <= len(words) <= 4 and all(w.isalpha() for w in words):
                 upper_words = [w.upper() for w in words]
-                ignored = {"STUDENT", "IDENTITY", "CARD", "COLLEGE", "UNIVERSITY", "CAMPUS", "DEPARTMENT", "FACULTY", "ACADEMIC", "YEAR", "ROLL", "BRANCH", "DAY", "SCHOLAR", "BLOOD", "GROUP", "FORMERLY", "KNOWN"}
+                ignored = {"STUDENT", "IDENTITY", "CARD", "COLLEGE", "UNIVERSITY", "CAMPUS", "DEPARTMENT", "FACULTY", "ACADEMIC", "YEAR", "ROLL", "BRANCH", "DAY", "SCHOLAR", "BLOOD", "GROUP", "FORMERLY", "KNOWN", "SIGNATURE", "REGISTRAR", "DIRECTOR"}
                 if not any(w in ignored for w in upper_words):
                     parsed["name"] = " ".join(words).title()
                     break
@@ -212,51 +287,110 @@ def parse_student_id_text(text: str) -> dict:
         if year_match:
             parsed["enrollment_year"] = year_match.group(1)
 
-    # 5. Extract Program and Branch from "Program : B.Tech (CSE)" line
-    prog_line_match = re.search(r'(?:Program|Course|Degree|Prog)\s*[:;\-\.\s|!]+\s*([^\n\r]+)', raw_full, re.IGNORECASE)
+    # -------------------------------------------------------------------------
+    # 5. Extract Program and Branch with Boundary Protection & Validation
+    # -------------------------------------------------------------------------
+    raw_prog_candidate = ""
+    raw_branch_candidate = ""
+
+    # Strategy A: Find line with Program/Course label
+    prog_line_match = re.search(r'(?:Program|Course|Degree|Prog)\s*[:;\-\.\s|!]+\s*([^\n\r]+)', text, re.IGNORECASE)
     if prog_line_match:
-        prog_line = prog_line_match.group(1).strip()
+        full_line = prog_line_match.group(1).strip()
+        # Truncate at any subsequent field label (e.g. Blood Group, DOB, etc.)
+        prog_line = re.split(STOP_LABELS_PATTERN, full_line, flags=re.IGNORECASE)[0].strip()
+
+        # Check for bracket pattern: e.g. "B.Tech (CSE)" or "BCA [IT]"
         bracket_match = re.search(r'([^\(\)\[\]]+?)\s*[\(\[]\s*([^\(\)\[\]]+)\s*[\)\]]', prog_line)
         if bracket_match:
-            raw_prog = bracket_match.group(1).strip()
-            raw_branch = bracket_match.group(2).strip()
-
-            # Program mapping
-            for pattern, p_val in PROGRAM_KEYWORDS.items():
-                if re.search(pattern, raw_prog, re.IGNORECASE):
-                    parsed["program"] = p_val
-                    break
-            if not parsed["program"]:
-                parsed["program"] = raw_prog
-
-            # Branch mapping from inside brackets
-            for pattern, b_val in BRANCH_KEYWORDS.items():
-                if re.search(pattern, raw_branch, re.IGNORECASE):
-                    parsed["branch"] = b_val
-                    break
-            if not parsed["branch"]:
-                parsed["branch"] = raw_branch.upper()
+            raw_prog_candidate = bracket_match.group(1).strip()
+            raw_branch_candidate = bracket_match.group(2).strip()
         else:
-            # No brackets in program line
-            for pattern, p_val in PROGRAM_KEYWORDS.items():
-                if re.search(pattern, prog_line, re.IGNORECASE):
-                    parsed["program"] = p_val
-                    break
-            if not parsed["program"]:
-                parsed["program"] = prog_line
+            raw_prog_candidate = prog_line
 
-    # Fallback Program / Branch search across full text if not found above
+    # Strategy B: Find line with explicit Branch / Department / Specialization label
+    branch_line_match = re.search(r'(?:Branch|Department|Dept|Specialization|Stream)\s*[:;\-\.\s|!]+\s*([^\n\r]+)', text, re.IGNORECASE)
+    if branch_line_match:
+        full_b_line = branch_line_match.group(1).strip()
+        b_line = re.split(STOP_LABELS_PATTERN, full_b_line, flags=re.IGNORECASE)[0].strip()
+        if not raw_branch_candidate or len(b_line) > len(raw_branch_candidate):
+            raw_branch_candidate = b_line
+
+    # Dynamic catalog matching helper
+    def match_against_catalog(candidate: str, catalog: list) -> str:
+        if not candidate or not catalog:
+            return ""
+        c_norm = re.sub(r'[^a-zA-Z0-9]', '', candidate).lower()
+        for item in catalog:
+            if not item:
+                continue
+            i_norm = re.sub(r'[^a-zA-Z0-9]', '', str(item)).lower()
+            if c_norm == i_norm or (len(c_norm) >= 3 and c_norm in i_norm):
+                return str(item)
+        return ""
+
+    # Resolve Program
+    # 1. Match against known_programs from DB if provided
+    if known_programs and raw_prog_candidate:
+        matched = match_against_catalog(raw_prog_candidate, known_programs)
+        if matched:
+            parsed["program"] = matched
+
+    # 2. Match against PROGRAM_KEYWORDS
+    if not parsed["program"] and raw_prog_candidate:
+        for pattern, p_val in PROGRAM_KEYWORDS.items():
+            if re.search(pattern, raw_prog_candidate, re.IGNORECASE):
+                parsed["program"] = p_val
+                break
+
+    # 3. Fallback: Search PROGRAM_KEYWORDS across full text if line wasn't found
     if not parsed["program"]:
         for pattern, program_val in PROGRAM_KEYWORDS.items():
             if re.search(pattern, raw_full, re.IGNORECASE):
                 parsed["program"] = program_val
                 break
 
+    # 4. If raw_prog_candidate is structurally a valid academic string and has no blacklist words
+    if not parsed["program"] and is_valid_academic_string(raw_prog_candidate):
+        parsed["program"] = raw_prog_candidate.title()
+
+    # Resolve Branch
+    # 1. Match against known_branches from DB if provided
+    if known_branches and raw_branch_candidate:
+        matched = match_against_catalog(raw_branch_candidate, known_branches)
+        if matched:
+            parsed["branch"] = matched
+
+    # 2. Match against BRANCH_KEYWORDS
+    if not parsed["branch"] and raw_branch_candidate:
+        for pattern, b_val in BRANCH_KEYWORDS.items():
+            if re.search(pattern, raw_branch_candidate, re.IGNORECASE):
+                parsed["branch"] = b_val
+                break
+
+    # 3. Fallback: Search BRANCH_KEYWORDS across full text
     if not parsed["branch"]:
         for pattern, branch_val in BRANCH_KEYWORDS.items():
             if re.search(pattern, raw_full, re.IGNORECASE):
                 parsed["branch"] = branch_val
                 break
+
+    # 4. If raw_branch_candidate is structurally a valid academic string and has no blacklist words
+    if not parsed["branch"] and is_valid_academic_string(raw_branch_candidate):
+        parsed["branch"] = raw_branch_candidate.upper()
+
+    # Final sanity check: NEVER allow blacklisted strings in program or branch
+    if not is_valid_academic_string(parsed["program"]):
+        parsed["program"] = ""
+    if not is_valid_academic_string(parsed["branch"]):
+        parsed["branch"] = ""
+
+    # Construct institutional email using CU-ID / Student ID if email not explicitly found
+    if not parsed["email"] and parsed["id"]:
+        clean_id_str = parsed["id"].lower()
+        parsed["email"] = f"{clean_id_str}@coeruniversity.ac.in"
+
+    return parsed
 
     # Construct institutional email using CU-ID / Student ID if email not explicitly found
     if not parsed["email"] and parsed["id"]:

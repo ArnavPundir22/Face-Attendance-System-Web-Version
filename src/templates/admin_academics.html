@@ -8,6 +8,16 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   {% include 'includes/pwa_head.html' %}
+  <style>
+    .item-selected {
+      background: rgba(59, 130, 246, 0.12) !important;
+      border-color: rgba(59, 130, 246, 0.35) !important;
+    }
+    .branch-item-selected {
+      background: rgba(168, 85, 247, 0.12) !important;
+      border-color: rgba(168, 85, 247, 0.35) !important;
+    }
+  </style>
 </head>
 <body class="pb-24 md:pb-8 flex flex-col md:flex-row">
 
@@ -101,87 +111,611 @@
 
   <main class="w-full flex-1 p-4 sm:p-6 max-w-6xl mx-auto mt-24 md:mt-8 md:pl-72">
     <div class="glass-panel shadow-2xl p-5 sm:p-8 rounded-2xl inner-glow">
+      
+      <!-- Top Title Bar -->
       <div class="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
         <div class="flex items-center gap-3">
-          <i data-lucide="layers" class="w-6 h-6 text-blue-400"></i>
-          <h2 class="text-xl font-bold font-geist text-white">Manage Programs & Branches</h2>
+          <div class="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400">
+            <i data-lucide="layers" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h2 class="text-xl font-bold font-geist text-white">Manage Programs & Branches</h2>
+            <p class="text-xs text-gray-400 mt-0.5">Configure institutional curriculum options and remove unwanted or erroneous entries</p>
+          </div>
         </div>
-        <a href="/admin" class="btn-secondary-glass px-4 py-2 rounded-lg text-xs font-semibold">Back to Admin</a>
+        <a href="/admin" class="btn-secondary-glass px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5">
+          <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Back to Admin
+        </a>
       </div>
 
+      <!-- Flash Messages -->
+      {% if msg %}
+      <div id="flash-msg" class="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center justify-between animate-fadeIn">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="check-circle-2" class="w-4 h-4 shrink-0"></i>
+          <span>{{ msg }}</span>
+        </div>
+        <button type="button" onclick="this.parentElement.remove()" class="text-emerald-400/60 hover:text-emerald-300">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      {% endif %}
+
+      {% if error %}
+      <div id="flash-error" class="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center justify-between animate-fadeIn">
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+          <span>{{ error }}</span>
+        </div>
+        <button type="button" onclick="this.parentElement.remove()" class="text-rose-400/60 hover:text-rose-300">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      {% endif %}
+
+      <!-- Toast Alert Placeholder -->
+      <div id="toast" class="hidden mb-6 p-4 rounded-xl text-xs flex items-center justify-between animate-fadeIn"></div>
+
+      <!-- Global Bulk Action Bar (Visible when any items are checked) -->
+      <div id="global-bulk-bar" class="hidden mb-6 p-4 rounded-xl bg-blue-950/40 border border-blue-500/30 backdrop-blur-md flex flex-wrap items-center justify-between gap-3 shadow-lg">
+        <div class="flex items-center gap-2.5 text-xs text-gray-200">
+          <span class="w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse"></span>
+          <span class="text-gray-400">Total Selected:</span>
+          <strong id="global-total-count" class="text-white font-semibold">0 items</strong>
+          <span class="text-gray-400 text-[11px]">(<span id="global-prog-count">0</span> programs, <span id="global-branch-count">0</span> branches)</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="clearAllSelections()" class="btn-secondary-glass px-3 py-1.5 text-xs rounded-lg">
+            Deselect All
+          </button>
+          <button type="button" onclick="openBulkDeleteModal('all')" class="btn-danger-glass px-4 py-1.5 text-xs font-semibold rounded-lg flex items-center gap-1.5 shadow-sm">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Delete All Selected (<span id="global-btn-count">0</span>)
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Columns Grid -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         
-        <!-- PROGRAMS -->
-        <div class="bg-white/5 border border-white/10 rounded-xl p-5 space-y-4">
-          <h3 class="text-sm font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
-            <i data-lucide="book-open" class="w-4 h-4"></i> Programs
-          </h3>
+        <!-- ================= PROGRAMS COLUMN ================= -->
+        <div class="bg-white/5 border border-white/10 rounded-xl p-5 space-y-4 flex flex-col">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
+              <i data-lucide="book-open" class="w-4 h-4"></i> Programs
+            </h3>
+            <span class="text-xs text-gray-400 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/10" id="prog-total-badge">
+              {{ programs|length }} registered
+            </span>
+          </div>
+
+          <!-- Add Program Form -->
           <form action="/admin/academics" method="POST" class="flex gap-2">
             <input type="hidden" name="action" value="add">
             <input type="hidden" name="type" value="program">
-            <input type="text" name="value" required placeholder="e.g. B.Tech" class="input-dark-glass w-full px-3 py-2 text-xs rounded-lg">
-            <button type="submit" class="btn-primary-glass px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-1">
+            <input type="text" name="value" required placeholder="Add program (e.g. B.Tech)" class="input-dark-glass w-full px-3 py-2 text-xs rounded-lg focus:border-blue-500">
+            <button type="submit" class="btn-primary-glass px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-1 whitespace-nowrap">
               <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add
             </button>
           </form>
-          <div class="space-y-2 max-h-60 overflow-y-auto">
+
+          <!-- Search & Multi-Select Toolbar -->
+          <div class="space-y-2.5 pt-2 border-t border-white/5">
+            <div class="relative">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5"></i>
+              <input type="text" id="prog-search" placeholder="Search programs..." oninput="filterList('prog')" class="input-dark-glass w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-black/20 text-gray-200 placeholder-gray-500">
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div class="flex items-center gap-2">
+                <label class="flex items-center gap-1.5 cursor-pointer text-gray-300 hover:text-white select-none">
+                  <input type="checkbox" id="prog-select-all" onchange="toggleSelectAll('prog', this.checked)" class="w-3.5 h-3.5 rounded text-blue-500 bg-black/40 border-white/20 focus:ring-0 cursor-pointer">
+                  <span>Select All</span>
+                </label>
+                {% set unused_p = programs|selectattr('count', 'equalto', 0)|list %}
+                {% if unused_p|length > 0 %}
+                <button type="button" onclick="selectUnused('prog')" class="text-[11px] px-2 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 transition flex items-center gap-1" title="Select programs with 0 enrolled students">
+                  <i data-lucide="filter" class="w-3 h-3"></i> Select Unused ({{ unused_p|length }})
+                </button>
+                {% endif %}
+              </div>
+
+              <button type="button" id="prog-bulk-btn" onclick="openBulkDeleteModal('program')" class="hidden btn-danger-glass px-2.5 py-1 text-xs rounded-lg flex items-center gap-1 font-semibold">
+                <i data-lucide="trash-2" class="w-3 h-3"></i> Delete (<span id="prog-sel-count">0</span>)
+              </button>
+            </div>
+          </div>
+
+          <!-- Programs Items List -->
+          <div class="space-y-1.5 max-h-96 overflow-y-auto pr-1" id="prog-list-container">
             {% for item in programs %}
-            <div class="flex justify-between items-center bg-[#0b1326]/60 p-2.5 rounded-lg border border-white/5 text-xs text-white">
-              <span>{{ item }}</span>
-              <form action="/admin/academics" method="POST">
-                <input type="hidden" name="action" value="delete">
-                <input type="hidden" name="type" value="program">
-                <input type="hidden" name="value" value="{{ item }}">
-                <button type="submit" class="text-rose-400 hover:text-rose-300 text-xs flex items-center gap-1">
+            <div class="prog-row flex items-center justify-between p-2 rounded-lg border border-white/5 bg-[#0b1326]/60 hover:bg-[#0b1326]/90 transition-all select-none" data-value="{{ item.value }}" data-count="{{ item.count }}">
+              <label class="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer py-0.5">
+                <input type="checkbox" value="{{ item.value }}" class="prog-checkbox w-4 h-4 rounded text-blue-500 bg-black/40 border-white/20 focus:ring-0 cursor-pointer" onchange="onItemSelectionChange()">
+                <span class="prog-name text-xs text-white truncate max-w-[180px] sm:max-w-xs" title="{{ item.value }}">{{ item.value }}</span>
+              </label>
+              <div class="flex items-center gap-2 shrink-0">
+                {% if item.count == 0 %}
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">0 students</span>
+                {% else %}
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-300 border border-blue-500/20">{{ item.count }} enrolled</span>
+                {% endif %}
+                <button type="button" onclick="confirmSingleDelete('program', '{{ item.value|replace("'", "\\'") }}', {{ item.count }})" class="p-1 text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 rounded transition" title="Delete program">
                   <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 </button>
-              </form>
+              </div>
             </div>
             {% else %}
-            <p class="text-xs text-gray-500 text-center py-2">No custom programs added.</p>
+            <p class="text-xs text-gray-500 text-center py-4">No custom programs added.</p>
             {% endfor %}
+            <p id="prog-no-results" class="hidden text-xs text-gray-500 text-center py-4">No programs match your search.</p>
           </div>
         </div>
 
-        <!-- BRANCHES -->
-        <div class="bg-white/5 border border-white/10 rounded-xl p-5 space-y-4">
-          <h3 class="text-sm font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">
-            <i data-lucide="git-branch" class="w-4 h-4"></i> Branches
-          </h3>
+        <!-- ================= BRANCHES COLUMN ================= -->
+        <div class="bg-white/5 border border-white/10 rounded-xl p-5 space-y-4 flex flex-col">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">
+              <i data-lucide="git-branch" class="w-4 h-4"></i> Branches
+            </h3>
+            <span class="text-xs text-gray-400 bg-white/5 px-2.5 py-0.5 rounded-full border border-white/10" id="branch-total-badge">
+              {{ branches|length }} registered
+            </span>
+          </div>
+
+          <!-- Add Branch Form -->
           <form action="/admin/academics" method="POST" class="flex gap-2">
             <input type="hidden" name="action" value="add">
             <input type="hidden" name="type" value="branch">
-            <input type="text" name="value" required placeholder="e.g. CSE" class="input-dark-glass w-full px-3 py-2 text-xs rounded-lg">
-            <button type="submit" class="btn-primary-glass px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-1">
+            <input type="text" name="value" required placeholder="Add branch (e.g. CSE)" class="input-dark-glass w-full px-3 py-2 text-xs rounded-lg focus:border-purple-500">
+            <button type="submit" class="btn-primary-glass px-4 py-2 text-xs font-bold rounded-lg flex items-center gap-1 whitespace-nowrap">
               <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add
             </button>
           </form>
-          <div class="space-y-2 max-h-60 overflow-y-auto">
+
+          <!-- Search & Multi-Select Toolbar -->
+          <div class="space-y-2.5 pt-2 border-t border-white/5">
+            <div class="relative">
+              <i data-lucide="search" class="w-3.5 h-3.5 text-gray-400 absolute left-3 top-2.5"></i>
+              <input type="text" id="branch-search" placeholder="Search branches..." oninput="filterList('branch')" class="input-dark-glass w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-black/20 text-gray-200 placeholder-gray-500">
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div class="flex items-center gap-2">
+                <label class="flex items-center gap-1.5 cursor-pointer text-gray-300 hover:text-white select-none">
+                  <input type="checkbox" id="branch-select-all" onchange="toggleSelectAll('branch', this.checked)" class="w-3.5 h-3.5 rounded text-purple-500 bg-black/40 border-white/20 focus:ring-0 cursor-pointer">
+                  <span>Select All</span>
+                </label>
+                {% set unused_b = branches|selectattr('count', 'equalto', 0)|list %}
+                {% if unused_b|length > 0 %}
+                <button type="button" onclick="selectUnused('branch')" class="text-[11px] px-2 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/20 transition flex items-center gap-1" title="Select branches with 0 enrolled students">
+                  <i data-lucide="filter" class="w-3 h-3"></i> Select Unused ({{ unused_b|length }})
+                </button>
+                {% endif %}
+              </div>
+
+              <button type="button" id="branch-bulk-btn" onclick="openBulkDeleteModal('branch')" class="hidden btn-danger-glass px-2.5 py-1 text-xs rounded-lg flex items-center gap-1 font-semibold">
+                <i data-lucide="trash-2" class="w-3 h-3"></i> Delete (<span id="branch-sel-count">0</span>)
+              </button>
+            </div>
+          </div>
+
+          <!-- Branches Items List -->
+          <div class="space-y-1.5 max-h-96 overflow-y-auto pr-1" id="branch-list-container">
             {% for item in branches %}
-            <div class="flex justify-between items-center bg-[#0b1326]/60 p-2.5 rounded-lg border border-white/5 text-xs text-white">
-              <span>{{ item }}</span>
-              <form action="/admin/academics" method="POST">
-                <input type="hidden" name="action" value="delete">
-                <input type="hidden" name="type" value="branch">
-                <input type="hidden" name="value" value="{{ item }}">
-                <button type="submit" class="text-rose-400 hover:text-rose-300 text-xs flex items-center gap-1">
+            <div class="branch-row flex items-center justify-between p-2 rounded-lg border border-white/5 bg-[#0b1326]/60 hover:bg-[#0b1326]/90 transition-all select-none" data-value="{{ item.value }}" data-count="{{ item.count }}">
+              <label class="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer py-0.5">
+                <input type="checkbox" value="{{ item.value }}" class="branch-checkbox w-4 h-4 rounded text-purple-500 bg-black/40 border-white/20 focus:ring-0 cursor-pointer" onchange="onItemSelectionChange()">
+                <span class="branch-name text-xs text-white truncate max-w-[180px] sm:max-w-xs" title="{{ item.value }}">{{ item.value }}</span>
+              </label>
+              <div class="flex items-center gap-2 shrink-0">
+                {% if item.count == 0 %}
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">0 students</span>
+                {% else %}
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-500/10 text-purple-300 border border-purple-500/20">{{ item.count }} enrolled</span>
+                {% endif %}
+                <button type="button" onclick="confirmSingleDelete('branch', '{{ item.value|replace("'", "\\'") }}', {{ item.count }})" class="p-1 text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 rounded transition" title="Delete branch">
                   <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 </button>
-              </form>
+              </div>
             </div>
             {% else %}
-            <p class="text-xs text-gray-500 text-center py-2">No custom branches added.</p>
+            <p class="text-xs text-gray-500 text-center py-4">No custom branches added.</p>
             {% endfor %}
+            <p id="branch-no-results" class="hidden text-xs text-gray-500 text-center py-4">No branches match your search.</p>
           </div>
         </div>
-
-
 
       </div>
     </div>
   </main>
 
+  <!-- ================= CONFIRMATION MODAL ================= -->
+  <div id="delete-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+    <div class="glass-panel max-w-md w-full p-6 rounded-2xl shadow-2xl border border-white/10 space-y-4">
+      <div class="flex items-center gap-3 text-rose-400">
+        <div class="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0">
+          <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-white">Confirm Removal</h3>
+          <p class="text-xs text-gray-400">Remove academic structure entries</p>
+        </div>
+      </div>
+
+      <div class="space-y-3 text-xs text-gray-300">
+        <p>You are about to remove <strong id="modal-item-count" class="text-white">0</strong> item(s) from the catalog:</p>
+        
+        <div id="modal-preview-list" class="max-h-48 overflow-y-auto space-y-1 p-2.5 rounded-lg bg-black/40 border border-white/5 font-mono text-[11px] text-gray-200">
+          <!-- Dynamic item tags inserted here -->
+        </div>
+
+        <div id="modal-warning" class="hidden p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] leading-relaxed">
+          ⚠️ <strong>Active Enrollment Alert:</strong> One or more selected items currently have enrolled students. Deleting them removes the option from future dropdown filters, but does not alter existing student records.
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-2 border-t border-white/10">
+        <button type="button" onclick="closeModal()" class="btn-secondary-glass px-4 py-2 text-xs rounded-lg">
+          Cancel
+        </button>
+        <button type="button" id="modal-confirm-btn" onclick="executeDeletion()" class="btn-danger-glass px-4 py-2 text-xs font-semibold rounded-lg flex items-center gap-1.5">
+          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          <span>Yes, Delete</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden Fallback Form for non-JS / standard POST submission -->
+  <form id="fallback-delete-form" action="/admin/academics" method="POST" class="hidden">
+    <input type="hidden" name="action" value="delete_multiple">
+    <div id="fallback-inputs"></div>
+  </form>
+
   <script>
+    // State variables
+    let pendingDeletion = {
+      programs: [],
+      branches: [],
+      totalCount: 0,
+      hasEnrolled: false
+    };
+
+    // Filter list by search term
+    function filterList(type) {
+      const searchInput = document.getElementById(`${type}-search`);
+      const term = (searchInput.value || '').trim().toLowerCase();
+      const rows = document.querySelectorAll(`.${type}-row`);
+      const noResults = document.getElementById(`${type}-no-results`);
+      let visibleCount = 0;
+
+      rows.forEach(row => {
+        const val = (row.getAttribute('data-value') || '').toLowerCase();
+        if (!term || val.includes(term)) {
+          row.style.display = 'flex';
+          visibleCount++;
+        } else {
+          row.style.display = 'none';
+        }
+      });
+
+      if (noResults) {
+        noResults.style.display = visibleCount === 0 && rows.length > 0 ? 'block' : 'none';
+      }
+    }
+
+    // Toggle select all visible items in a section
+    function toggleSelectAll(type, checked) {
+      const rows = document.querySelectorAll(`.${type}-row`);
+      rows.forEach(row => {
+        if (row.style.display !== 'none') {
+          const cb = row.querySelector(`.${type}-checkbox`);
+          if (cb) cb.checked = checked;
+        }
+      });
+      onItemSelectionChange();
+    }
+
+    // Select all items in a section that have 0 enrolled students
+    function selectUnused(type) {
+      const rows = document.querySelectorAll(`.${type}-row`);
+      rows.forEach(row => {
+        const count = parseInt(row.getAttribute('data-count') || '0', 10);
+        if (count === 0 && row.style.display !== 'none') {
+          const cb = row.querySelector(`.${type}-checkbox`);
+          if (cb) cb.checked = true;
+        }
+      });
+      onItemSelectionChange();
+    }
+
+    // Clear all selections across both sections
+    function clearAllSelections() {
+      document.querySelectorAll('.prog-checkbox, .branch-checkbox').forEach(cb => cb.checked = false);
+      const progSelectAll = document.getElementById('prog-select-all');
+      if (progSelectAll) progSelectAll.checked = false;
+      const branchSelectAll = document.getElementById('branch-select-all');
+      if (branchSelectAll) branchSelectAll.checked = false;
+      onItemSelectionChange();
+    }
+
+    // Selection change handler
+    function onItemSelectionChange() {
+      const selectedPrograms = [];
+      const selectedBranches = [];
+
+      document.querySelectorAll('.prog-row').forEach(row => {
+        const cb = row.querySelector('.prog-checkbox');
+        if (cb && cb.checked) {
+          selectedPrograms.push(row.getAttribute('data-value'));
+          row.classList.add('item-selected');
+        } else {
+          row.classList.remove('item-selected');
+        }
+      });
+
+      document.querySelectorAll('.branch-row').forEach(row => {
+        const cb = row.querySelector('.branch-checkbox');
+        if (cb && cb.checked) {
+          selectedBranches.push(row.getAttribute('data-value'));
+          row.classList.add('branch-item-selected');
+        } else {
+          row.classList.remove('branch-item-selected');
+        }
+      });
+
+      const progCount = selectedPrograms.length;
+      const branchCount = selectedBranches.length;
+      const totalCount = progCount + branchCount;
+
+      // Update Programs section button & count
+      const progBulkBtn = document.getElementById('prog-bulk-btn');
+      const progSelCount = document.getElementById('prog-sel-count');
+      if (progSelCount) progSelCount.textContent = progCount;
+      if (progBulkBtn) {
+        if (progCount > 0) progBulkBtn.classList.remove('hidden');
+        else progBulkBtn.classList.add('hidden');
+      }
+
+      // Update Branches section button & count
+      const branchBulkBtn = document.getElementById('branch-bulk-btn');
+      const branchSelCount = document.getElementById('branch-sel-count');
+      if (branchSelCount) branchSelCount.textContent = branchCount;
+      if (branchBulkBtn) {
+        if (branchCount > 0) branchBulkBtn.classList.remove('hidden');
+        else branchBulkBtn.classList.add('hidden');
+      }
+
+      // Update Global Bar
+      const globalBar = document.getElementById('global-bulk-bar');
+      const globalTotal = document.getElementById('global-total-count');
+      const globalProg = document.getElementById('global-prog-count');
+      const globalBranch = document.getElementById('global-branch-count');
+      const globalBtn = document.getElementById('global-btn-count');
+
+      if (globalTotal) globalTotal.textContent = `${totalCount} item${totalCount === 1 ? '' : 's'}`;
+      if (globalProg) globalProg.textContent = progCount;
+      if (globalBranch) globalBranch.textContent = branchCount;
+      if (globalBtn) globalBtn.textContent = totalCount;
+
+      if (globalBar) {
+        if (totalCount > 0) globalBar.classList.remove('hidden');
+        else globalBar.classList.add('hidden');
+      }
+    }
+
+    // Open confirmation modal for batch deletion
+    function openBulkDeleteModal(scope) {
+      let programs = [];
+      let branches = [];
+      let hasEnrolled = false;
+
+      if (scope === 'program' || scope === 'all') {
+        document.querySelectorAll('.prog-row').forEach(row => {
+          const cb = row.querySelector('.prog-checkbox');
+          if (cb && cb.checked) {
+            const val = row.getAttribute('data-value');
+            const cnt = parseInt(row.getAttribute('data-count') || '0', 10);
+            programs.push({ value: val, count: cnt });
+            if (cnt > 0) hasEnrolled = true;
+          }
+        });
+      }
+
+      if (scope === 'branch' || scope === 'all') {
+        document.querySelectorAll('.branch-row').forEach(row => {
+          const cb = row.querySelector('.branch-checkbox');
+          if (cb && cb.checked) {
+            const val = row.getAttribute('data-value');
+            const cnt = parseInt(row.getAttribute('data-count') || '0', 10);
+            branches.push({ value: val, count: cnt });
+            if (cnt > 0) hasEnrolled = true;
+          }
+        });
+      }
+
+      const total = programs.length + branches.length;
+      if (total === 0) return;
+
+      pendingDeletion = {
+        programs: programs.map(p => p.value),
+        branches: branches.map(b => b.value),
+        totalCount: total,
+        hasEnrolled: hasEnrolled
+      };
+
+      populateModal(pendingDeletion, programs, branches);
+    }
+
+    // Open confirmation modal for a single item delete
+    function confirmSingleDelete(type, value, studentCount) {
+      const isProgram = type === 'program';
+      pendingDeletion = {
+        programs: isProgram ? [value] : [],
+        branches: !isProgram ? [value] : [],
+        totalCount: 1,
+        hasEnrolled: studentCount > 0
+      };
+
+      const progs = isProgram ? [{ value: value, count: studentCount }] : [];
+      const branchs = !isProgram ? [{ value: value, count: studentCount }] : [];
+      populateModal(pendingDeletion, progs, branchs);
+    }
+
+    function populateModal(state, programs, branches) {
+      document.getElementById('modal-item-count').textContent = state.totalCount;
+      const previewList = document.getElementById('modal-preview-list');
+      previewList.innerHTML = '';
+
+      programs.forEach(p => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between py-1 border-b border-white/5 last:border-0';
+        item.innerHTML = `
+          <span class="text-blue-300 flex items-center gap-1.5 truncate">
+            <span class="px-1.5 py-0.2 rounded bg-blue-500/20 text-[9px] uppercase font-bold text-blue-400">Prog</span>
+            ${escapeHtml(p.value)}
+          </span>
+          <span class="text-[10px] text-gray-400 shrink-0">${p.count} students</span>
+        `;
+        previewList.appendChild(item);
+      });
+
+      branches.forEach(b => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center justify-between py-1 border-b border-white/5 last:border-0';
+        item.innerHTML = `
+          <span class="text-purple-300 flex items-center gap-1.5 truncate">
+            <span class="px-1.5 py-0.2 rounded bg-purple-500/20 text-[9px] uppercase font-bold text-purple-400">Branch</span>
+            ${escapeHtml(b.value)}
+          </span>
+          <span class="text-[10px] text-gray-400 shrink-0">${b.count} students</span>
+        `;
+        previewList.appendChild(item);
+      });
+
+      const warningEl = document.getElementById('modal-warning');
+      if (state.hasEnrolled) warningEl.classList.remove('hidden');
+      else warningEl.classList.add('hidden');
+
+      document.getElementById('delete-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeModal() {
+      document.getElementById('delete-modal').classList.add('hidden');
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast');
+      if (!toast) return;
+
+      const isSuccess = type === 'success';
+      toast.className = `mb-6 p-4 rounded-xl text-xs flex items-center justify-between animate-fadeIn ${
+        isSuccess ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' : 'bg-rose-500/10 border border-rose-500/20 text-rose-400'
+      }`;
+      toast.innerHTML = `
+        <div class="flex items-center gap-2.5">
+          <i data-lucide="${isSuccess ? 'check-circle-2' : 'alert-circle'}" class="w-4 h-4 shrink-0"></i>
+          <span>${escapeHtml(message)}</span>
+        </div>
+        <button type="button" onclick="this.parentElement.classList.add('hidden')" class="opacity-60 hover:opacity-100">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      `;
+      toast.classList.remove('hidden');
+      lucide.createIcons();
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 6000);
+    }
+
+    // Execute deletion via AJAX or fallback
+    async function executeDeletion() {
+      const confirmBtn = document.getElementById('modal-confirm-btn');
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = `<span class="animate-spin inline-block w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full"></span> Deleting...`;
+
+      try {
+        const response = await fetch('/admin/academics', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            action: 'delete_multiple',
+            programs: pendingDeletion.programs,
+            branches: pendingDeletion.branches
+          })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          // Remove deleted items from the DOM
+          pendingDeletion.programs.forEach(val => {
+            const rows = document.querySelectorAll(`.prog-row[data-value="${CSS.escape(val)}"]`);
+            rows.forEach(r => r.remove());
+          });
+          pendingDeletion.branches.forEach(val => {
+            const rows = document.querySelectorAll(`.branch-row[data-value="${CSS.escape(val)}"]`);
+            rows.forEach(r => r.remove());
+          });
+
+          // Update total badges
+          const remainingProgs = document.querySelectorAll('.prog-row').length;
+          const remainingBranches = document.querySelectorAll('.branch-row').length;
+          document.getElementById('prog-total-badge').textContent = `${remainingProgs} registered`;
+          document.getElementById('branch-total-badge').textContent = `${remainingBranches} registered`;
+
+          closeModal();
+          clearAllSelections();
+          showToast(`Successfully removed ${result.deleted_count || pendingDeletion.totalCount} academic items.`, 'success');
+        } else {
+          throw new Error(result.error || 'Server error occurred during deletion');
+        }
+      } catch (err) {
+        console.error('AJAX deletion failed, falling back to form submit:', err);
+        // Fallback to standard form submit
+        const form = document.getElementById('fallback-delete-form');
+        const inputsContainer = document.getElementById('fallback-inputs');
+        inputsContainer.innerHTML = '';
+
+        pendingDeletion.programs.forEach(val => {
+          const inp = document.createElement('input');
+          inp.type = 'hidden';
+          inp.name = 'programs';
+          inp.value = val;
+          inputsContainer.appendChild(inp);
+        });
+
+        pendingDeletion.branches.forEach(val => {
+          const inp = document.createElement('input');
+          inp.type = 'hidden';
+          inp.name = 'branches';
+          inp.value = val;
+          inputsContainer.appendChild(inp);
+        });
+
+        form.submit();
+      } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = `<i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Yes, Delete`;
+        lucide.createIcons();
+      }
+    }
+
+    // Close modal on escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+
     lucide.createIcons();
   </script>
   <script src="{{ url_for('static', filename='js/offline-detector.js') }}"></script>

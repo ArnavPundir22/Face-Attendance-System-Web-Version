@@ -1,27 +1,50 @@
-# Secrets & credentials
+# =============================================================================
+# BioSecure AI — Git Ignore Configuration
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Secrets, Credentials & Local Configuration (Never commit credentials)
+# -----------------------------------------------------------------------------
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.cert
+*.pfx
+*.p12
 cookies.txt
+token.json
+secrets.json
+credentials.json
+serviceAccountKey*.json
+client_secret*.json
 
-# SQLite database (contains student PII)
-database.db
-
-# Face encoding files
+# -----------------------------------------------------------------------------
+# 2. Biometric Data, Databases & Student PII
+# -----------------------------------------------------------------------------
+known_faces/
+known_faces/*
+!known_faces/.gitkeep
 EncodeFile_Insight.npy
 EncodeFile_Insight_names.json
 EncodeFile_Insight.pkl
-
-# Student face photos (PII)
-known_faces/
-
-#IDF
+*.npy
+*.npz
+database.db
+*.db
+*.sqlite
+*.sqlite3
+data.csv
 IDF/
 
-# Legacy data files
-data.csv
-
-# Python
+# -----------------------------------------------------------------------------
+# 3. Python Bytecode, Virtual Environments & Packaging
+# -----------------------------------------------------------------------------
 __pycache__/
 *.py[cod]
+*$py.class
 *.pyo
 *.pyd
 *.egg-info/
@@ -29,30 +52,93 @@ dist/
 build/
 .eggs/
 *.egg
+.installed.cfg
+
+# Virtual Environments
 .venv/
 venv/
 env/
+ENV/
+env.bak/
+venv.bak/
 
-# IDE
+# -----------------------------------------------------------------------------
+# 4. Testing, Caches & Coverage Reports
+# -----------------------------------------------------------------------------
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+nosetests.xml
+coverage.xml
+
+# -----------------------------------------------------------------------------
+# 5. Nginx, Reverse Proxy & Server Runtime Artifacts
+# -----------------------------------------------------------------------------
+nginx/logs/*
+!nginx/logs/.gitkeep
+nginx/temp/
+nginx/nginx-runtime.conf
+tools/
+*.pid
+*.seed
+*.pid.lock
+
+# -----------------------------------------------------------------------------
+# 6. Logs & Ephemeral Files
+# -----------------------------------------------------------------------------
+*.log
+logs/
+*.tmp
+*.bak
+
+# -----------------------------------------------------------------------------
+# 7. Operating System & Editor Files
+# -----------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# IDEs & Text Editors
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
+*.sublime-project
+*.sublime-workspace
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-
-.pytest_cache/
-
+# Microsoft Office Temporary Lock Files
+~$*
+.~lock.*
 AI_Task_Force_Status_Report.docx
 
-# Nginx runtime artifacts & tools
-nginx/logs/
-nginx/temp/
-nginx/nginx-runtime.conf
-tools/
+# -----------------------------------------------------------------------------
+# 8. Network Tunnels & Local Binaries
+# -----------------------------------------------------------------------------
+.cloudflared/
+cloudflared
+cloudflared.exe
+ngrok
+ngrok.exe
 
+# -----------------------------------------------------------------------------
+# 9. Institutional & Intern Work Trackers (Spreadsheets & Deliverables)
+# -----------------------------------------------------------------------------
+*.xlsx
+*.xls
+*.xlsm
+deliverables/trackers/
+*Tracker*.xlsx
+*Tracker*.xls
+*tracker*.xlsx
+*tracker*.xls
+/AI_Intern_Work_Tracker_Face_Recognition.*

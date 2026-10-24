@@ -636,49 +636,48 @@
         if (el) { el.value = parsed.enrollment_year; highlightAutoFilledField(el); }
       }
 
+      function selectBestMatchingOption(selectElement, candidate) {
+        if (!candidate || !selectElement) return false;
+        const norm = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const candNorm = norm(candidate);
+        if (!candNorm) return false;
+
+        // Pass 1: Exact normalized match
+        for (let opt of selectElement.options) {
+          if (!opt.value) continue;
+          if (norm(opt.value) === candNorm) {
+            selectElement.value = opt.value;
+            highlightAutoFilledField(selectElement);
+            return true;
+          }
+        }
+
+        // Pass 2: Substring inclusion match
+        for (let opt of selectElement.options) {
+          if (!opt.value) continue;
+          const optNorm = norm(opt.value);
+          if (optNorm.includes(candNorm) || (candNorm.length >= 3 && candNorm.includes(optNorm))) {
+            selectElement.value = opt.value;
+            highlightAutoFilledField(selectElement);
+            return true;
+          }
+        }
+        return false;
+      }
+
       if (parsed.program) {
         const select = document.getElementById('programSelect');
-        if (select) {
-          let found = false;
-          for (let opt of select.options) {
-            if (opt.value && (opt.value.toLowerCase() === parsed.program.toLowerCase() || opt.value.toLowerCase().includes(parsed.program.toLowerCase()))) {
-              select.value = opt.value;
-              found = true;
-              highlightAutoFilledField(select);
-              break;
-            }
-          }
-          if (!found && parsed.program.trim()) {
-            const newOpt = document.createElement('option');
-            newOpt.value = parsed.program.trim();
-            newOpt.text = `${parsed.program.trim()} (New Auto-Added)`;
-            newOpt.selected = true;
-            select.appendChild(newOpt);
-            highlightAutoFilledField(select);
-          }
+        const matched = selectBestMatchingOption(select, parsed.program);
+        if (!matched && parsed.program.trim()) {
+          console.warn("OCR program not matched in registered catalog:", parsed.program);
         }
       }
 
       if (parsed.branch) {
         const select = document.getElementById('branchSelect');
-        if (select) {
-          let found = false;
-          for (let opt of select.options) {
-            if (opt.value && (opt.value.toLowerCase() === parsed.branch.toLowerCase() || opt.value.toLowerCase().includes(parsed.branch.toLowerCase()))) {
-              select.value = opt.value;
-              found = true;
-              highlightAutoFilledField(select);
-              break;
-            }
-          }
-          if (!found && parsed.branch.trim()) {
-            const newOpt = document.createElement('option');
-            newOpt.value = parsed.branch.trim();
-            newOpt.text = `${parsed.branch.trim()} (New Auto-Added)`;
-            newOpt.selected = true;
-            select.appendChild(newOpt);
-            highlightAutoFilledField(select);
-          }
+        const matched = selectBestMatchingOption(select, parsed.branch);
+        if (!matched && parsed.branch.trim()) {
+          console.warn("OCR branch not matched in registered catalog:", parsed.branch);
         }
       }
     }
