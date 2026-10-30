@@ -23,6 +23,19 @@ def test_service_worker_endpoint(client):
     response = client.get("/sw.js")
     assert response.status_code == 200
     assert response.headers.get("Service-Worker-Allowed") == "/"
+    assert b"biosecure-pwa-v2" in response.data
+    assert b"/viewer" in response.data
+    assert b"/students" in response.data
+    assert b"/add_student" in response.data
+    assert b"/static/js/pwa-nav.js" in response.data
+
+def test_pwa_nav_static_asset(client):
+    response = client.get("/static/js/pwa-nav.js")
+    assert response.status_code == 200
+    assert b"__pwaPageCache" in response.data
+    assert b"startViewTransition" in response.data
+    assert b"teardownCurrentView" in response.data
+
 
 def test_error_404_handler(client):
     # Unauthenticated non-existent route redirects to /login per security policy

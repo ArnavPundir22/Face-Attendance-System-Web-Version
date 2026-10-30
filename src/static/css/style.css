@@ -559,3 +559,36 @@ select.input-dark-glass {
     transform-origin: 50% 50%;
 }
 
+/* PWA Native View Transitions */
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: 0.18s;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* PWA Client Navigation Top Progress Bar */
+#pwa-nav-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 2.5px;
+    width: 0%;
+    background: linear-gradient(90deg, #3b82f6, #06b6d4);
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.7);
+    z-index: 999999;
+    pointer-events: none;
+    opacity: 0;
+    transition: width 0.2s ease, opacity 0.15s ease;
+}
+#pwa-nav-bar.active {
+    opacity: 1;
+}
+
+/* Tactile Active Feedback for Navigation */
+nav.fixed.bottom-0 a:active,
+aside nav a:active {
+    transform: scale(0.95);
+    transition-duration: 100ms;
+}
+
+

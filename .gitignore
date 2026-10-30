@@ -142,3 +142,18 @@ deliverables/trackers/
 *tracker*.xlsx
 *tracker*.xls
 /AI_Intern_Work_Tracker_Face_Recognition.*
+
+# -----------------------------------------------------------------------------
+# 10. AI Collaboration, Agent Workspaces & Tracing Documents
+# -----------------------------------------------------------------------------
+.agents/
+HANDOVER.md
+DECISIONS.md
+FLOW.md
+FEATURE.md
+BUG.md
+ROLLBACK.md
+TEST_CHECKLIST.md
+ARCHITECTURE.md
+CONSTRAINTS.md
+

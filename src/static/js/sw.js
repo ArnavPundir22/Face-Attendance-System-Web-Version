@@ -1,8 +1,11 @@
-const CACHE_NAME = 'biosecure-pwa-v1';
+const CACHE_NAME = 'biosecure-pwa-v2';
 
 // App Shell assets to pre-cache
 const PRECACHE_ASSETS = [
   '/',
+  '/viewer',
+  '/students',
+  '/add_student',
   '/offline',
   '/manifest.json',
   '/static/css/style.css',
@@ -11,6 +14,7 @@ const PRECACHE_ASSETS = [
   '/static/js/guided-camera.js',
   '/static/js/id-scanner.js',
   '/static/js/pwa.js',
+  '/static/js/pwa-nav.js',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',
   '/static/icons/apple-touch-icon.png',
@@ -20,7 +24,7 @@ const PRECACHE_ASSETS = [
 
 // Install Event: Pre-cache App Shell
 self.addEventListener('install', (event) => {
-  console.log('[Service Worker] Installing Service Worker v1...');
+  console.log('[Service Worker] Installing Service Worker v2...');
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[Service Worker] Pre-caching App Shell assets');
@@ -33,7 +37,7 @@ self.addEventListener('install', (event) => {
 
 // Activate Event: Clean up old caches & take immediate control
 self.addEventListener('activate', (event) => {
-  console.log('[Service Worker] Activating Service Worker v1...');
+  console.log('[Service Worker] Activating Service Worker v2...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -58,49 +62,56 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle HTML Page Navigation Requests (Network First, Fallback to Cache / Offline Page)
+  // Handle HTML Page Navigation Requests (Fast Stale-While-Revalidate with Background Refresh)
   if (request.mode === 'navigate' || (request.headers.get('accept') && request.headers.get('accept').includes('text/html'))) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // Clone and update cache with fresh copy
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
-          return response;
-        })
-        .catch(async () => {
-          console.log('[Service Worker] Network failed for navigation; checking cache for:', url.pathname);
-          const cachedResponse = await caches.match(request);
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-          // If requested page isn't in cache, show offline fallback page
-          const offlinePage = await caches.match('/offline');
-          if (offlinePage) {
-            return offlinePage;
-          }
-          return new Response(
-            '<html><body><h1>Offline</h1><p>BioSecure AI is offline and the requested page is not cached.</p></body></html>',
-            { headers: { 'Content-Type': 'text/html' } }
-          );
-        })
-    );
-    return;
-  }
-
-  // Handle Static Assets (CSS, JS, Images, Fonts, Icons, CDNs) — Stale-While-Revalidate
-  if (
-    url.pathname.startsWith('/static/') ||
-    url.hostname.includes('tailwindcss.com') ||
-    url.hostname.includes('unpkg.com') ||
-    url.hostname.includes('googleapis.com') ||
-    url.hostname.includes('gstatic.com')
-  ) {
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
         const fetchPromise = fetch(request)
           .then((networkResponse) => {
             if (networkResponse && networkResponse.status === 200) {
+              const responseClone = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+            }
+            return networkResponse;
+          })
+          .catch(async () => {
+            if (cachedResponse) {
+              return cachedResponse;
+            }
+            const offlinePage = await caches.match('/offline');
+            if (offlinePage) {
+              return offlinePage;
+            }
+            return new Response(
+              '<html><body><h1>Offline</h1><p>BioSecure AI is offline and the requested page is not cached.</p></body></html>',
+              { headers: { 'Content-Type': 'text/html' } }
+            );
+          });
+
+        // Fast return cached copy immediately (< 10ms), fallback to network fetch
+        return cachedResponse || fetchPromise;
+      })
+    );
+    return;
+  }
+
+  // Handle Static Assets & Vendor CDNs (CSS, JS, Images, Fonts, Icons, CDNs) — Stale-While-Revalidate
+  if (
+    url.pathname.startsWith('/static/') ||
+    url.hostname.includes('tailwindcss.com') ||
+    url.hostname.includes('unpkg.com') ||
+    url.hostname.includes('googleapis.com') ||
+    url.hostname.includes('gstatic.com') ||
+    url.hostname.includes('datatables.net') ||
+    url.hostname.includes('code.jquery.com') ||
+    url.hostname.includes('cdnjs.cloudflare.com') ||
+    url.hostname.includes('cdn.jsdelivr.net')
+  ) {
+    event.respondWith(
+      caches.match(request).then((cachedResponse) => {
+        const fetchPromise = fetch(request)
+          .then((networkResponse) => {
+            if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque')) {
               const responseClone = networkResponse.clone();
               caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
             }
