@@ -43,6 +43,9 @@ logger = logging.getLogger(__name__)
 
 def create_app() -> Flask:
     """Create and configure the Flask application."""
+    from src.security.license_verifier import enforce_license_boot
+    enforce_license_boot()
+
     # Note: templates and static folders are inside src/ templates/ and static/
     # Because __init__.py is inside src/, Flask automatically resolves paths relative to src/
     app = Flask(__name__)
@@ -126,6 +129,26 @@ def create_app() -> Flask:
     # ------------------------------------------------------------------
     # Request hooks
     # ------------------------------------------------------------------
+
+    @app.before_request
+    def enforce_runtime_license():
+        """Mid-flight license expiration check."""
+        from flask import request
+        if request.path.startswith("/static/"):
+            return None
+        from src.security.license_verifier import check_license_runtime
+        is_expired, error_msg = check_license_runtime()
+        if is_expired:
+            logger.warning("License check failed mid-flight: %s", error_msg)
+            if _is_api_request():
+                return jsonify({
+                    "success": False,
+                    "error": "License Expired",
+                    "message": error_msg or "Software license has expired. Please contact support to renew.",
+                    "code": "LICENSE_EXPIRED",
+                }), 403
+            return render_template("error_403.html"), 403
+        return None
 
     @app.before_request
     def configure_cookies_and_require_login():

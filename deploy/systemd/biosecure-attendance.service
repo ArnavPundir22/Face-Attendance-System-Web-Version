@@ -1,0 +1,33 @@
+[Unit]
+Description=BioSecure AI Face Attendance Production Service
+After=network.target remote-fs.target
+
+[Service]
+Type=simple
+User=attendance
+Group=attendance
+WorkingDirectory=/opt/biosecure
+EnvironmentFile=/opt/biosecure/.env
+
+# Start Gunicorn WSGI server using virtualenv
+ExecStart=/opt/biosecure/.venv/bin/gunicorn app:app --config /opt/biosecure/gunicorn.conf.py
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=35
+
+# Automatic recovery
+Restart=always
+RestartSec=5s
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/opt/biosecure/known_faces /opt/biosecure/IDF
+
+# Resource limits
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
