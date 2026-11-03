@@ -75,6 +75,8 @@ venv.bak/
 # -----------------------------------------------------------------------------
 # 4. Testing, Caches & Coverage Reports
 # -----------------------------------------------------------------------------
+tests/
+scripts/empirical_cache_stress_test.py
 .pytest_cache/
 .coverage
 .coverage.*
