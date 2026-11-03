@@ -80,7 +80,7 @@ To record attendance for a class session:
 
 ## 🛡️ Monitoring Biometric Drift (`/admin/drift`)
 
-To manage biometric template aging (Patent Application #3):
+To monitor and manage biometric template aging:
 
 1. Navigate to **Drift Monitoring** in the admin header (`/admin/drift`).
 2. The dashboard displays all enrolled students sorted by highest `EWMA Drift Score`:

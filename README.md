@@ -10,7 +10,6 @@
 [![Supabase](https://img.shields.io/badge/Supabase-pgvector-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
 [![RapidOCR](https://img.shields.io/badge/RapidOCR-ONNX_DBNet_SVTR-4B8BBE)](https://github.com/RapidAI/RapidOCR)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-CDN-38B2AC?logo=tailwind-css&logoColor=white)](https://tailwindcss.com/)
-[![Patent Status](https://img.shields.io/badge/Patent_Status-IDF_Filed_2026-1F4E78)](file:///home/dell/Face-Attendance-System-Web-Version/IDF/New%20Patent%20IDF.docx)
 
 </div>
 
@@ -22,7 +21,7 @@
 
 By taking or uploading a single classroom group photo, the system instantly identifies all registered students, marks them **PRESENT** in a PostgreSQL database powered by Supabase `pgvector`, and provides real-time digital attendance records with detailed analytics.
 
-Beyond standard attendance marking, BioSecure AI features a novel, patent-pending **Biometric Embedding Drift Engine (2026 Patent Application)**. This parallel monitoring engine tracks facial template aging over time (beards, hairstyles, weight changes, semester progression) using **3D Pose-Gated EWMA Accumulation**, proactively notifying administrators before biometric recognition degradation or identity verification failure occurs.
+Beyond standard attendance marking, BioSecure AI features an advanced **Biometric Embedding Drift Engine**. This parallel monitoring engine tracks facial template aging over time (beards, hairstyles, weight changes, semester progression) using **3D Pose-Gated EWMA Accumulation**, proactively notifying administrators before biometric recognition degradation or identity verification failure occurs.
 
 ---
 
@@ -50,9 +49,9 @@ Explore our comprehensive, detailed technical sub-documentation guides in the [`
 | **Biometric AI** | 🧠 **InsightFace ArcFace 512D** | Extracts high-precision 512-dimensional normalized hyperspherical face embeddings using ONNX Runtime. |
 | **Ultra-Fast Matching** | ⚡ **In-Memory BLAS Matrix Vector Matcher** | Performs batch matrix dot-product operations ($Q \cdot M^T$) in $<1\text{ ms}$ on CPU, bypassing network roundtrips. |
 | **Persistent Search** | 🚀 **Supabase pgvector Integration** | Native PostgreSQL vector Cosine similarity RPC queries (`match_face` at `FACE_MATCH_THRESHOLD = 0.40`). |
-| **Patent Novelty #1** | 🛡️ **3D Pose Gate Noise Validator** | Rejects uncooperative head angles ($|\text{Yaw}| \le 25^\circ, |\text{Pitch}| \le 20^\circ$) to eliminate group-photo noise (`POSE_REJECTED`). |
-| **Patent Novelty #2** | 📈 **EWMA Drift Accumulator** | Exponentially Weighted Moving Average ($\alpha = 0.30$) tracking template aging ($D_t = 1.0 - S$). |
-| **Patent Novelty #3** | 🚨 **Multi-Tier Alert Machine** | Classifies biometric health (`HEALTHY` $<0.15$, `WARNING` $\ge 0.15$, `CRITICAL` $\ge 0.25$, `ALERT` $\ge 0.35$). |
+| **Biometric Stability** | 🛡️ **3D Pose Gate Noise Validator** | Rejects uncooperative head angles ($|\text{Yaw}| \le 25^\circ, |\text{Pitch}| \le 20^\circ$) to eliminate group-photo noise (`POSE_REJECTED`). |
+| **Drift Tracking** | 📈 **EWMA Drift Accumulator** | Exponentially Weighted Moving Average ($\alpha = 0.30$) tracking template aging ($D_t = 1.0 - S$). |
+| **Health Monitoring** | 🚨 **Multi-Tier Alert Machine** | Classifies biometric health (`HEALTHY` $<0.15$, `WARNING` $\ge 0.15$, `CRITICAL` $\ge 0.25$, `ALERT` $\ge 0.35$). |
 | **Smart Automation** | 📧 **SMTP Email Dispatcher** | Dispatches real-time Gmail warning emails to administrators upon `CRITICAL` or `ALERT` drift escalation. |
 | **ID Card Scanner** | 💳 **RapidOCR Neural ID Card Reader** | Pretrained RapidOCR (DBNet + SVTR ONNX) and PyTesseract scanner (`/api/ocr_id_card`) for student enrollment. |
 | **Mobile Experience** | 📱 **Native Camera Window Capture** | Dedicated mobile camera button launching the OS camera capture window directly (`capture="environment"`, ChatGPT-style). |
@@ -82,7 +81,7 @@ graph TD
         MatchRes --> |6. Write Attendance| AttLog[(Supabase attendance Table)]
     end
 
-    subgraph "Part B: Novel Pose-Gated EWMA Drift Engine (2026 Patent)"
+    subgraph "Part B: Pose-Gated EWMA Drift Engine"
         Arc --> |7. 3D Euler Angles| PoseGate{3D Pose Gate<br/>|Yaw|<=25° & |Pitch|<=20°}
         PoseGate -->|No: Rejected| PoseReject[Log POSE_REJECTED<br/>EWMA Unchanged]
         PoseGate -->|Yes: Accepted| DriftCalc[Calculate Drift D = 1.0 - S]
@@ -115,7 +114,7 @@ SUPABASE_ANON_KEY="your-supabase-anon-key"
 # Face Matching Threshold (Cosine Similarity: 0.0 - 1.0)
 FACE_MATCH_THRESHOLD=0.40
 
-# Embedding Drift Engine Constants (2026 Patent Application)
+# Embedding Drift Engine Constants
 DRIFT_ALPHA=0.30                # EWMA smoothing factor α
 DRIFT_POSE_YAW_MAX=25.0         # Max yaw angle cutoff (°)
 DRIFT_POSE_PITCH_MAX=20.0       # Max pitch angle cutoff (°)

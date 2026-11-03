@@ -2,7 +2,7 @@
 
 Welcome to the official technical documentation portal for **BioSecure AI**, developed at **COER University, Roorkee**. 
 
-BioSecure AI is a production-ready, high-performance automated facial recognition classroom attendance system designed to replace manual roll calls and physical attendance registers. It incorporates a novel **Pose-Gated EWMA Embedding Drift Engine (2026 Patent Application)** to solve biometric template aging.
+BioSecure AI is a production-ready, high-performance automated facial recognition classroom attendance system designed to replace manual roll calls and physical attendance registers. It incorporates an advanced **Pose-Gated EWMA Embedding Drift Engine** to solve biometric template aging.
 
 ---
 
@@ -18,13 +18,6 @@ Explore the system through our dedicated sub-documentation modules:
 | 🔌 **[API Reference](api_reference.md)** | REST endpoints manual | Attendance logging, Neural ID Card OCR, student registration, `/admin/drift` APIs, PWA endpoints, status codes, `/healthz` |
 | 🌍 **[Ops & Deployment](deployment.md)** | Production setup & guidelines | Gunicorn WSGI worker tuning, Nginx reverse proxy, systemd daemons, RLS security scripts, virtualenv linking, automated tests |
 | 👤 **[User & Admin Guide](user_guide.md)** | How to use the app | Registering students, Mobile Camera ID scanning, classroom photo uploads, PWA offline usage, SMTP alerts, drift resets |
-
----
-
-## 📜 Intellectual Property & Patent Documentation
-
-* 📄 **[Invention Disclosure Form (IDF)](file:///home/dell/Face-Attendance-System-Web-Version/IDF/New%20Patent%20IDF.docx)**: Official patent disclosure document detailing system architecture, traditional attendance replacement context, pose-gated EWMA drift scoring math, and 300 DPI system flowchart.
-* 📄 **[Patent Prior Art & Novelty Search Report](file:///home/dell/Face-Attendance-System-Web-Version/IDF/Patent_Prior_Art_Search_Report.docx)**: Exhaustive search report covering InPASS, Google Patents, Espacenet, WIPO, USPTO, and IEEE Xplore databases up to August 2026.
 
 ---
 
@@ -49,7 +42,7 @@ graph TD
         Match --> |6. Mark Attendance| RecLog[Mark Student PRESENT]
     end
 
-    subgraph "Part B: Novel Embedding Drift Engine (Patent #3)"
+    subgraph "Part B: Embedding Drift Engine"
         Arc --> |7. 3D Euler Angles| PoseGate{3D Pose Gate<br/>|Yaw|<=25° AND |Pitch|<=20°}
         PoseGate -->|No: Rejected| PoseReject[Log POSE_REJECTED<br/>EWMA Unchanged]
         PoseGate -->|Yes: Accepted| DriftCalc[Calculate Drift D = 1.0 - S]

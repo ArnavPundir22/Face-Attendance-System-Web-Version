@@ -1,6 +1,6 @@
 # 🗄️ Database & pgvector Guide
 
-BioSecure AI relies on **Supabase (PostgreSQL)** for identity, student records, 512D ArcFace embeddings storage, attendance logging, academic structures, and individual **Biometric Embedding Drift Tracking (2026 Patent Application)**.
+BioSecure AI relies on **Supabase (PostgreSQL)** for identity, student records, 512D ArcFace embeddings storage, attendance logging, academic structures, and individual **Biometric Embedding Drift Tracking**.
 
 ---
 
@@ -79,7 +79,7 @@ CREATE TABLE public.students (
     enrollment_year INT,                             -- Enrollment / Batch Year (e.g., 2024)
     academic_year TEXT,                              -- Academic Session String
     embedding VECTOR(512),                           -- ArcFace 512D facial embedding vector
-    current_ewma_drift DOUBLE PRECISION DEFAULT 0.0, -- Current EWMA Drift Score (Patent #3)
+    current_ewma_drift DOUBLE PRECISION DEFAULT 0.0, -- Current EWMA Drift Score
     drift_alert_level TEXT DEFAULT 'HEALTHY',        -- Alert level: HEALTHY/WARNING/CRITICAL/ALERT
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -105,7 +105,7 @@ CREATE TABLE public.attendance (
 CREATE INDEX IF NOT EXISTS idx_attendance_student_id ON public.attendance(student_id);
 CREATE INDEX IF NOT EXISTS idx_attendance_timestamp ON public.attendance(timestamp);
 
--- 4. Create Embedding Health & Drift Logs History Table (Patent #3)
+-- 4. Create Embedding Health & Drift Logs History Table
 CREATE TABLE public.embedding_health (
     id BIGSERIAL PRIMARY KEY,
     student_id TEXT NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
@@ -237,7 +237,16 @@ To ensure high-performance BLAS in-memory matrix caching without deserialization
 4. **L2 Hypersphere Normalization**: The vector is scaled by $\|v\|_2$ with an $\epsilon = 10^{-10}$ guard:
    \[\hat{v} = \frac{v}{\|v\|_2 + \epsilon}\]
 
-This resilient parsing ensures all enrolled students (e.g., all 844 students) load cleanly into CPU RAM at server startup, enabling sub-millisecond attendance matching.
+This resilient parsing ensures all enrolled students (1,126+ canonical profiles) load cleanly into CPU RAM at server startup, enabling sub-millisecond attendance matching.
+
+---
+
+## 📄 PostgREST Range Pagination & Vector Optimization (`src/utils/db.py`)
+
+Supabase PostgREST imposes a strict statement cap of 1,000 rows per query. To prevent silent record truncation on cohorts exceeding 1,000 students (e.g., the current 1,126-student directory):
+
+1. **`fetch_all_records()` Helper**: Iterates through records in batches of 1,000 using `.range(start, end)` until `len(data) < batch_size`.
+2. **Scalar Field Projections**: Scalar directory views (`/students`, `/admin/students`, `/get_attendance_data`, `/api/academic_options`) strictly omit heavy `vector(512)` columns, reducing network payload size from ~6.5MB to ~160KB and preventing timeout exceptions (`57014`).
 
 ---
 

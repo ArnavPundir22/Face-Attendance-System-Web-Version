@@ -23,7 +23,7 @@ Optional environment variables (sensible defaults provided):
   KNOWN_FACES_DIR           — path to face photo storage (default: known_faces)
   LOG_LEVEL                 — Python logging level (default: INFO)
 
-  --- Embedding Drift Detection (Patent Idea #3) ---
+  --- Embedding Drift Detection (Pose-Gated EWMA) ---
   DRIFT_ALPHA               — EWMA smoothing factor 0<α<1 (default: 0.3)
   DRIFT_POSE_YAW_MAX        — max yaw angle (°) to accept for drift update (default: 25)
   DRIFT_POSE_PITCH_MAX      — max pitch angle (°) to accept for drift update (default: 20)
@@ -69,7 +69,7 @@ INSIGHTFACE_CTX_ID: int = int(os.environ.get("INSIGHTFACE_CTX_ID", "-1"))
 INSIGHTFACE_DET_SIZE: int = int(os.environ.get("INSIGHTFACE_DET_SIZE", "1280"))
 
 # -------------------------
-# Embedding Drift Detection  (Patent Idea #3 — Pose-Gated EWMA)
+# Embedding Drift Detection (Pose-Gated EWMA Engine)
 # -------------------------
 # EWMA smoothing factor — lower = smoother / slower to react; higher = faster
 DRIFT_ALPHA: float               = float(os.environ.get("DRIFT_ALPHA", "0.3"))

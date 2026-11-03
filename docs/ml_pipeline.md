@@ -54,7 +54,7 @@ Where entry $C_{i, j}$ represents the Cosine similarity between query face $i$ a
 
 ---
 
-## 🛡️ Novel 3D Pose Gate & EWMA Embedding Drift Engine (2026 Patent Application)
+## 🛡️ 3D Pose Gate & EWMA Embedding Drift Engine
 
 To solve **Biometric Template Aging** (facial appearance variation caused by beard growth, new haircuts, aging, weight fluctuations across academic semesters), BioSecure AI runs a parallel biometric health tracking engine:
 

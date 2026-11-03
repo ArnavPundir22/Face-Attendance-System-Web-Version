@@ -1,6 +1,6 @@
 # 🔌 REST API Reference Manual
 
-This manual documents all REST endpoints, request parameters, JSON payloads, responses, and error codes for **BioSecure AI**, including attendance processing, neural ID card OCR scanning, and the **Biometric Embedding Drift Engine (2026 Patent Application)**.
+This manual documents all REST endpoints, request parameters, JSON payloads, responses, and error codes for **BioSecure AI**, including attendance processing, neural ID card OCR scanning, and the **Biometric Embedding Drift Engine**.
 
 ---
 
@@ -121,7 +121,7 @@ Fetches distinct programs, branches, and batch years registered in the system.
 
 ### `POST /submit_student`
 Registers a new student profile, saves reference photo to `known_faces/`, extracts 512D ArcFace embedding, and updates in-memory BLAS matrix cache.
-- **Request Headers**: `Content-Type: multipart/form-data`
+- **Request Headers**: `Content-Type: multipart/form-data` or `application/x-www-form-urlencoded`
 - **Request Body**:
   - `name` (string, required): Full student name.
   - `id` (string, required): Student ID / Roll Number.
@@ -130,7 +130,8 @@ Registers a new student profile, saves reference photo to `known_faces/`, extrac
   - `email` (string): Student email.
   - `enrollment_year` (int): 4-digit batch year (e.g. 2024).
   - `academic_year` (string): Academic session string.
-  - `photo` (file binary, required): Portrait image.
+  - `photo` (file binary, optional if `photo_base64` provided): Portrait image file.
+  - `photo_base64` (string, optional if `photo` provided): Data URL or raw base64 JPEG snapshot from guided camera.
 - **Success Response (200 OK - JSON / Redirect)**:
   ```json
   {
@@ -162,7 +163,7 @@ Scans physical ID cards using pretrained RapidOCR (DBNet + SVTR ONNX) and PyTess
 
 ---
 
-## 🛡️ Embedding Drift & Patent Admin Endpoints (Patent #3)
+## 🛡️ Embedding Drift & Biometric Health Endpoints
 
 ### `GET /admin/drift`
 Renders the Biometric Embedding Drift Management Dashboard.

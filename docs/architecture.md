@@ -1,6 +1,6 @@
 # 🏗️ System Architecture Guide
 
-This document describes the design patterns, application structure, and execution lifecycles of **BioSecure AI**, detailing both the **Primary Facial Recognition Attendance Pipeline**, **RapidOCR ID Card Reader**, and the novel **Pose-Gated EWMA Embedding Drift Engine (2026 Patent Application)**.
+This document describes the design patterns, application structure, and execution lifecycles of **BioSecure AI**, detailing both the **Primary Facial Recognition Attendance Pipeline**, **RapidOCR ID Card Reader**, and the **Pose-Gated EWMA Embedding Drift Engine**.
 
 ---
 
@@ -18,10 +18,6 @@ BioSecure AI is organized using the standard **Python Application Factory** layo
 ├── requirements-windows.txt    # Python dependencies (Windows)
 ├── start_face_attendance.sh    # Linux launcher script
 ├── start_face_attendance.bat   # Windows launcher script
-│
-├── IDF/                        # Official 2026 Patent Filing Package
-│   ├── New Patent IDF.docx     # Invention Disclosure Form (Full System Architecture & Math)
-│   └── Patent_Prior_Art_Search_Report.docx # Global Prior Art Search Report (2018-2026)
 │
 ├── src/                        # Main Application Package
 │   ├── __init__.py            # Application factory (create_app), error handlers & hooks
@@ -84,7 +80,7 @@ sequenceDiagram
     loop For Each Detected Student Face (S >= 0.40)
         App->>DB: Log attendance status PRESENT in attendance table
         
-        note over App, DB: --- PART B: EMBEDDING DRIFT ENGINE (PATENT #3) ---
+        note over App, DB: --- PART B: EMBEDDING DRIFT ENGINE ---
         App->>App: Evaluate 3D Pose Gate (|Yaw| <= 25° AND |Pitch| <= 20°)
         alt Pose Gate Passed (Frontal Face)
             App->>App: Compute instantaneous drift D = 1.0 - S

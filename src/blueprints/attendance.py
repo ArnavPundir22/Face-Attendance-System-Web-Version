@@ -128,7 +128,7 @@ def _send_drift_email_alert(student_id: str, alert_level: str, ewma_drift: float
 
 def _compute_drift_event(student_id: str, cosine_sim: float, pose_yaw: float, pose_pitch: float):
     """
-    In-memory Pose-Gated EWMA calculation (Patent Idea #3).
+    In-memory Pose-Gated EWMA calculation for template health tracking.
     Runs with ZERO network latency by utilizing cached EWMA values.
     Returns (drift_info, health_log_dict, student_update_dict, email_tuple).
     """
@@ -359,7 +359,7 @@ def upload_photo():
                     recognized_ids.add(matched_id)
                     confidence_map[matched_id] = best_score
 
-                    # ── Fast In-Memory Pose-Gated Drift (Patent Idea #3) ────────────
+                    # ── Fast In-Memory Pose-Gated Drift Engine ───────────────────────
                     pose_yaw   = float(face.pose[1]) if (hasattr(face, 'pose') and face.pose is not None) else 0.0
                     pose_pitch = float(face.pose[0]) if (hasattr(face, 'pose') and face.pose is not None) else 0.0
                     drift_info, h_log, s_update, e_alert = _compute_drift_event(matched_id, best_score, pose_yaw, pose_pitch)

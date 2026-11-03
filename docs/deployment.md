@@ -25,7 +25,7 @@ INSIGHTFACE_CTX_ID=-1
 # Face Vector Matching Thresholds
 FACE_MATCH_THRESHOLD=0.40
 
-# Biometric Embedding Drift Engine Constants (2026 Patent Application)
+# Biometric Embedding Drift Engine Constants
 DRIFT_ALPHA=0.30                # EWMA smoothing weight α
 DRIFT_POSE_YAW_MAX=25.0         # Max yaw angle threshold (°)
 DRIFT_POSE_PITCH_MAX=20.0       # Max pitch angle threshold (°)
