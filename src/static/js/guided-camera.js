@@ -224,6 +224,11 @@
 
     resetToLiveStream() {
       this.isCaptured = false;
+      window.__capturedStudentBlob = null;
+      window.__capturedStudentDataUrl = null;
+      const b64Input = document.getElementById('photoBase64Input');
+      if (b64Input) b64Input.value = '';
+
       if (this.capturedPreview) this.capturedPreview.classList.add('hidden');
       if (this.cameraContainer) this.cameraContainer.classList.remove('hidden');
       this.resetProgressRing();
@@ -529,6 +534,9 @@
       ctx.drawImage(this.video, 0, 0, vW, vH);
 
       const dataUrl = this.canvas.toDataURL('image/jpeg', 0.95);
+      window.__capturedStudentDataUrl = dataUrl;
+      const b64Input = document.getElementById('photoBase64Input');
+      if (b64Input) b64Input.value = dataUrl;
 
       // 4. Update Preview UI
       if (this.capturedImg) {
@@ -537,15 +545,21 @@
       if (this.cameraContainer) this.cameraContainer.classList.add('hidden');
       if (this.capturedPreview) this.capturedPreview.classList.remove('hidden');
 
-      // 5. Convert to Blob & populate HTML form File Input using DataTransfer
+      // 5. Convert to Blob & store for form submission (plus DataTransfer fallback)
       this.canvas.toBlob((blob) => {
-        if (blob && this.fileInput) {
-          const file = new File([blob], `student_photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
-          const dt = new DataTransfer();
-          dt.items.add(file);
-          this.fileInput.files = dt.files;
-
-          this.fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+        if (blob) {
+          window.__capturedStudentBlob = blob;
+          if (this.fileInput) {
+            try {
+              const file = new File([blob], `student_photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
+              const dt = new DataTransfer();
+              dt.items.add(file);
+              this.fileInput.files = dt.files;
+              this.fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+            } catch (dtErr) {
+              console.warn('DataTransfer input sync skipped:', dtErr);
+            }
+          }
         }
       }, 'image/jpeg', 0.95);
 

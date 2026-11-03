@@ -14,12 +14,13 @@ Routes:
   POST       /admin/user/delete/<id>         — delete user
 """
 
+import os
 from collections import Counter
 from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
 
-from src.utils.db import supabase_admin as supabase, is_valid_email
+from src.utils.db import supabase_admin as supabase, is_valid_email, fetch_all_records
 from src import config
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -40,7 +41,7 @@ def admin_dashboard():
         return denied
 
     try:
-        total_students = supabase.table('students').select('*', count='exact').execute().count or 0
+        total_students = supabase.table('students').select('id', head=True, count='exact').execute().count or 0
         total_attendance = supabase.table('attendance').select('*', count='exact').execute().count or 0
         
         # We can't efficiently count auth.users from client without admin API, so we fetch all
@@ -101,8 +102,12 @@ def admin_students():
         return denied
 
     try:
-        students_resp = supabase.table('students').select('*').order('name').execute()
-        students = students_resp.data
+        students = fetch_all_records(
+            client=supabase,
+            table_name='students',
+            select_fields='id, name, program, branch, enrollment_year, gmail',
+            order_field='name'
+        )
     except Exception:
         students = []
         
@@ -124,11 +129,14 @@ def admin_edit_student(student_id):
         return redirect(url_for('admin.admin_students'))
 
     if request.method == 'POST':
-        name    = request.form['name'].strip()
-        program = request.form['program'].strip()
-        branch  = request.form['branch'].strip()
-        gmail   = request.form['gmail'].strip()
-        photo   = request.files.get('photo')
+        name            = request.form.get('name', '').strip()
+        program         = request.form.get('program', '').strip()
+        branch          = request.form.get('branch', '').strip()
+        gmail           = request.form.get('gmail', '').strip()
+        enrollment_year = request.form.get('enrollment_year', '').strip()
+        photo           = request.files.get('photo')
+
+        parsed_year = int(enrollment_year) if enrollment_year and enrollment_year.isdigit() else None
 
         update_payload = {
             'name': name,
@@ -136,7 +144,10 @@ def admin_edit_student(student_id):
             'branch': branch,
             'gmail': gmail
         }
+        if parsed_year is not None:
+            update_payload['enrollment_year'] = parsed_year
 
+        new_embedding = None
         # If a new re-enrollment photo is provided, encode it and reset EWMA
         if photo and photo.filename:
             from werkzeug.utils import secure_filename
@@ -160,6 +171,7 @@ def admin_edit_student(student_id):
                         new_emb = np.array(face.embedding, dtype=np.float32)
                         normalized_emb = normalize_embedding(new_emb)
                         if normalized_emb is not None:
+                            new_embedding = normalized_emb
                             update_payload['embedding'] = normalized_emb.tolist()
                             update_payload['current_ewma_drift'] = 0.0
                             update_payload['drift_alert_level'] = 'HEALTHY'
@@ -183,8 +195,31 @@ def admin_edit_student(student_id):
             supabase.table('students').update(update_payload).eq('id', student_id).execute()
         except Exception as e:
             print("Update student error:", e)
+
+        # Synchronize in-memory biometric cache
+        try:
+            from src.utils.face_cache import add_student_to_cache, update_student_metadata_cache
+            if new_embedding is not None:
+                add_student_to_cache(
+                    student_id=student_id,
+                    name=name,
+                    program=program,
+                    branch=branch,
+                    embedding=new_embedding,
+                    enrollment_year=parsed_year
+                )
+            else:
+                update_student_metadata_cache(
+                    student_id=student_id,
+                    name=name,
+                    program=program,
+                    branch=branch,
+                    enrollment_year=parsed_year
+                )
+        except Exception as cache_err:
+            print(f"Face cache sync error on edit: {cache_err}")
             
-        return redirect(url_for('admin.admin_drift'))
+        return redirect(url_for('admin.admin_students'))
 
     return render_template('edit_student.html', student=student)
 
@@ -196,8 +231,12 @@ def admin_delete_student(student_id):
         return denied
 
     try:
-        # 1. Delete student attendance logs first to satisfy foreign key constraints
+        # 1. Delete student attendance and health logs first to satisfy foreign key constraints
         supabase.table('attendance').delete().eq('student_id', student_id).execute()
+        try:
+            supabase.table('embedding_health').delete().eq('student_id', student_id).execute()
+        except Exception:
+            pass
         
         # 2. Delete the student profile from the database
         supabase.table('students').delete().eq('id', student_id).execute()
@@ -210,6 +249,13 @@ def admin_delete_student(student_id):
             filepath = os.path.join(config.KNOWN_FACES_DIR, filename)
             if os.path.exists(filepath):
                 os.remove(filepath)
+
+        # 4. Synchronize in-memory biometric cache
+        try:
+            from src.utils.face_cache import remove_student_from_cache
+            remove_student_from_cache(student_id)
+        except Exception as cache_err:
+            print(f"Face cache removal error for student {student_id}: {cache_err}")
     except Exception as e:
         print(f"Cascading delete failed for student {student_id}: {e}")
         
@@ -223,8 +269,12 @@ def admin_mark_attendance():
         return denied
 
     try:
-        students_resp = supabase.table('students').select('*').order('name').execute()
-        students = students_resp.data or []
+        students = fetch_all_records(
+            client=supabase,
+            table_name='students',
+            select_fields='id, name, program, branch, enrollment_year, gmail',
+            order_field='name'
+        )
     except Exception:
         students = []
 
@@ -417,8 +467,12 @@ def admin_reset():
             # Delete all rows in attendance table where att_id is greater than 0
             supabase.table('attendance').delete().gt('att_id', 0).execute()
         elif reset_type == 'all':
-            # Delete attendance first because of foreign key dependency
+            # Delete attendance and embedding health logs first because of foreign key dependency
             supabase.table('attendance').delete().gt('att_id', 0).execute()
+            try:
+                supabase.table('embedding_health').delete().gt('id', 0).execute()
+            except Exception as eh_err:
+                print(f"Notice: Failed to clear embedding_health: {eh_err}")
             # Delete all students (where ID is not empty)
             supabase.table('students').delete().neq('id', '').execute()
 
@@ -431,6 +485,13 @@ def admin_reset():
                             os.unlink(file_path)
                     except Exception as e:
                         print(f"Failed to delete {file_path} on disk: {e}")
+
+            # Clear in-memory biometric cache
+            try:
+                from src.utils.face_cache import clear_face_cache
+                clear_face_cache()
+            except Exception as cache_err:
+                print(f"Failed to clear face cache on reset: {cache_err}")
         else:
             return redirect(url_for('admin.admin_dashboard', error="Invalid reset type"))
 
@@ -535,10 +596,13 @@ def admin_academics():
     except Exception:
         rows = []
 
-    # Fetch enrolled student counts per program and branch
+    # Fetch enrolled student counts per program and branch across all registered students
     try:
-        stus_resp = supabase.table('students').select('program, branch').execute()
-        stus = stus_resp.data or []
+        stus = fetch_all_records(
+            client=supabase,
+            table_name='students',
+            select_fields='program, branch'
+        )
         p_counts = Counter(s.get('program') for s in stus if s.get('program'))
         b_counts = Counter(s.get('branch') for s in stus if s.get('branch'))
     except Exception as e:
@@ -574,11 +638,13 @@ def admin_drift():
 
     try:
         # Fetch all students sorted by EWMA drift descending (most critical first)
-        students_resp = supabase.table('students') \
-            .select('id, name, program, branch, current_ewma_drift, drift_alert_level') \
-            .order('current_ewma_drift', desc=True) \
-            .execute()
-        students = students_resp.data or []
+        students = fetch_all_records(
+            client=supabase,
+            table_name='students',
+            select_fields='id, name, program, branch, current_ewma_drift, drift_alert_level',
+            order_field='current_ewma_drift',
+            desc=True
+        )
 
         # Count summary stats
         summary = {

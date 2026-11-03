@@ -132,13 +132,9 @@ def create_app() -> Flask:
         """Configure session cookie security for ngrok/HTTPS and check auth."""
         from flask import request
 
-        is_https = request.is_secure or request.headers.get("X-Forwarded-Proto") == "https"
-        if is_https:
-            app.config['SESSION_COOKIE_SECURE'] = True
-            app.config['SESSION_COOKIE_SAMESITE'] = 'None'
-        else:
-            app.config['SESSION_COOKIE_SECURE'] = False
-            app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+        is_https = bool(request.is_secure or request.headers.get("X-Forwarded-Proto") == "https")
+        app.config['SESSION_COOKIE_SECURE'] = is_https
+        app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
         public_paths = {"/login", "/favicon.ico", "/healthz", "/auth/callback", "/manifest.json", "/sw.js", "/offline"}
         if (
@@ -148,6 +144,13 @@ def create_app() -> Flask:
         ):
             return None
         if "logged_in" not in session:
+            is_ajax = (
+                request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+                or 'application/json' in request.headers.get('Accept', '')
+                or request.is_json
+            )
+            if is_ajax:
+                return jsonify({"success": False, "error": "Authentication required. Please log in.", "redirect": "/login"}), 401
             return redirect(url_for("auth.login"))
         return None
 

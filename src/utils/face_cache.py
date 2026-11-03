@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from src import config
-from src.utils.db import supabase_admin
+from src.utils.db import supabase_admin, fetch_all_records
 from src.utils.face import normalize_embedding
 
 logger = logging.getLogger(__name__)
@@ -35,11 +35,14 @@ def reload_face_cache() -> int:
     with _cache_lock:
         try:
             logger.info("Initializing/Reloading in-memory face embedding cache...")
-            response = supabase_admin.table('students') \
-                .select('id, name, program, branch, enrollment_year, academic_year, current_ewma_drift, drift_alert_level, embedding') \
-                .execute()
+            rows = fetch_all_records(
+                client=supabase_admin,
+                table_name='students',
+                select_fields='id, name, program, branch, enrollment_year, academic_year, current_ewma_drift, drift_alert_level, embedding',
+                order_field='id',
+                batch_size=500
+            )
             
-            rows = response.data or []
             new_ids: List[str] = []
             new_meta: Dict[str, Dict[str, Any]] = {}
             emb_list: List[np.ndarray] = []
@@ -191,6 +194,57 @@ def add_student_to_cache(student_id: str, name: str, program: str, branch: str, 
         logger.info("Added/updated student %s in memory face cache (Total: %d).", sid_clean, len(_student_ids))
 
 
+def remove_student_from_cache(student_id: str) -> bool:
+    """
+    Remove a student from the in-memory matrix and metadata cache.
+    Returns True if the student was present and removed, False otherwise.
+    """
+    global _student_ids, _student_metadata, _embeddings_matrix
+
+    if not student_id or not str(student_id).strip():
+        return False
+
+    ensure_cache_initialized()
+    sid_clean = str(student_id).strip()
+
+    with _cache_lock:
+        removed = False
+
+        if sid_clean in _student_ids:
+            idx = _student_ids.index(sid_clean)
+            _student_ids.pop(idx)
+            if _embeddings_matrix is not None:
+                if len(_student_ids) == 0:
+                    _embeddings_matrix = None
+                else:
+                    _embeddings_matrix = np.delete(_embeddings_matrix, idx, axis=0)
+            removed = True
+
+        if sid_clean in _student_metadata:
+            _student_metadata.pop(sid_clean, None)
+            removed = True
+
+        if removed:
+            logger.info("Removed student %s from memory face cache (Total: %d).", sid_clean, len(_student_ids))
+
+        return removed
+
+
+def clear_face_cache() -> None:
+    """
+    Completely clear the in-memory face embedding cache and reset matrix state.
+    """
+    global _student_ids, _student_metadata, _embeddings_matrix, _is_initialized
+
+    with _cache_lock:
+        _student_ids = []
+        _student_metadata = {}
+        _embeddings_matrix = None
+        _is_initialized = False
+        logger.info("In-memory face cache cleared.")
+
+
+
 def get_student_ewma(student_id: str) -> float:
     """Get the cached EWMA drift score for a student without database queries."""
     ensure_cache_initialized()
@@ -207,3 +261,28 @@ def update_cached_student_drift(student_id: str, new_ewma: float, alert_level: s
         if sid in _student_metadata:
             _student_metadata[sid]['current_ewma_drift'] = new_ewma
             _student_metadata[sid]['drift_alert_level'] = alert_level
+
+
+def update_student_metadata_cache(
+    student_id: str,
+    name: str,
+    program: str,
+    branch: str,
+    enrollment_year: Optional[int] = None,
+    academic_year: Optional[str] = None,
+) -> bool:
+    """Update metadata for an existing student in cache without recalculating embedding."""
+    ensure_cache_initialized()
+    sid_clean = str(student_id).strip()
+    with _cache_lock:
+        if sid_clean in _student_metadata:
+            _student_metadata[sid_clean]['name'] = name
+            _student_metadata[sid_clean]['program'] = program
+            _student_metadata[sid_clean]['branch'] = branch
+            if enrollment_year is not None:
+                _student_metadata[sid_clean]['enrollment_year'] = enrollment_year
+            if academic_year is not None:
+                _student_metadata[sid_clean]['academic_year'] = academic_year
+            return True
+        return False
+

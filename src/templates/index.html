@@ -218,11 +218,8 @@
             </div>
             
             <!-- Hidden File Inputs -->
-            <input id="nativeCameraInput" type="file" name="images" accept="image/*" capture="environment" />
-            <input id="galleryInput" type="file" name="images" accept="image/*" multiple />
-            
-            <!-- Main Input that holds the combined files for submission -->
-            <input id="formFileInput" type="file" name="images" multiple class="hidden" />
+            <input id="nativeCameraInput" type="file" accept="image/*" capture="environment" class="hidden" />
+            <input id="galleryInput" type="file" accept="image/*" multiple class="hidden" />
         </div>
 
         <!-- PREVIEWS -->
@@ -301,12 +298,11 @@
   const previewHint = document.getElementById("previewHint");
   const nativeCameraInput = document.getElementById("nativeCameraInput");
   const galleryInput = document.getElementById("galleryInput");
-  const formFileInput = document.getElementById("formFileInput");
   const submitBtn = document.getElementById("submitBtn");
   const submitBtnText = document.getElementById("submitBtnText");
   
-  // We use DataTransfer to programmatically manage files from multiple input sources
-  let dataTransfer = new DataTransfer();
+  // Clean in-memory array holding selected files — cross-browser safe, no DataTransfer dependency
+  let selectedFiles = [];
 
   /* ------------------------------
         DESKTOP WEBCAM LOGIC & SCREEN WAKE LOCK
@@ -414,35 +410,33 @@
   function handleFileSelection(files) {
     if (!files || files.length === 0) return;
     
-    // Add new files to our DataTransfer object
     Array.from(files).forEach(file => {
-        dataTransfer.items.add(file);
+      if (!selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
+        selectedFiles.push(file);
+      }
     });
     
-    // Update the master hidden input that will be submitted
-    formFileInput.files = dataTransfer.files;
-    
-    // Enable submit button
-    submitBtn.disabled = false;
-    
+    submitBtn.disabled = selectedFiles.length === 0;
     updatePreviews();
 
     // Automatically trigger photo processing on upload / capture
-    if (typeof form.requestSubmit === 'function') {
+    if (selectedFiles.length > 0) {
+      if (typeof form.requestSubmit === 'function') {
         form.requestSubmit();
-    } else {
+      } else {
         form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+      }
     }
   }
 
   function updatePreviews() {
     previewBox.innerHTML = "";
-    const files = formFileInput.files;
     
-    if (files.length > 0) {
+    if (selectedFiles.length > 0) {
         previewBox.classList.remove("hidden");
-        previewHint.innerText = `${files.length} image(s) ready to process. Tap to remove.`;
-        submitBtnText.innerText = `Scan & Mark Present (${files.length})`;
+        previewHint.innerText = `${selectedFiles.length} image(s) ready to process. Tap to remove.`;
+        submitBtnText.innerText = `Scan & Mark Present (${selectedFiles.length})`;
+        submitBtn.disabled = false;
     } else {
         previewBox.classList.add("hidden");
         previewHint.innerText = "No images selected.";
@@ -450,7 +444,7 @@
         submitBtn.disabled = true;
     }
 
-    Array.from(files).forEach((file, index) => {
+    selectedFiles.forEach((file, index) => {
       const reader = new FileReader();
       reader.onload = ev => {
         const container = document.createElement("div");
@@ -475,15 +469,7 @@
   }
   
   function removeFile(indexToRemove) {
-      const newDt = new DataTransfer();
-      const files = formFileInput.files;
-      for (let i = 0; i < files.length; i++) {
-          if (i !== indexToRemove) {
-              newDt.items.add(files[i]);
-          }
-      }
-      dataTransfer = newDt; // update global reference
-      formFileInput.files = dataTransfer.files;
+      selectedFiles.splice(indexToRemove, 1);
       
       // Reset the actual inputs so change event fires even if same file selected again
       nativeCameraInput.value = "";
@@ -507,17 +493,17 @@
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    if (formFileInput.files.length === 0) return;
+    if (selectedFiles.length === 0) return;
 
     // Capture the name for filename generation
     lastSubmittedLecture = (form.querySelector('input[name="lecture"]').value || "").trim() || "UnknownSub";
 
-    // Use FormData but replace 'images' from native/gallery inputs with our master formFileInput
+    // Build FormData directly with all in-memory selected files
     const formData = new FormData(form);
-    formData.delete('images'); // remove duplicates
+    formData.delete('images'); // remove duplicates/empty inputs
     
-    Array.from(formFileInput.files).forEach(file => {
-        formData.append('images', file);
+    selectedFiles.forEach(file => {
+        formData.append('images', file, file.name);
     });
 
     // Loading UI
@@ -667,8 +653,7 @@
         lucide.createIcons();
         
         // Reset form completely on success
-        dataTransfer = new DataTransfer();
-        formFileInput.files = dataTransfer.files;
+        selectedFiles = [];
         nativeCameraInput.value = "";
         galleryInput.value = "";
         form.reset();

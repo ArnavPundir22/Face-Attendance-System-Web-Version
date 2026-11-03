@@ -8,11 +8,13 @@ Provides two Supabase clients:
                    Only use for admin-only routes (blueprints/admin.py).
 
 Also exports:
+  fetch_all_records(client, table_name, ...) -> list[dict]
   is_valid_email(email) -> bool
 """
 
 import logging
 import os
+from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
@@ -64,3 +66,47 @@ def is_valid_email(email: str) -> bool:
         return False
     local, domain = addr.rsplit("@", 1)
     return bool(local) and bool(domain) and "." in domain
+
+
+def fetch_all_records(
+    client: Client,
+    table_name: str,
+    select_fields: str = "*",
+    order_field: Optional[str] = None,
+    batch_size: int = 1000,
+    desc: bool = False,
+) -> List[Dict[str, Any]]:
+    """
+    Fetch all records from a Supabase table using range-based pagination.
+    Overcomes the PostgREST 1,000-row limit without statement timeouts.
+
+    :param client: Initialized Supabase Client (supabase or supabase_admin)
+    :param table_name: Database table name (e.g. 'students')
+    :param select_fields: Comma-separated columns to project (defaults to '*')
+    :param order_field: Column or comma-separated columns for deterministic ordering
+    :param batch_size: Number of records to fetch per page (defaults to 1000)
+    :param desc: Whether to sort descending (defaults to False, ascending)
+    :return: List of all record dictionaries
+    """
+    records: List[Dict[str, Any]] = []
+    start = 0
+
+    while True:
+        end = start + batch_size - 1
+        query = client.table(table_name).select(select_fields)
+
+        if order_field:
+            for field in [f.strip() for f in order_field.split(',') if f.strip()]:
+                query = query.order(field, desc=desc)
+
+        res = query.range(start, end).execute()
+        data = res.data or []
+        records.extend(data)
+
+        if len(data) < batch_size:
+            break
+
+        start += batch_size
+
+    return records
+

@@ -235,6 +235,7 @@
       </div>
 
       <form id="studentForm" enctype="multipart/form-data" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <input type="hidden" name="photo_base64" id="photoBase64Input" value="">
         
         <!-- Left Column: Photo upload & Guided Camera -->
         <div class="space-y-5">
@@ -250,7 +251,7 @@
 
           <!-- Section A: Guided Live Camera Container -->
           <div id="guidedCamSection" class="space-y-3">
-            <div class="guided-frame-wrapper relative w-full h-80 sm:h-96 rounded-2xl overflow-hidden border border-white/15 bg-black flex items-center justify-center">
+            <div id="guidedCameraContainer" class="guided-frame-wrapper relative w-full h-80 sm:h-96 rounded-2xl overflow-hidden border border-white/15 bg-black flex items-center justify-center">
               
               <!-- Live Video Stream -->
               <video id="guidedVideo" class="w-full h-full object-cover scale-x-[-1]" autoplay playsinline muted></video>
@@ -356,7 +357,7 @@
 
             <div>
               <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Student ID (Unique Identifier)</label>
-              <input type="text" name="id" required placeholder="e.g. STU12345" class="input-dark-glass w-full rounded-lg px-4 py-2.5 text-sm">
+              <input type="text" name="id" required placeholder="e.g. STU12345" class="input-dark-glass w-full rounded-lg px-4 py-2.5 text-sm uppercase font-mono" oninput="this.value = this.value.toUpperCase()">
             </div>
 
             <div class="grid grid-cols-2 gap-4">
@@ -410,9 +411,12 @@
 
     let guidedCam = null;
     let idScanner = null;
+    window.__selectedUploadedFile = null;
+    window.__capturedStudentBlob = null;
+    window.__capturedStudentDataUrl = null;
 
     // Fetch dynamic academic options & initialize Guided Camera on load
-    document.addEventListener("DOMContentLoaded", async function() {
+    async function initAddStudent() {
       // 1. Fetch Academic Options
       try {
         const res = await fetch('/api/academic_options');
@@ -421,18 +425,22 @@
         const pSel = document.getElementById('programSelect');
         const bSel = document.getElementById('branchSelect');
 
-        (data.programs || []).forEach(p => {
-          pSel.innerHTML += `<option value="${p}">${p}</option>`;
-        });
-        (data.branches || []).forEach(b => {
-          bSel.innerHTML += `<option value="${b}">${b}</option>`;
-        });
+        if (pSel && bSel) {
+          pSel.innerHTML = '<option value="">Select Program</option>';
+          bSel.innerHTML = '<option value="">Select Branch</option>';
+          (data.programs || []).forEach(p => {
+            pSel.innerHTML += `<option value="${p}">${p}</option>`;
+          });
+          (data.branches || []).forEach(b => {
+            bSel.innerHTML += `<option value="${b}">${b}</option>`;
+          });
+        }
       } catch (e) {
         console.error("Error loading academic options:", e);
       }
 
       // 2. Initialize Guided Camera System
-      if (window.GuidedCameraEngine) {
+      if (window.GuidedCameraEngine && !guidedCam) {
         guidedCam = new window.GuidedCameraEngine();
         guidedCam.startCamera();
       }
@@ -616,6 +624,17 @@
           rawOcrContent.classList.toggle('hidden');
         });
       }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initAddStudent);
+    } else {
+      initAddStudent();
+    }
+    document.addEventListener('pwa:pagechange', (e) => {
+      if (e.detail && e.detail.path === '/add_student') {
+        initAddStudent();
+      }
     });
 
     function populateFormFromOCR(parsed) {
@@ -692,8 +711,9 @@
     function previewImage(event) {
       const preview = document.getElementById('imagePreview');
       const text = document.getElementById('previewText');
-      const file = event.target.files[0];
+      const file = event.target.files && event.target.files[0];
       if (file) {
+        window.__selectedUploadedFile = file;
         const reader = new FileReader();
         reader.onload = () => {
           preview.src = reader.result;
@@ -702,6 +722,7 @@
         };
         reader.readAsDataURL(file);
       } else {
+        window.__selectedUploadedFile = null;
         preview.classList.add('hidden');
         text.classList.remove('hidden');
       }
@@ -712,8 +733,21 @@
       const form = e.target;
       const formData = new FormData(form);
 
-      const photoFile = formData.get('photo');
-      if (!photoFile || photoFile.size === 0) {
+      let photoFile = formData.get('photo');
+      if ((!photoFile || photoFile.size === 0) && window.__selectedUploadedFile) {
+        formData.set('photo', window.__selectedUploadedFile, window.__selectedUploadedFile.name);
+        photoFile = window.__selectedUploadedFile;
+      } else if ((!photoFile || photoFile.size === 0) && window.__capturedStudentBlob) {
+        formData.set('photo', window.__capturedStudentBlob, 'student_camera_photo.jpg');
+        photoFile = window.__capturedStudentBlob;
+      }
+
+      const b64 = window.__capturedStudentDataUrl || document.getElementById('photoBase64Input')?.value;
+      if (b64) {
+        formData.set('photo_base64', b64);
+      }
+
+      if ((!photoFile || photoFile.size === 0) && !b64) {
         showMessage("Please snap a photo using the Guided Camera or upload an image file first.", false);
         return;
       }
@@ -736,6 +770,11 @@
           showMessage(data.success ? data.message : (data.error || "Registration failed"), data.success);
           if (data.success) {
             form.reset();
+            window.__selectedUploadedFile = null;
+            window.__capturedStudentBlob = null;
+            window.__capturedStudentDataUrl = null;
+            const b64Inp = document.getElementById('photoBase64Input');
+            if (b64Inp) b64Inp.value = '';
             document.getElementById('imagePreview').classList.add('hidden');
             document.getElementById('imagePreview').src = '';
             document.getElementById('previewText').classList.remove('hidden');

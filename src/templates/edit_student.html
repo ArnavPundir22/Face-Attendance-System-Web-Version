@@ -123,6 +123,11 @@
         </div>
 
         <div>
+          <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Enrollment Year</label>
+          <input type="number" name="enrollment_year" value="{{ student['enrollment_year'] or '' }}" placeholder="e.g. 2024" class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm" />
+        </div>
+
+        <div>
           <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Gmail</label>
           <input name="gmail" value="{{ student['gmail'] }}" class="input-dark-glass w-full rounded-lg px-4 py-3 text-sm" required />
         </div>
@@ -137,7 +142,7 @@
 
         <div class="flex gap-3 pt-4 border-t border-white/10">
           <button type="submit" class="btn-primary-glass px-6 py-2.5 rounded-lg text-sm font-semibold flex-1">Save & Re-Enroll</button>
-          <a href="/admin/drift" class="btn-secondary-glass px-6 py-2.5 rounded-lg text-sm font-semibold flex-1 text-center">Cancel</a>
+          <a href="/admin/students" class="btn-secondary-glass px-6 py-2.5 rounded-lg text-sm font-semibold flex-1 text-center">Cancel</a>
         </div>
       </form>
     </div>

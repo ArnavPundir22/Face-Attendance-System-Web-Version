@@ -153,6 +153,7 @@
               <th class="p-4">Name</th>
               <th class="p-4">Program</th>
               <th class="p-4">Branch</th>
+              <th class="p-4">Year</th>
               <th class="p-4">Gmail</th>
               <th class="p-4">Actions</th>
             </tr>
@@ -165,9 +166,10 @@
                 data-year="{{ s['enrollment_year'] or '' }}">
               <td class="p-4 font-semibold text-blue-400 font-geist student-id">{{ s['id'] }}</td>
               <td class="p-4 font-medium text-white student-name">{{ s['name'] }}</td>
-              <td class="p-4 text-gray-300 font-geist">{{ s['program'] }}</td>
-              <td class="p-4 text-gray-300 font-geist">{{ s['branch'] }}</td>
-              <td class="p-4 text-gray-300 font-geist">{{ s['gmail'] }}</td>
+              <td class="p-4 text-gray-300 font-geist">{{ s['program'] or '-' }}</td>
+              <td class="p-4 text-gray-300 font-geist">{{ s['branch'] or '-' }}</td>
+              <td class="p-4 text-gray-300 font-geist">{{ s['enrollment_year'] or '-' }}</td>
+              <td class="p-4 text-gray-300 font-geist">{{ s['gmail'] or '-' }}</td>
               <td class="p-4">
                 <div class="flex items-center gap-3">
                   <a href="/admin/student/edit/{{ s['id'] }}" class="text-blue-400 hover:text-blue-300 text-sm font-semibold transition-colors flex items-center gap-1">

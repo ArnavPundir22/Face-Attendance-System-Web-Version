@@ -15,9 +15,9 @@ from flask import Blueprint, jsonify, redirect, render_template, request, send_f
 from werkzeug.utils import secure_filename
 
 from src import config
-from src.utils.db import supabase_admin
+from src.utils.db import supabase_admin, fetch_all_records
 from src.utils.face import normalize_embedding, model
-from src.utils.face_cache import add_student_to_cache
+from src.utils.face_cache import add_student_to_cache, update_student_metadata_cache
 
 students_bp = Blueprint('students', __name__)
 
@@ -25,12 +25,16 @@ students_bp = Blueprint('students', __name__)
 @students_bp.route('/students')
 def students():
     try:
-        # Fetch students from Supabase
-        response = supabase_admin.table('students').select('id, name, program, branch, enrollment_year, gmail, current_ewma_drift, drift_alert_level').execute()
-        data = response.data or []
+        data = fetch_all_records(
+            client=supabase_admin,
+            table_name='students',
+            select_fields='id, name, program, branch, enrollment_year, gmail',
+            order_field='name'
+        )
         return render_template('students.html', students=data)
     except Exception as e:
         return render_template('students.html', students=[], error="Could not load students.")
+
 
 
 @students_bp.route('/student/photo/<student_id>')
@@ -90,25 +94,28 @@ def submit_student():
         return redirect(url_for('students.add_student', status=status, message=message))
 
     name       = request.form.get('name', '').strip()
-    student_id = request.form.get('id', '').strip()
+    student_id = request.form.get('id', '').strip().upper()
     program    = request.form.get('program', '').strip()
     branch     = request.form.get('branch', '').strip()
     gmail      = request.form.get('email', '').strip()
     enrollment_year = request.form.get('enrollment_year', '').strip()
     academic_year   = request.form.get('academic_year', '').strip()
     photo           = request.files.get('photo')
+    photo_base64    = request.form.get('photo_base64', '').strip()
 
-    if not name or not student_id or not photo:
+    has_photo_file = bool(photo and getattr(photo, 'filename', None))
+    if not name or not student_id or (not has_photo_file and not photo_base64):
         return _respond('error', 'Name, Student ID, and Photo are required fields.', 400)
 
-    # Check for existing student by ID
+    # Check for existing student by ID case-insensitively using ilike
     try:
-        existing = supabase_admin.table('students').select('id, name').eq('id', student_id).execute()
+        existing = supabase_admin.table('students').select('id, name').ilike('id', student_id).execute()
         if existing.data:
             existing_name = existing.data[0].get('name', 'another student')
+            matched_id = existing.data[0].get('id', student_id)
             return _respond(
                 'error',
-                f'Student ID "{student_id}" is already registered in the system (assigned to {existing_name}).',
+                f'Student ID "{student_id}" is already registered in the system (assigned to {existing_name}, ID: {matched_id}).',
                 409
             )
     except Exception as e:
@@ -136,7 +143,17 @@ def submit_student():
     filename = f"{safe_id}.jpg"
     os.makedirs(config.KNOWN_FACES_DIR, exist_ok=True)
     filepath = os.path.join(config.KNOWN_FACES_DIR, filename)
-    photo.save(filepath)
+
+    if has_photo_file:
+        photo.save(filepath)
+    elif photo_base64:
+        try:
+            raw_b64 = photo_base64.split(',', 1)[1] if ',' in photo_base64 else photo_base64
+            img_bytes = base64.b64decode(raw_b64)
+            with open(filepath, 'wb') as f:
+                f.write(img_bytes)
+        except Exception as e:
+            return _respond('error', f'Failed to decode camera photo: {e}', 400)
 
     # Encode the new face first
     image = cv2.imread(filepath)
@@ -319,17 +336,13 @@ def update_student(student_id=None):
         )
     else:
         # If no new photo, update metadata in cache
-        try:
-            from src.utils.face_cache import _student_metadata, _cache_lock
-            with _cache_lock:
-                if sid in _student_metadata:
-                    _student_metadata[sid]['name'] = name
-                    _student_metadata[sid]['program'] = program
-                    _student_metadata[sid]['branch'] = branch
-                    if enrollment_year and enrollment_year.isdigit():
-                        _student_metadata[sid]['enrollment_year'] = int(enrollment_year)
-        except Exception:
-            pass
+        update_student_metadata_cache(
+            student_id=sid,
+            name=name,
+            program=program,
+            branch=branch,
+            enrollment_year=int(enrollment_year) if enrollment_year and str(enrollment_year).isdigit() else None
+        )
 
     return jsonify({
         "success": True,

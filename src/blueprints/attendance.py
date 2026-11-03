@@ -19,7 +19,7 @@ from flask import Blueprint, jsonify, render_template, request
 import re
 
 from src import config
-from src.utils.db import supabase_admin, is_valid_email
+from src.utils.db import supabase_admin, is_valid_email, fetch_all_records
 from src.utils.face import model, normalize_embedding
 from src.utils.face_cache import match_faces_batch, get_student_ewma, update_cached_student_drift
 
@@ -215,9 +215,12 @@ def viewer():
 @attendance_bp.route('/get_attendance_data')
 def get_attendance_data():
     try:
-        # Fetch all registered students to map student ID to batch/enrollment year
-        students_resp = supabase_admin.table('students').select('id, name, branch, program, enrollment_year, academic_year').execute()
-        stus = students_resp.data or []
+        # Fetch all registered students using pagination to map student ID to batch/enrollment year
+        stus = fetch_all_records(
+            client=supabase_admin,
+            table_name='students',
+            select_fields='id, name, branch, program, enrollment_year, academic_year'
+        )
         student_year_map = {}
         students_list = []
         for s in stus:
@@ -399,7 +402,7 @@ def upload_photo():
 
     if recognized_ids:
         try:
-            rec_students_resp = supabase_admin.table('students').select('*').in_('id', list(recognized_ids)).execute()
+            rec_students_resp = supabase_admin.table('students').select('id, name, program, branch, enrollment_year, academic_year, gmail').in_('id', list(recognized_ids)).execute()
             rec_students = rec_students_resp.data or []
             
             from collections import Counter
@@ -459,7 +462,7 @@ def upload_photo():
         if represented_pbs:
             for p, b in represented_pbs:
                 try:
-                    resp = supabase_admin.table('students').select('*').ilike('program', p).ilike('branch', b).execute()
+                    resp = supabase_admin.table('students').select('id, name, program, branch, enrollment_year, academic_year, gmail').ilike('program', p).ilike('branch', b).execute()
                     raw = resp.data or []
                     if represented_years:
                         filtered_raw = [s for s in raw if extract_student_year(s) in represented_years]
@@ -491,7 +494,7 @@ def upload_photo():
         # ── SEPARATE CLASS MODE (Single Group Focus) ─────────────────────────
         if detected_program and detected_branch:
             try:
-                students_resp = supabase_admin.table('students').select('*').ilike('program', detected_program).ilike('branch', detected_branch).execute()
+                students_resp = supabase_admin.table('students').select('id, name, program, branch, enrollment_year, academic_year, gmail').ilike('program', detected_program).ilike('branch', detected_branch).execute()
                 raw_students = students_resp.data or []
                 
                 # If detected_year is still None, derive the most common batch year among raw_students for that program & branch
@@ -656,7 +659,7 @@ def update_attendance_status():
                     lecture = 'General'
 
             # Fetch student details for a complete attendance insert
-            student_resp = supabase_admin.table('students').select('*').eq('id', student_id).execute()
+            student_resp = supabase_admin.table('students').select('id, name, program, branch, enrollment_year, academic_year, gmail').eq('id', student_id).execute()
             if student_resp.data:
                 student = student_resp.data[0]
                 supabase_admin.table('attendance').insert({
@@ -687,9 +690,12 @@ def get_academic_options():
         programs = sorted(list({r.get('value') for r in rows if r.get('type') == 'program'}))
         branches = sorted(list({r.get('value') for r in rows if r.get('type') == 'branch'}))
 
-        # Also fetch distinct batch years from students
-        students_resp = supabase_admin.table('students').select('*').execute()
-        stus = students_resp.data or []
+        # Also fetch distinct batch years from all students using pagination and scalar projection
+        stus = fetch_all_records(
+            client=supabase_admin,
+            table_name='students',
+            select_fields='id, enrollment_year, academic_year'
+        )
         years = sorted(list({extract_student_year(s) for s in stus if extract_student_year(s) is not None}), reverse=True)
 
         return jsonify({
