@@ -10,11 +10,11 @@
 !.env.example
 *.pem
 !src/security/license_public_key.pem
-!license_kit/license_public_key.pem
 developer_private_key.pem
-license_kit/developer_private_key.pem
-license_kit/output/*.license
-license_kit/output/*.lic
+license_kit/
+license_console.sh
+license_console.bat
+scripts/devtools/
 .license
 .license_state
 .theme
