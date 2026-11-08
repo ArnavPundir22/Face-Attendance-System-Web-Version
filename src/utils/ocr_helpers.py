@@ -391,10 +391,3 @@ def parse_student_id_text(text: str, known_programs: list = None, known_branches
         parsed["email"] = f"{clean_id_str}@coeruniversity.ac.in"
 
     return parsed
-
-    # Construct institutional email using CU-ID / Student ID if email not explicitly found
-    if not parsed["email"] and parsed["id"]:
-        clean_id_str = parsed["id"].lower()
-        parsed["email"] = f"{clean_id_str}@coeruniversity.ac.in"
-
-    return parsed

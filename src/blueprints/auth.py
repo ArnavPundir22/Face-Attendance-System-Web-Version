@@ -6,9 +6,8 @@ Routes: /login, /logout, /register, /forgot_password
 
 import logging
 from flask import Blueprint, redirect, render_template, request, session, url_for
-from src.utils.db import supabase, supabase_admin, is_valid_email
-from src import config
 from supabase import AuthApiError
+from src.utils.db import supabase, supabase_admin, is_valid_email
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +96,7 @@ def register():
         try:
             # Create user using Supabase Admin API
             # This allows creating a user without auto-signing them in
-            response = supabase_admin.auth.admin.create_user({
+            supabase_admin.auth.admin.create_user({
                 "email": email,
                 "password": password,
                 "email_confirm": True, # Auto confirm since it's created by admin
@@ -111,7 +110,7 @@ def register():
             
         except AuthApiError as e:
             return render_template('register.html', error=str(e.message))
-        except Exception as e:
+        except Exception:
             return render_template('register.html', error="An error occurred while creating the user.")
 
     return render_template('register.html')

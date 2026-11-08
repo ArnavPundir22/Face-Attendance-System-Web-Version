@@ -14,6 +14,7 @@ Routes:
   POST       /admin/user/delete/<id>         — delete user
 """
 
+import logging
 import os
 from collections import Counter
 from datetime import datetime, timedelta
@@ -21,7 +22,10 @@ from datetime import datetime, timedelta
 from flask import Blueprint, jsonify, redirect, render_template, request, session, url_for
 
 from src.utils.db import supabase_admin as supabase, is_valid_email, fetch_all_records
+from src.utils.face_cache import get_cached_students, is_cache_populated
 from src import config
+
+logger = logging.getLogger(__name__)
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -35,6 +39,7 @@ def _require_admin():
 
 @admin_bp.route('')
 @admin_bp.route('/')
+@admin_bp.route('/dashboard')
 def admin_dashboard():
     denied = _require_admin()
     if denied:
@@ -42,7 +47,7 @@ def admin_dashboard():
 
     try:
         total_students = supabase.table('students').select('id', head=True, count='exact').execute().count or 0
-        total_attendance = supabase.table('attendance').select('*', count='exact').execute().count or 0
+        total_attendance = supabase.table('attendance').select('att_id', head=True, count='exact').execute().count or 0
         
         # We can't efficiently count auth.users from client without admin API, so we fetch all
         users_resp = supabase.auth.admin.list_users()
@@ -51,10 +56,10 @@ def admin_dashboard():
         today_date = datetime.now().strftime("%Y-%m-%d")
         
         # Count attendance where timestamp starts with today's date
-        today_att_resp = supabase.table('attendance').select('*', count='exact').ilike('timestamp', f'{today_date}%').execute()
+        today_att_resp = supabase.table('attendance').select('att_id', head=True, count='exact').ilike('timestamp', f'{today_date}%').execute()
         today_att = today_att_resp.count or 0
     except Exception as e:
-        print("Dashboard error:", e)
+        logger.error("Dashboard error: %s", e)
         total_students, total_attendance, total_users, today_att = 0, 0, 0, 0
 
     return render_template(
@@ -76,19 +81,19 @@ def admin_stats():
         for d in range(6, -1, -1):
             day = (datetime.now() - timedelta(days=d)).strftime("%Y-%m-%d")
             
-            cnt_resp = supabase.table('attendance').select('*', count='exact').ilike('timestamp', f'{day}%').execute()
+            cnt_resp = supabase.table('attendance').select('att_id', head=True, count='exact').ilike('timestamp', f'{day}%').execute()
             cnt = cnt_resp.count or 0
             trend.append({'date': day, 'count': cnt})
 
         today = datetime.now().strftime("%Y-%m-%d")
-        present_resp = supabase.table('attendance').select('*', count='exact').ilike('timestamp', f'{today}%').ilike('status', '%Present%').execute()
+        present_resp = supabase.table('attendance').select('att_id', head=True, count='exact').ilike('timestamp', f'{today}%').ilike('status', '%Present%').execute()
         present = present_resp.count or 0
         
-        total_today_resp = supabase.table('attendance').select('*', count='exact').ilike('timestamp', f'{today}%').execute()
+        total_today_resp = supabase.table('attendance').select('att_id', head=True, count='exact').ilike('timestamp', f'{today}%').execute()
         total_today = total_today_resp.count or 0
         
     except Exception as e:
-        print("Stats error:", e)
+        logger.error("Stats error: %s", e)
         present = 0
         total_today = 0
 
@@ -102,12 +107,15 @@ def admin_students():
         return denied
 
     try:
-        students = fetch_all_records(
-            client=supabase,
-            table_name='students',
-            select_fields='id, name, program, branch, enrollment_year, gmail',
-            order_field='name'
-        )
+        if is_cache_populated() and getattr(fetch_all_records, '__module__', None) == 'src.utils.db':
+            students = sorted(get_cached_students(), key=lambda s: (s.get('name') or '').lower())
+        else:
+            students = fetch_all_records(
+                client=supabase,
+                table_name='students',
+                select_fields='id, name, program, branch, enrollment_year, gmail',
+                order_field='name'
+            )
     except Exception:
         students = []
         
@@ -121,7 +129,7 @@ def admin_edit_student(student_id):
         return denied
 
     try:
-        student_resp = supabase.table('students').select('*').eq('id', student_id).execute()
+        student_resp = supabase.table('students').select('id, name, program, branch, enrollment_year, gmail').eq('id', student_id).execute()
         if not student_resp.data:
             return redirect(url_for('admin.admin_students'))
         student = student_resp.data[0]
@@ -154,7 +162,7 @@ def admin_edit_student(student_id):
             import os
             import cv2
             import numpy as np
-            from src.utils.face import model, normalize_embedding
+            from src.utils.face import extract_faces, normalize_embedding
 
             safe_id = secure_filename(student_id)
             if safe_id:
@@ -165,7 +173,7 @@ def admin_edit_student(student_id):
 
                 image = cv2.imread(filepath)
                 if image is not None:
-                    faces = model.get(image)
+                    faces = extract_faces(image)
                     if faces:
                         face = faces[0]
                         new_emb = np.array(face.embedding, dtype=np.float32)
@@ -187,14 +195,14 @@ def admin_edit_student(student_id):
                                     'pose_yaw': 0.0,
                                     'pose_pitch': 0.0,
                                     'pose_accepted': True
-                                }).execute()
+                                }, returning='minimal').execute()
                             except Exception as err:
-                                print(f"Error logging re-enrollment event: {err}")
+                                logger.error("Error logging re-enrollment event: %s", err)
 
         try:
-            supabase.table('students').update(update_payload).eq('id', student_id).execute()
+            supabase.table('students').update(update_payload, returning='minimal').eq('id', student_id).execute()
         except Exception as e:
-            print("Update student error:", e)
+            logger.error("Update student error: %s", e)
 
         # Synchronize in-memory biometric cache
         try:
@@ -206,7 +214,8 @@ def admin_edit_student(student_id):
                     program=program,
                     branch=branch,
                     embedding=new_embedding,
-                    enrollment_year=parsed_year
+                    enrollment_year=parsed_year,
+                    gmail=gmail
                 )
             else:
                 update_student_metadata_cache(
@@ -214,10 +223,11 @@ def admin_edit_student(student_id):
                     name=name,
                     program=program,
                     branch=branch,
-                    enrollment_year=parsed_year
+                    enrollment_year=parsed_year,
+                    gmail=gmail
                 )
         except Exception as cache_err:
-            print(f"Face cache sync error on edit: {cache_err}")
+            logger.error("Face cache sync error on edit: %s", cache_err)
             
         return redirect(url_for('admin.admin_students'))
 
@@ -255,9 +265,9 @@ def admin_delete_student(student_id):
             from src.utils.face_cache import remove_student_from_cache
             remove_student_from_cache(student_id)
         except Exception as cache_err:
-            print(f"Face cache removal error for student {student_id}: {cache_err}")
+            logger.error("Face cache removal error for student %s: %s", student_id, cache_err)
     except Exception as e:
-        print(f"Cascading delete failed for student {student_id}: {e}")
+        logger.error("Cascading delete failed for student %s: %s", student_id, e)
         
     return redirect(url_for('admin.admin_students'))
 
@@ -269,12 +279,15 @@ def admin_mark_attendance():
         return denied
 
     try:
-        students = fetch_all_records(
-            client=supabase,
-            table_name='students',
-            select_fields='id, name, program, branch, enrollment_year, gmail',
-            order_field='name'
-        )
+        if is_cache_populated() and getattr(fetch_all_records, '__module__', None) == 'src.utils.db':
+            students = sorted(get_cached_students(), key=lambda s: (s.get('name') or '').lower())
+        else:
+            students = fetch_all_records(
+                client=supabase,
+                table_name='students',
+                select_fields='id, name, program, branch, enrollment_year, gmail',
+                order_field='name'
+            )
     except Exception:
         students = []
 
@@ -302,9 +315,9 @@ def admin_mark_attendance():
 
         try:
             if attendance_records:
-                supabase.table('attendance').insert(attendance_records).execute()
+                supabase.table('attendance').insert(attendance_records, returning='minimal').execute()
         except Exception as e:
-            print("Bulk manual mark attendance error:", e)
+            logger.error("Bulk manual mark attendance error: %s", e)
             return render_template('admin_mark.html', students=students, error="Database error")
             
         return redirect(url_for('admin.admin_dashboard'))
@@ -342,7 +355,7 @@ def admin_users():
         # Sort users by username case-insensitive
         users.sort(key=lambda x: x['username'].lower())
     except Exception as e:
-        print("List users error:", e)
+        logger.error("List users error: %s", e)
         users = []
         
     return render_template('admin_users.html', users=users, current_user=session.get('username'))
@@ -472,7 +485,7 @@ def admin_reset():
             try:
                 supabase.table('embedding_health').delete().gt('id', 0).execute()
             except Exception as eh_err:
-                print(f"Notice: Failed to clear embedding_health: {eh_err}")
+                logger.warning("Notice: Failed to clear embedding_health: %s", eh_err)
             # Delete all students (where ID is not empty)
             supabase.table('students').delete().neq('id', '').execute()
 
@@ -484,20 +497,20 @@ def admin_reset():
                         if os.path.isfile(file_path) or os.path.islink(file_path):
                             os.unlink(file_path)
                     except Exception as e:
-                        print(f"Failed to delete {file_path} on disk: {e}")
+                        logger.error("Failed to delete %s on disk: %s", file_path, e)
 
             # Clear in-memory biometric cache
             try:
                 from src.utils.face_cache import clear_face_cache
                 clear_face_cache()
             except Exception as cache_err:
-                print(f"Failed to clear face cache on reset: {cache_err}")
+                logger.error("Failed to clear face cache on reset: %s", cache_err)
         else:
             return redirect(url_for('admin.admin_dashboard', error="Invalid reset type"))
 
         return redirect(url_for('admin.admin_dashboard', status="success", message="Database reset successfully"))
     except Exception as e:
-        print("Reset error:", e)
+        logger.error("Reset error: %s", e)
         return redirect(url_for('admin.admin_dashboard', error=str(e)))
 
 
@@ -553,10 +566,10 @@ def admin_academics():
                 supabase.table('academic_structure').upsert({
                     'type': item_type,
                     'value': item_value
-                }, on_conflict='type,value').execute()
+                }, on_conflict='type,value', returning='minimal').execute()
             except Exception as e:
                 error_msg = str(e)
-                print("Error adding academic item:", e)
+                logger.error("Error adding academic item: %s", e)
 
         elif action in ('delete', 'delete_multiple', 'bulk_delete'):
             try:
@@ -571,7 +584,7 @@ def admin_academics():
                     deleted_count += _batch_delete_academic_items(item_type, values)
             except Exception as e:
                 error_msg = str(e)
-                print("Error deleting academic items:", e)
+                logger.error("Error deleting academic items: %s", e)
 
         # Return JSON if requested via AJAX
         if is_json or request.headers.get('Accept') == 'application/json':
@@ -591,22 +604,25 @@ def admin_academics():
 
     # Fetch academic structure from table
     try:
-        resp = supabase.table('academic_structure').select('*').order('value').execute()
+        resp = supabase.table('academic_structure').select('type, value').order('value').execute()
         rows = resp.data or []
     except Exception:
         rows = []
 
     # Fetch enrolled student counts per program and branch across all registered students
     try:
-        stus = fetch_all_records(
-            client=supabase,
-            table_name='students',
-            select_fields='program, branch'
-        )
+        if is_cache_populated() and getattr(fetch_all_records, '__module__', None) == 'src.utils.db':
+            stus = get_cached_students()
+        else:
+            stus = fetch_all_records(
+                client=supabase,
+                table_name='students',
+                select_fields='program, branch'
+            )
         p_counts = Counter(s.get('program') for s in stus if s.get('program'))
         b_counts = Counter(s.get('branch') for s in stus if s.get('branch'))
     except Exception as e:
-        print("Error fetching student counts for academic structure:", e)
+        logger.error("Error fetching student counts for academic structure: %s", e)
         p_counts = Counter()
         b_counts = Counter()
 
@@ -638,13 +654,20 @@ def admin_drift():
 
     try:
         # Fetch all students sorted by EWMA drift descending (most critical first)
-        students = fetch_all_records(
-            client=supabase,
-            table_name='students',
-            select_fields='id, name, program, branch, current_ewma_drift, drift_alert_level',
-            order_field='current_ewma_drift',
-            desc=True
-        )
+        if is_cache_populated() and getattr(fetch_all_records, '__module__', None) == 'src.utils.db':
+            students = sorted(
+                get_cached_students(),
+                key=lambda s: float(s.get('current_ewma_drift') or 0.0),
+                reverse=True
+            )
+        else:
+            students = fetch_all_records(
+                client=supabase,
+                table_name='students',
+                select_fields='id, name, program, branch, current_ewma_drift, drift_alert_level',
+                order_field='current_ewma_drift',
+                desc=True
+            )
 
         # Count summary stats
         summary = {
@@ -655,7 +678,7 @@ def admin_drift():
             'alert': sum(1 for s in students if s.get('drift_alert_level') == 'ALERT'),
         }
     except Exception as e:
-        print("Error loading drift dashboard:", e)
+        logger.error("Error loading drift dashboard: %s", e)
         students = []
         summary = {'total': 0, 'healthy': 0, 'warning': 0, 'critical': 0, 'alert': 0}
 
@@ -676,7 +699,7 @@ def api_drift_history(student_id):
 
     try:
         logs_resp = supabase.table('embedding_health') \
-            .select('*') \
+            .select('pose_accepted, created_at, pose_yaw, pose_pitch, ewma_drift') \
             .eq('student_id', student_id) \
             .order('created_at', desc=False) \
             .limit(50) \
@@ -698,7 +721,7 @@ def reset_student_drift(student_id):
         supabase.table('students').update({
             'current_ewma_drift': 0.0,
             'drift_alert_level': 'HEALTHY'
-        }).eq('id', student_id).execute()
+        }, returning='minimal').eq('id', student_id).execute()
 
         # Append re-enrollment event to health log
         supabase.table('embedding_health').insert({
@@ -710,10 +733,17 @@ def reset_student_drift(student_id):
             'pose_yaw': 0.0,
             'pose_pitch': 0.0,
             'pose_accepted': True
-        }).execute()
+        }, returning='minimal').execute()
+
+        # Synchronize in-memory biometric cache
+        try:
+            from src.utils.face_cache import update_cached_student_drift
+            update_cached_student_drift(student_id, 0.0, 'HEALTHY')
+        except Exception as cache_err:
+            logger.error("Face cache sync error on drift reset: %s", cache_err)
 
     except Exception as e:
-        print(f"Error resetting drift for {student_id}: {e}")
+        logger.error("Error resetting drift for %s: %s", student_id, e)
 
     return redirect(url_for('admin.admin_drift'))
 

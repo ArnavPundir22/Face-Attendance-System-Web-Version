@@ -16,8 +16,13 @@ from werkzeug.utils import secure_filename
 
 from src import config
 from src.utils.db import supabase_admin, fetch_all_records
-from src.utils.face import normalize_embedding, model
-from src.utils.face_cache import add_student_to_cache, update_student_metadata_cache
+from src.utils.face import normalize_embedding, extract_faces
+from src.utils.face_cache import (
+    add_student_to_cache,
+    update_student_metadata_cache,
+    get_cached_students,
+    is_cache_populated
+)
 
 students_bp = Blueprint('students', __name__)
 
@@ -25,14 +30,17 @@ students_bp = Blueprint('students', __name__)
 @students_bp.route('/students')
 def students():
     try:
-        data = fetch_all_records(
-            client=supabase_admin,
-            table_name='students',
-            select_fields='id, name, program, branch, enrollment_year, gmail',
-            order_field='name'
-        )
+        if is_cache_populated() and getattr(fetch_all_records, '__module__', None) == 'src.utils.db':
+            data = sorted(get_cached_students(), key=lambda s: (s.get('name') or '').lower())
+        else:
+            data = fetch_all_records(
+                client=supabase_admin,
+                table_name='students',
+                select_fields='id, name, program, branch, enrollment_year, gmail',
+                order_field='name'
+            )
         return render_template('students.html', students=data)
-    except Exception as e:
+    except Exception:
         return render_template('students.html', students=[], error="Could not load students.")
 
 
@@ -160,7 +168,7 @@ def submit_student():
     if image is None:
         return _respond('error', 'Saved photo image could not be read.', 400)
 
-    faces = model.get(image)
+    faces = extract_faces(image)
     if not faces:
         return _respond('error', 'No face detected in uploaded photo. Please ensure clear lighting and position face towards camera.', 400)
 
@@ -181,12 +189,13 @@ def submit_student():
             "gmail": gmail,
             "embedding": normalized_emb.tolist()
         }
-        if enrollment_year:
-            insert_data["enrollment_year"] = int(enrollment_year)
+        parsed_year = int(enrollment_year) if enrollment_year and enrollment_year.isdigit() else None
+        if parsed_year is not None:
+            insert_data["enrollment_year"] = parsed_year
         if academic_year:
             insert_data["academic_year"] = academic_year
 
-        supabase_admin.table('students').insert(insert_data).execute()
+        supabase_admin.table('students').insert(insert_data, returning='minimal').execute()
 
         # Auto-register new Program & Branch into academic_structure if not present and sensible
         is_clean_acad = lambda v: bool(v and len(v.strip()) <= 40 and '\n' not in v and not any(k in v.lower() for k in ['blood', 'registrar', 'zeiss', 'vivo']))
@@ -194,7 +203,7 @@ def submit_student():
             try:
                 ex_p = supabase_admin.table('academic_structure').select('id').eq('type', 'program').eq('value', program).execute()
                 if not ex_p.data:
-                    supabase_admin.table('academic_structure').insert({"type": "program", "value": program}).execute()
+                    supabase_admin.table('academic_structure').insert({"type": "program", "value": program}, returning='minimal').execute()
             except Exception:
                 pass
 
@@ -202,20 +211,23 @@ def submit_student():
             try:
                 ex_b = supabase_admin.table('academic_structure').select('id').eq('type', 'branch').eq('value', branch).execute()
                 if not ex_b.data:
-                    supabase_admin.table('academic_structure').insert({"type": "branch", "value": branch}).execute()
+                    supabase_admin.table('academic_structure').insert({"type": "branch", "value": branch}, returning='minimal').execute()
             except Exception:
                 pass
 
         # Update in-memory matrix face cache
-        add_student_to_cache(
-            student_id=student_id,
-            name=name,
-            program=program,
-            branch=branch,
-            embedding=normalized_emb,
-            enrollment_year=int(enrollment_year) if enrollment_year else None,
-            academic_year=academic_year
-        )
+        cache_kwargs = {
+            'student_id': student_id,
+            'name': name,
+            'program': program,
+            'branch': branch,
+            'embedding': normalized_emb,
+            'enrollment_year': parsed_year,
+            'academic_year': academic_year if academic_year else None
+        }
+        if gmail:
+            cache_kwargs['gmail'] = gmail
+        add_student_to_cache(**cache_kwargs)
     except Exception as e:
         return _respond('error', f'Database insertion error: {e}', 500)
 
@@ -236,11 +248,25 @@ def update_student(student_id=None):
     if not sid:
         return jsonify({"success": False, "error": "Student ID is required."}), 400
 
-    name = req_data.get('name', '').strip()
-    program = req_data.get('program', '').strip()
-    branch = req_data.get('branch', '').strip()
-    gmail = req_data.get('gmail') or req_data.get('email', '').strip()
-    enrollment_year = req_data.get('enrollment_year', '').strip()
+    raw_name = req_data.get('name')
+    name = str(raw_name).strip() if raw_name is not None else ''
+
+    raw_program = req_data.get('program')
+    program = str(raw_program).strip() if raw_program is not None else ''
+
+    raw_branch = req_data.get('branch')
+    branch = str(raw_branch).strip() if raw_branch is not None else ''
+
+    raw_email = req_data.get('gmail') or req_data.get('email')
+    gmail = str(raw_email).strip() if raw_email is not None else ''
+
+    raw_year = req_data.get('enrollment_year')
+    str_year = str(raw_year).strip() if raw_year is not None else ''
+    enrollment_year = int(str_year) if str_year.isdigit() else None
+
+    raw_academic = req_data.get('academic_year')
+    str_academic = str(raw_academic).strip() if raw_academic is not None else ''
+    academic_year = str_academic if str_academic else None
 
     if not name:
         return jsonify({"success": False, "error": "Student Name is required."}), 400
@@ -252,11 +278,10 @@ def update_student(student_id=None):
         'branch': branch,
         'gmail': gmail
     }
-    if enrollment_year:
-        try:
-            update_payload['enrollment_year'] = int(enrollment_year)
-        except ValueError:
-            pass
+    if enrollment_year is not None:
+        update_payload['enrollment_year'] = enrollment_year
+    if academic_year is not None:
+        update_payload['academic_year'] = academic_year
 
     safe_id = secure_filename(sid)
     if not safe_id:
@@ -288,7 +313,7 @@ def update_student(student_id=None):
         if image is None:
             return jsonify({"success": False, "error": "Uploaded photo could not be read."}), 400
 
-        faces = model.get(image)
+        faces = extract_faces(image)
         if not faces:
             return jsonify({"success": False, "error": "No face detected in new photo. Please upload a clear face photo."}), 400
 
@@ -314,35 +339,34 @@ def update_student(student_id=None):
                 'pose_yaw': 0.0,
                 'pose_pitch': 0.0,
                 'pose_accepted': True
-            }).execute()
+            }, returning='minimal').execute()
         except Exception:
             pass
 
     # Update database
     try:
-        supabase_admin.table('students').update(update_payload).eq('id', sid).execute()
+        supabase_admin.table('students').update(update_payload, returning='minimal').eq('id', sid).execute()
     except Exception as e:
         return jsonify({"success": False, "error": f"Database update failed: {e}"}), 500
 
     # Update in-memory face cache
+    cache_kwargs = {
+        'student_id': sid,
+        'name': name,
+        'program': program,
+        'branch': branch,
+        'enrollment_year': enrollment_year,
+        'academic_year': academic_year,
+    }
+    if gmail:
+        cache_kwargs['gmail'] = gmail
+
     if new_embedding is not None:
-        add_student_to_cache(
-            student_id=sid,
-            name=name,
-            program=program,
-            branch=branch,
-            embedding=new_embedding,
-            enrollment_year=int(enrollment_year) if enrollment_year and enrollment_year.isdigit() else None
-        )
+        cache_kwargs['embedding'] = new_embedding
+        add_student_to_cache(**cache_kwargs)
     else:
         # If no new photo, update metadata in cache
-        update_student_metadata_cache(
-            student_id=sid,
-            name=name,
-            program=program,
-            branch=branch,
-            enrollment_year=int(enrollment_year) if enrollment_year and str(enrollment_year).isdigit() else None
-        )
+        update_student_metadata_cache(**cache_kwargs)
 
     return jsonify({
         "success": True,
@@ -353,6 +377,7 @@ def update_student(student_id=None):
             "program": program,
             "branch": branch,
             "enrollment_year": enrollment_year,
+            "academic_year": academic_year,
             "gmail": gmail,
             "photo_url": f"/student/photo/{sid}"
         }

@@ -457,16 +457,8 @@
         }
     }
 
-    // Trigger matrix rendering on filters change, reloading fresh logs first
-    $('#matrixLectureFilter, #matrixProgramFilter, #matrixBranchFilter, #matrixBatchFilter, #matrixDateFilter').on('change input', async function() {
-        try {
-            const res = await fetch("/get_attendance_data");
-            const json = await res.json();
-            rawAttendanceData = json.attendance || [];
-            rawStudentsData = json.students || [];
-        } catch (e) {
-            console.error("Failed to reload data on filter change:", e);
-        }
+    // Trigger matrix rendering on filters change using client-side data
+    $('#matrixLectureFilter, #matrixProgramFilter, #matrixBranchFilter, #matrixBatchFilter, #matrixDateFilter').on('change input', function() {
         renderMatrixRegister();
     });
 

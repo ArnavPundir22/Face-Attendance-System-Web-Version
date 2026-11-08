@@ -32,7 +32,6 @@ Optional environment variables (sensible defaults provided):
   DRIFT_ALERT_THRESHOLD     — EWMA level that triggers RE-ENROLLMENT REQUIRED (default: 0.35)
 """
 
-import logging
 import os
 import warnings
 from pathlib import Path

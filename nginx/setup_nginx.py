@@ -12,7 +12,6 @@ import argparse
 import os
 import platform
 import socket
-import sys
 from pathlib import Path
 
 # Project root directory (one level up from nginx/)
@@ -66,8 +65,6 @@ def generate_nginx_config(
     lb_method: str = "least_conn"
 ) -> Path:
     """Generate and write the nginx-runtime.conf file."""
-    is_windows = target_os.lower().startswith("win")
-
     # Ensure log and temp directories exist
     logs_dir = NGINX_DIR / "logs"
     temp_dir = NGINX_DIR / "temp"
@@ -82,15 +79,29 @@ def generate_nginx_config(
     mime_types_str = f"{nginx_dir_str}/mime.types"
 
     # Upstream configuration
+    if upstream_servers:
+        upstream_servers = [
+            s.strip() for s in upstream_servers if s and s.strip()
+        ]
     if not upstream_servers:
         env_upstreams = os.environ.get("NGINX_UPSTREAM_SERVERS")
         if env_upstreams:
-            upstream_servers = [s.strip() for s in env_upstreams.split(",") if s.strip()]
+            upstream_servers = [
+                s.strip() for s in env_upstreams.split(",") if s.strip()
+            ]
         else:
             upstream_servers = [f"127.0.0.1:{backend_port}"]
 
+    # Deduplicate upstream servers while preserving order
+    seen = set()
+    deduped_servers = []
+    for s in upstream_servers:
+        if s not in seen:
+            seen.add(s)
+            deduped_servers.append(s)
+    upstream_servers = deduped_servers
+
     # Validate load balancing method
-    valid_methods = {"least_conn", "round_robin", "ip_hash"}
     method_directive = ""
     if lb_method == "least_conn":
         method_directive = "    least_conn;\n"
@@ -100,8 +111,12 @@ def generate_nginx_config(
         method_directive = "    least_conn;\n"
 
     upstream_lines = []
+    is_single_backend = len(upstream_servers) == 1
     for srv in upstream_servers:
-        upstream_lines.append(f"    server {srv} max_fails=3 fail_timeout=10s;")
+        if is_single_backend:
+            upstream_lines.append(f"    server {srv} max_fails=0;")
+        else:
+            upstream_lines.append(f"    server {srv} max_fails=3 fail_timeout=10s;")
     upstreams_block = "\n".join(upstream_lines)
 
     # Windows-specific pid / directives
@@ -294,7 +309,11 @@ def main():
     nginx_port = args.port or default_nginx_port
     backend_port = args.backend_port or default_backend_port
 
-    upstreams = [s.strip() for s in args.upstreams.split(",")] if args.upstreams else None
+    upstreams = (
+        [s.strip() for s in args.upstreams.split(",") if s.strip()]
+        if args.upstreams
+        else None
+    )
 
     # On Windows, ensure portable Nginx is downloaded if needed
     if args.os.lower().startswith("win"):

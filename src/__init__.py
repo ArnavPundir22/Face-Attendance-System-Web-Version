@@ -43,6 +43,9 @@ logger = logging.getLogger(__name__)
 
 def create_app() -> Flask:
     """Create and configure the Flask application."""
+    from src.utils.console_helpers import disable_windows_console_quickedit
+    disable_windows_console_quickedit()
+
     from src.security.license_verifier import enforce_license_boot
     enforce_license_boot()
 

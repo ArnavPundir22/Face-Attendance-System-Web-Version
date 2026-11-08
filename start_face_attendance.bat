@@ -5,6 +5,9 @@ REM ============================================================
 
 cd /d "%~dp0"
 
+REM Disable QuickEdit mode early so mouse clicks inside console never freeze server stdout
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$h = (Add-Type -MemberDefinition '[DllImport(\"kernel32.dll\")] public static extern IntPtr GetStdHandle(int n); [DllImport(\"kernel32.dll\")] public static extern bool GetConsoleMode(IntPtr h, out uint m); [DllImport(\"kernel32.dll\")] public static extern bool SetConsoleMode(IntPtr h, uint m);' -Name 'K32' -Namespace 'Win' -PassThru)::GetStdHandle(-10); $m = 0; if ([Win.K32]::GetConsoleMode($h, [ref]$m)) { [Win.K32]::SetConsoleMode($h, ($m -band -bnot 0x40) -bor 0x80) }" >nul 2>&1
+
 REM 1. Activate virtual environment if it exists
 if exist ".venv\Scripts\activate.bat" (
     echo Activating virtual environment...

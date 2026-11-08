@@ -71,7 +71,7 @@ def is_valid_email(email: str) -> bool:
 def fetch_all_records(
     client: Client,
     table_name: str,
-    select_fields: str = "*",
+    select_fields: Optional[str] = None,
     order_field: Optional[str] = None,
     batch_size: int = 1000,
     desc: bool = False,
@@ -82,12 +82,17 @@ def fetch_all_records(
 
     :param client: Initialized Supabase Client (supabase or supabase_admin)
     :param table_name: Database table name (e.g. 'students')
-    :param select_fields: Comma-separated columns to project (defaults to '*')
+    :param select_fields: Explicit comma-separated columns to project (e.g. 'id, name').
+                         Wildcard '*' and empty projections are prohibited to prevent unbounded egress.
     :param order_field: Column or comma-separated columns for deterministic ordering
     :param batch_size: Number of records to fetch per page (defaults to 1000)
     :param desc: Whether to sort descending (defaults to False, ascending)
     :return: List of all record dictionaries
     """
+    tokens = [f.strip() for f in select_fields.split(',') if f.strip()] if select_fields else []
+    if not tokens or any('*' in t for t in tokens):
+        raise ValueError("Explicit select_fields required; '*' or empty projections are prohibited.")
+
     records: List[Dict[str, Any]] = []
     start = 0
 
@@ -109,4 +114,3 @@ def fetch_all_records(
         start += batch_size
 
     return records
-

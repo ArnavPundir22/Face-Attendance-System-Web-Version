@@ -77,6 +77,9 @@ venv.bak/
 # -----------------------------------------------------------------------------
 tests/
 scripts/empirical_cache_stress_test.py
+scripts/fuzz_db_guard.py
+scripts/test_adversarial_guard_harness.py
+scripts/verify_mutation_payload_suppression.py
 .pytest_cache/
 .coverage
 .coverage.*
@@ -168,4 +171,7 @@ ROLLBACK.md
 TEST_CHECKLIST.md
 ARCHITECTURE.md
 CONSTRAINTS.md
+PROJECT.md
+TEST_INFRA.md
+TEST_READY.md
 
