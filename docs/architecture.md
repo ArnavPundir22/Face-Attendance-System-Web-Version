@@ -28,10 +28,15 @@ BioSecure AI is organized using the standard **Python Application Factory** layo
 │   │   ├── auth.py            # Supabase Auth login, logout, OAuth & session handling
 │   │   └── students.py        # Student records, enrollment & /api/ocr_id_card OCR scanner
 │   │
+│   ├── security/              # Cryptographic Verification & Host Integrity
+│   │   ├── license_verifier.py# Offline Ed25519 deployment verifier & clock protection
+│   │   └── license_public_key.pem # Application public verification key
+│   │
 │   ├── utils/                 # Sub-system Utilities (Services)
 │   │   ├── auth_helpers.py    # Rate limiting & brute-force protection
-│   │   ├── db.py              # Supabase Client connections (Anon & Service Role)
-│   │   ├── face.py            # InsightFace ArcFace 512D & 3D pose angle inference
+│   │   ├── console_helpers.py # Win32 QuickEdit console suppression & host stability
+│   │   ├── db.py              # Supabase Client connections & range pagination
+│   │   ├── face.py            # InsightFace ArcFace 512D & thread-safe _inference_lock
 │   │   ├── face_cache.py      # Thread-safe in-memory NumPy BLAS batch vector matrix matcher
 │   │   └── ocr_helpers.py     # Pretrained Neural RapidOCR (ONNX DBNet+SVTR) & PyTesseract
 │   │
@@ -112,3 +117,11 @@ sequenceDiagram
    Backend operations utilize Supabase PostgREST API client instances initialized with `SUPABASE_SERVICE_ROLE_KEY`. This eliminates traditional PostgreSQL socket exhaustion risks during high-concurrency attendance submission events.
 4. **PWA & Service Worker Caching Architecture (`src/static/js/sw.js`)**:
    The client leverages a cache-first strategy for static App Shell assets (Tailwind CSS, Lucide Icons, UI scripts) and network-first for dynamic endpoints. If network disconnection occurs during mobile navigation, requests seamlessly degrade to `/offline`, ensuring continuous client responsiveness.
+5. **Double-Checked Locking & Copy-on-Write (CoW) Memory Matrices**:
+   Supabase network retrieval is decoupled from `_cache_lock`. Cache initialization utilizes `_init_lock` with double-checked locking, completely preventing thundering herd lock contention on cold boots. Embeddings array updates use copy-on-write pointer replacement, allowing active reader threads to query matrix snapshots with zero latency without blocking.
+6. **Thread-Safe Serialized Inference (`_inference_lock`)**:
+   Under concurrent group photo submissions, invocations of InsightFace's underlying ONNX Runtime C++ engine (`model.get()`) are serialized via `_inference_lock` in `src/utils/face.py`, eliminating CPU core thrashing, memory spikes, and race conditions.
+7. **Windows Console Host Stability (`src/utils/console_helpers.py`)**:
+   Programmatic clearing of `ENABLE_QUICK_EDIT_MODE` at boot eliminates terminal stdout pause bugs when mouse clicks occur inside Windows Command Prompt windows.
+8. **Under-the-Hood Cryptographic Host Verification (`src/security/`)**:
+   Offline asymmetric Ed25519 verification validates host deployment certificates against the application public key at boot, coupled with monotonic timestamp tracking (`.license_state`) to guarantee audit trail chronological integrity.

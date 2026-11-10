@@ -63,7 +63,7 @@ PHASES = [
     ("Phase 4: Factory Pattern, Gunicorn WSGI & Production Rebranding", tracker_phase4.ITEMS),
     ("Phase 5: High-Performance Admin Portal, Filters & Thread Tuning", tracker_phase5.ITEMS),
     ("Phase 6: Guided Live Camera Frame, RapidOCR & Progressive Web App", tracker_phase6.ITEMS),
-    ("Phase 7: Mobile Camera Launcher, 3D Pose Gate & EWMA Drift Engine", tracker_phase7.ITEMS),
+    ("Phase 7: Mobile Camera, EWMA Drift, Concurrency Hardening & Production Ops", tracker_phase7.ITEMS),
 ]
 
 ALL_ITEMS = []
@@ -539,7 +539,7 @@ def build_openpyxl_workbook():
             4: "Factory pattern create_app, Gunicorn WSGI, BioSecure rebrand, OpenAPI docs",
             5: "Admin Portal UI, department analytics, in-memory BLAS matcher (<1ms), thread tuning",
             6: "Live camera overlay, RapidOCR student card parsing, ngrok HTTPS fixes, offline PWA",
-            7: "Full-bleed mobile camera, 3D pose gate, EWMA drift adaptation (0.30), automated pytest suite",
+            7: "Mobile camera, 3D pose gate, EWMA drift (0.30), cache concurrency, QuickEdit freeze guard, zero-egress RAM cache, host integrity",
         }
         c5 = ws3.cell(row=p_idx, column=5, value=deliverables.get(p_idx - start_phase_row, ""))
         c5.font = font_data

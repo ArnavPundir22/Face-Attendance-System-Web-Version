@@ -58,7 +58,9 @@ Explore our comprehensive, detailed technical sub-documentation guides in the [`
 | **PWA & Offline** | ⚡ **Progressive Web App Architecture** | Offline App Shell with Service Worker (`sw.js`), full icon suite, and network-resilient offline status fallback. |
 | **Class Modes** | 🏫 **Separate vs Combined Roster Modes** | Supports single-class roster boundary enforcement and joint multi-branch combined lectures. |
 | **Admin Controls** | 👨‍💼 **Biometric Drift Management Portal** | Dedicated `/admin/drift` dashboard featuring single-click re-enrollment template reset functionality. |
-| **Security** | 🛡️ **Row-Level Security & RBAC** | Supabase Row-Level Security (RLS) policies protecting biometric vectors and student PII with proxy fix middleware. |
+| **Security & Integrity** | 🛡️ **Row-Level Security & Host Verification** | Supabase RLS policies, SameSite session guards, and under-the-hood asymmetric Ed25519 deployment integrity verification. |
+| **Concurrency & Stability**| ⚡ **Thread-Safe Inference & QuickEdit Guard** | Serialized ONNX Runtime inference (`_inference_lock`), double-checked cache locking, and Win32 QuickEdit freeze suppression. |
+| **Scale & Egress** | 📊 **PostgREST Range Pagination & RAM Roster** | Range-chunked `fetch_all_records` (1,126+ profiles), in-memory RAM student cache, and `returning='minimal'` mutation suppression. |
 
 ---
 
@@ -169,8 +171,8 @@ EMAIL_PASS="your-gmail-app-password"
 
 5. **Run Automated Test Suite:**
    ```bash
-   pytest tests/unit -v
-   # Runs 14 comprehensive unit tests covering embedding cache, OCR parsing, PWA, and routes.
+   pytest tests/ -v
+   # Runs comprehensive unit and adversarial tests covering cache, inference, pagination, and host integrity.
    ```
 
 ## 📂 Enterprise Project Structure
@@ -186,9 +188,10 @@ Face-Attendance-System-Web-Version/
 ├── requirements.txt            # Production dependencies (Linux / macOS)
 ├── requirements-windows.txt    # Windows-optimized dependencies
 ├── start_face_attendance.sh    # Production launcher script (Linux / Nginx)
-├── start_face_attendance.bat   # Production launcher script (Windows)
+├── start_face_attendance.bat   # Production launcher script (Windows with QuickEdit guard)
 ├── start_with_tunnel.bat       # Remote testing tunnel launcher
 ├── README.md                   # Enterprise system documentation
+├── ENTERPRISE_GUIDE.md         # Production ops, host integrity & enterprise manual
 │
 ├── src/                        # Core Application Source Code
 │   ├── __init__.py             # Application factory (create_app)
@@ -198,23 +201,26 @@ Face-Attendance-System-Web-Version/
 │   │   ├── attendance.py       # Attendance taking, multi-face verification & EWMA
 │   │   ├── auth.py             # Session authentication, login/logout & password resets
 │   │   └── students.py         # Student registration & ID card OCR ingestion
+│   ├── security/               # Platform verification & cryptographic keys
+│   │   ├── license_verifier.py # Asymmetric Ed25519 host verification & clock protection
+│   │   └── license_public_key.pem # Public verification key
 │   ├── utils/                  # Domain services, caching, ML & DB utilities
 │   │   ├── auth_helpers.py     # Decorators, password hashing & session guards
-│   │   ├── db.py               # Supabase PostgreSQL client & query helpers
-│   │   ├── face.py             # InsightFace ArcFace 512D model loader & extraction
-│   │   ├── face_cache.py       # In-memory BLAS matrix matcher (<1ms)
+│   │   ├── console_helpers.py  # Win32 QuickEdit console mode suppression
+│   │   ├── db.py               # Supabase PostgreSQL client & range pagination
+│   │   ├── face.py             # InsightFace ArcFace 512D model loader & thread-safe inference
+│   │   ├── face_cache.py       # In-memory BLAS matrix matcher & copy-on-write cache
 │   │   └── ocr_helpers.py      # RapidOCR ONNX & PyTesseract ID card parser
 │   ├── static/                 # Static assets (CSS, JS, icons, manifest.json, sw.js)
 │   └── templates/              # Jinja2 presentation templates
 │
 ├── tests/                      # Automated Testing Framework
 │   ├── conftest.py             # Pytest fixtures & environment setup
-│   ├── unit/                   # Unit test suite (14 passing tests)
-│   ├── e2e/                    # End-to-end integration tests
-│   └── fixtures/               # Test data & mocking fixtures
+│   ├── unit/                   # Unit test suite (routes, cache, integrity, OCR)
+│   └── test_adversarial_challenger2.py # Boundary pagination and concurrency stress tests
 │
 ├── deliverables/               # Formal Project Deliverables & Reports
-│   ├── trackers/               # Institutional Work Trackers (304 items, full dates)
+│   ├── trackers/               # Institutional Work Trackers (336 items, full dates)
 │   │   ├── AI_Intern_Work_Tracker_Face_Recognition.xlsx
 │   │   └── AI_Intern_Work_Tracker_Face_Recognition.xls
 │   ├── specifications/         # 10-Page Technical Architecture Specifications

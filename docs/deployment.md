@@ -94,7 +94,19 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 3. Configure Systemd Application Daemon
+### 3. Configure Environment Variables & Deployment Certificate
+Copy `.env.example` to `.env` and configure your credentials:
+```bash
+cp .env.example .env
+nano .env
+```
+
+Install the authorized deployment certificate (`.license`) in the application root directory:
+```bash
+cp /path/to/deployment.license /var/www/biosecure/.license
+```
+
+### 4. Configure Systemd Application Daemon
 Create a systemd unit file `/etc/systemd/system/biosecure.service`:
 
 ```ini
@@ -180,6 +192,37 @@ sudo ln -s /etc/nginx/sites-available/biosecure /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl restart nginx
 ```
+
+> [!TIP]
+> **Single-Backend Resilience (`max_fails=0`)**: If running behind a local Nginx instance with a single backend worker, use `nginx/setup_nginx.py` or ensure `max_fails=0` is configured on the upstream server block. This prevents Nginx from marking the node as failed during sudden request bursts.
+
+---
+
+## 🖥️ Windows Server Deployment (Waitress & QuickEdit Freeze Guard)
+
+For institutional deployments running on Windows Server or workstations:
+
+### 1. Set Up Python Virtual Environment
+```cmd
+python -m venv .venv
+.venv\Scripts\activate
+pip install --upgrade pip
+pip install -r requirements-windows.txt
+```
+
+### 2. Configure Environment & Deployment Certificate
+```cmd
+copy .env.example .env
+notepad .env
+copy \path\to\deployment.license .license
+```
+
+### 3. Start Application with QuickEdit Suppression
+```cmd
+start_face_attendance.bat
+```
+> [!NOTE]
+> The launcher and application invoke `src/utils/console_helpers.py` to disable Windows Command Prompt QuickEdit mode (`ENABLE_QUICK_EDIT_MODE = 0x0040`), ensuring mouse selections in the terminal window do not halt server threads.
 
 ---
 
