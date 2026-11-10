@@ -77,20 +77,20 @@ graph TD
         Dec --> |3. Detect & Align| Retina[RetinaFace 5-Landmark Detector]
         Retina --> |4. ArcFace Embeddings| Arc[ArcFace 512D Normalizer]
         Arc --> |5. In-Memory Matrix Match <1ms| Matrix[NumPy BLAS Matrix Engine]
-        Matrix -->|Cache Hit| MatchRes[Match Found S >= 0.40]
+        Matrix -->|Cache Hit| MatchRes["Match Found S >= 0.40"]
         Matrix -->|Cache Miss| RPC[Supabase pgvector match_face RPC]
         RPC --> MatchRes
         MatchRes --> |6. Write Attendance| AttLog[(Supabase attendance Table)]
     end
 
     subgraph "Part B: Pose-Gated EWMA Drift Engine"
-        Arc --> |7. 3D Euler Angles| PoseGate{3D Pose Gate<br/>|Yaw|<=25° & |Pitch|<=20°}
-        PoseGate -->|No: Rejected| PoseReject[Log POSE_REJECTED<br/>EWMA Unchanged]
-        PoseGate -->|Yes: Accepted| DriftCalc[Calculate Drift D = 1.0 - S]
-        DriftCalc --> |8. EWMA Update| EWMA[EWMA_t = 0.30*D + 0.70*EWMA_old]
-        EWMA --> |9. Health Evaluator| AlertEval{Alert Level Evaluator}
-        AlertEval -->|EWMA >= 0.25| SMTP[Dispatch Admin SMTP Email]
-        AlertEval -->|EWMA >= 0.35| AdminDash[Flag on /admin/drift Dashboard]
+        Arc --> |7. 3D Euler Angles| PoseGate{"3D Pose Gate<br/>|Yaw| &le; 25° and |Pitch| &le; 20°"}
+        PoseGate -->|No: Rejected| PoseReject["Log POSE_REJECTED<br/>EWMA Unchanged"]
+        PoseGate -->|Yes: Accepted| DriftCalc["Calculate Drift D = 1.0 - S"]
+        DriftCalc --> |8. EWMA Update| EWMA["EWMA_t = 0.30*D + 0.70*EWMA_old"]
+        EWMA --> |9. Health Evaluator| AlertEval{"Alert Level Evaluator"}
+        AlertEval -->|EWMA >= 0.25| SMTP["Dispatch Admin SMTP Email"]
+        AlertEval -->|EWMA >= 0.35| AdminDash["Flag on /admin/drift Dashboard"]
     end
 
     style Browser fill:#6366f1,stroke:#fafafa,stroke-width:2px,color:#fff
