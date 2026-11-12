@@ -118,7 +118,7 @@ if [ "$NGINX_AVAILABLE" -eq 1 ]; then
 
         # Run Gunicorn bound to localhost (without exec so the cleanup trap executes on exit)
         gunicorn wsgi:app \
-            --workers 2 \
+            --config gunicorn.conf.py \
             --bind "127.0.0.1:${BACKEND_PORT}" \
             --timeout "${GUNICORN_TIMEOUT:-300}" \
             --access-logfile - \
@@ -135,7 +135,7 @@ echo "🚀 BioSecure AI starting with direct Gunicorn server..."
 echo "🌐 Access Application at: http://0.0.0.0:${BACKEND_PORT}"
 echo "=========================================================="
 exec gunicorn wsgi:app \
-    --workers 2 \
+    --config gunicorn.conf.py \
     --bind "0.0.0.0:${BACKEND_PORT}" \
     --timeout "${GUNICORN_TIMEOUT:-300}" \
     --access-logfile - \

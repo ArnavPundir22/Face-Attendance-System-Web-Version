@@ -18,10 +18,12 @@ bind = f"0.0.0.0:{os.environ.get('PORT', '8000')}"
 # ---------------------------------------------------------------
 # Workers
 # ---------------------------------------------------------------
-# 2 workers is safe for 2 GB RAM + CPU-only InsightFace.
-# Increase to (2 * cpu_count + 1) if you have enough RAM (≥ 4 GB).
-workers = int(os.environ.get("WEB_CONCURRENCY", 2))
-worker_class = "sync"  # sync is fine; use gthread if you need threading
+# Single worker with multi-threading (gthread topology):
+# - Thread-safe in-memory face cache (src/utils/face_cache.py) without cross-process staleness
+# - Single InsightFace ONNX model instance in RAM (prevents duplicate ~1GB memory overhead)
+workers = 1
+worker_class = "gthread"
+threads = int(os.environ.get("GUNICORN_THREADS", 4))
 
 # ---------------------------------------------------------------
 # Timeouts

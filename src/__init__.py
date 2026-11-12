@@ -69,6 +69,7 @@ def create_app() -> Flask:
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['MAX_CONTENT_LENGTH'] = 25 * 1024 * 1024  # 25 MB max upload limit
 
     # ------------------------------------------------------------------
     # Register blueprints
