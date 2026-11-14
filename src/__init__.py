@@ -53,6 +53,9 @@ def create_app() -> Flask:
     # Because __init__.py is inside src/, Flask automatically resolves paths relative to src/
     app = Flask(__name__)
 
+    from src.utils.logger import setup_production_logging
+    setup_production_logging(app)
+
     # Trust reverse proxy headers (ngrok) to ensure callback redirects use the public URL scheme
     from werkzeug.middleware.proxy_fix import ProxyFix
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1, x_prefix=1)
@@ -112,7 +115,29 @@ def create_app() -> Flask:
 
     @app.errorhandler(500)
     def internal_error(error):
-        logger.exception("Internal server error: %s", error)
+        from flask import request, session, has_request_context
+        from src.utils.logger import extract_client_ip
+        err_logger = logging.getLogger("biosecure.error")
+        actor = "anonymous"
+        client_ip = "127.0.0.1"
+        path = "unknown"
+        method = "unknown"
+        if has_request_context():
+            try:
+                actor = session.get("username", "anonymous") if session else "anonymous"
+            except Exception:
+                actor = "anonymous"
+            try:
+                client_ip = extract_client_ip(request)
+                path = request.path
+                method = request.method
+            except Exception:
+                pass
+        err_logger.error(
+            "Internal server error 500 on %s %s | actor=%s | client_ip=%s | error=%s",
+            method, path, actor, client_ip, error,
+            exc_info=True
+        )
         if _is_api_request():
             return jsonify({"error": "Internal server error"}), 500
         return render_template("error_500.html"), 500

@@ -14,6 +14,7 @@ from datetime import datetime
 import logging
 import re
 import threading
+import time
 
 import cv2
 import numpy as np
@@ -22,6 +23,7 @@ from flask import Blueprint, jsonify, render_template, request
 from src import config
 from src.utils.db import supabase_admin, is_valid_email, fetch_all_records
 from src.utils.face import extract_faces, normalize_embedding
+from src.utils.logger import log_audit, log_biometric
 from src.utils.face_cache import (
     match_faces_batch,
     get_student_ewma,
@@ -294,6 +296,7 @@ def upload_photo():
     if 'images' not in request.files:
         return jsonify({"images": [], "session_attendance": [], "detected_program": None, "detected_branch": None, "detected_year": None})
 
+    start_time = time.perf_counter()
     lecture = request.form.get('lecture', '').strip()
     if not lecture:
         lecture = f"Session {datetime.now().strftime('%Y-%m-%d %H:%M')}"
@@ -302,6 +305,10 @@ def upload_photo():
 
     now       = datetime.now()
     timestamp = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    total_detected_faces = 0
+    total_matched_faces = 0
+    total_unknown_faces = 0
 
     recognized_ids = set()
     all_outputs      = []
@@ -322,6 +329,7 @@ def upload_photo():
         results  = []
 
         if faces:
+            total_detected_faces += len(faces)
             # 1. Batch extract and normalize all face embeddings for this image
             face_embeddings = [np.array(face.embedding, dtype=np.float32) for face in faces]
             
@@ -372,6 +380,7 @@ def upload_photo():
                 )
 
                 if matched_id and best_score >= config.FACE_MATCH_THRESHOLD:
+                    total_matched_faces += 1
                     recognized_ids.add(matched_id)
                     confidence_map[matched_id] = best_score
 
@@ -395,6 +404,7 @@ def upload_photo():
                         'pose_accepted': drift_info['pose_accepted'],
                     })
                 else:
+                    total_unknown_faces += 1
                     results.append({
                         "name": "Unknown",
                         "status": "Unknown",
@@ -653,6 +663,16 @@ def upload_photo():
         ).start()
     # ─────────────────────────────────────────────────────────────────────────
 
+    latency_ms = (time.perf_counter() - start_time) * 1000.0
+    log_biometric(
+        images=len(files),
+        detected=total_detected_faces,
+        matched=total_matched_faces,
+        unknown=total_unknown_faces,
+        latency_ms=latency_ms,
+        lecture=lecture,
+    )
+
     return jsonify({
         "images": all_outputs,
         "session_attendance": session_attend,
@@ -716,9 +736,23 @@ def update_attendance_status():
                 }, returning='minimal').execute()
             else:
                 return jsonify({"success": False, "error": "Student not found in directory"}), 404
+
+        eff_lec = lecture or (existing.data[0].get('lecture') if existing.data else 'General')
+        log_audit(
+            action="ATTENDANCE_OVERRIDE",
+            target=student_id,
+            status="SUCCESS",
+            details=f"Status changed to {status} for lecture '{eff_lec}' at {timestamp}",
+        )
         return jsonify({"success": True})
     except Exception as e:
         logger.error("Error updating/inserting attendance status: %s", e, exc_info=True)
+        log_audit(
+            action="ATTENDANCE_OVERRIDE",
+            target=student_id,
+            status="FAILED",
+            details=str(e),
+        )
         return jsonify({"success": False, "error": str(e)}), 500
 
 

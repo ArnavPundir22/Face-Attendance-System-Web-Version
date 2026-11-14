@@ -14,6 +14,24 @@ if exist ".venv\Scripts\activate.bat" (
     call ".venv\Scripts\activate.bat"
 )
 
+REM 1.1 Auto-expose NVIDIA CUDA/cuDNN DLL paths & install missing GPU dependencies
+set "NVIDIA_DIR="
+if defined VIRTUAL_ENV if exist "%VIRTUAL_ENV%\Lib\site-packages\nvidia" set "NVIDIA_DIR=%VIRTUAL_ENV%\Lib\site-packages\nvidia"
+if not defined NVIDIA_DIR if exist ".venv\Lib\site-packages\nvidia" set "NVIDIA_DIR=.venv\Lib\site-packages\nvidia"
+
+if defined NVIDIA_DIR (
+    REM Auto-install missing cuFFT dependency if CUDA 12 packages are present
+    if exist "%NVIDIA_DIR%\cublas" (
+        if not exist "%NVIDIA_DIR%\cufft" (
+            echo [INFO] Installing missing NVIDIA cuFFT GPU dependency for RTX GPU...
+            pip install nvidia-cufft-cu12 nvidia-curand-cu12
+        )
+    )
+    for /d %%D in ("%NVIDIA_DIR%\*") do (
+        if exist "%%D\bin" call set "PATH=%%D\bin;%%PATH%%"
+    )
+)
+
 REM 2. Ensure Waitress & RapidOCR dependencies are installed
 python -c "import waitress" >nul 2>&1
 if %errorlevel% neq 0 (

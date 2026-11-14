@@ -23,6 +23,7 @@ from src.utils.face_cache import (
     get_cached_students,
     is_cache_populated
 )
+from src.utils.logger import log_audit
 
 students_bp = Blueprint('students', __name__)
 
@@ -231,6 +232,13 @@ def submit_student():
     except Exception as e:
         return _respond('error', f'Database insertion error: {e}', 500)
 
+    log_audit(
+        action="STUDENT_ENROLLED",
+        target=student_id,
+        status="SUCCESS",
+        details=f"Name: {name}, Program: {program}, Branch: {branch}",
+    )
+
     return _respond('success', f'Student profile for "{name}" (ID: {student_id}) successfully registered!', 200)
 
 
@@ -367,6 +375,13 @@ def update_student(student_id=None):
     else:
         # If no new photo, update metadata in cache
         update_student_metadata_cache(**cache_kwargs)
+
+    log_audit(
+        action="STUDENT_UPDATED",
+        target=sid,
+        status="SUCCESS",
+        details=f"Name: {name}, Program: {program}, Branch: {branch}",
+    )
 
     return jsonify({
         "success": True,

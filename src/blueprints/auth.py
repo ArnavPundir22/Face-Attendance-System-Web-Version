@@ -8,6 +8,13 @@ import logging
 from flask import Blueprint, redirect, render_template, request, session, url_for
 from supabase import AuthApiError
 from src.utils.db import supabase, supabase_admin, is_valid_email
+from src.utils.auth_helpers import (
+    is_account_locked,
+    record_failed_login,
+    clear_failed_logins,
+    remaining_attempts,
+)
+from src.utils.logger import log_audit
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +28,20 @@ def login():
 
         if not email or not password:
             return render_template('login.html', error="Email and password required")
+
+        # Check account lockout before attempting login
+        locked, remaining = is_account_locked(email)
+        if locked:
+            log_audit(
+                action="AUTH_LOCKOUT",
+                target=email,
+                status="BLOCKED",
+                details=f"Account locked. Try again in {remaining}s"
+            )
+            return render_template(
+                'login.html',
+                error=f"Account locked due to too many failed attempts. Try again in {remaining} seconds."
+            )
 
         try:
             # Authenticate with Supabase Auth
@@ -43,16 +64,43 @@ def login():
             session['user_id'] = user.id
             session['access_token'] = auth_response.session.access_token
 
+            # Clear failed login attempts on success
+            clear_failed_logins(email)
+            log_audit(
+                action="AUTH_LOGIN_SUCCESS",
+                target=email,
+                status="SUCCESS",
+                details=f"Username: {username}"
+            )
+
             logger.info(f"User {username} successfully logged in via password.")
             return redirect(url_for('attendance.index'))
             
         except Exception as e:
             logger.error(f"Password login failed for {email}: {e}", exc_info=True)
-            error_message = str(e)
-            if "AuthApiError" in error_message or hasattr(e, 'message'):
-                error_message = getattr(e, 'message', str(e))
+            record_failed_login(email)
+            locked, remaining = is_account_locked(email)
+            if locked:
+                log_audit(
+                    action="AUTH_LOCKOUT",
+                    target=email,
+                    status="BLOCKED",
+                    details=f"Threshold reached. Locked for {remaining}s"
+                )
+                error_message = f"Account locked due to too many failed attempts. Try again in {remaining} seconds."
             else:
-                error_message = "Invalid email or password"
+                rem = remaining_attempts(email)
+                log_audit(
+                    action="AUTH_LOGIN_FAILURE",
+                    target=email,
+                    status="FAILED",
+                    details=f"Invalid credentials. Attempts remaining: {rem}"
+                )
+                error_message = str(e)
+                if "AuthApiError" in error_message or hasattr(e, 'message'):
+                    error_message = getattr(e, 'message', str(e))
+                else:
+                    error_message = "Invalid email or password"
             return render_template('login.html', error=error_message)
 
     error = request.args.get('error')
@@ -62,6 +110,13 @@ def login():
 
 @auth_bp.route('/logout')
 def logout():
+    username = session.get('username', 'anonymous')
+    log_audit(
+        action="AUTH_LOGOUT",
+        target=username,
+        status="SUCCESS",
+        details="User logged out"
+    )
     try:
         # If we have an access token, we can sign out from Supabase as well
         if 'access_token' in session:
@@ -106,11 +161,29 @@ def register():
                 }
             })
             
+            log_audit(
+                action="AUTH_USER_CREATED",
+                target=username,
+                status="SUCCESS",
+                details=f"Email: {email}"
+            )
             return render_template('register.html', success=f"User {username} successfully created.")
             
         except AuthApiError as e:
+            log_audit(
+                action="AUTH_USER_CREATED",
+                target=username,
+                status="FAILED",
+                details=str(e.message)
+            )
             return render_template('register.html', error=str(e.message))
-        except Exception:
+        except Exception as e:
+            log_audit(
+                action="AUTH_USER_CREATED",
+                target=username,
+                status="FAILED",
+                details=str(e)
+            )
             return render_template('register.html', error="An error occurred while creating the user.")
 
     return render_template('register.html')
@@ -187,10 +260,23 @@ def callback():
             session['user_id'] = user.id
             session['access_token'] = res.session.access_token
 
+            log_audit(
+                action="AUTH_LOGIN_SUCCESS",
+                target=user.email or username,
+                status="SUCCESS",
+                details=f"OAuth login, username: {username}"
+            )
+
             logger.info(f"OAuth login successful for user: {username}")
             return redirect(url_for('attendance.index'))
         except Exception as e:
             logger.error(f"OAuth code exchange failed: {e}", exc_info=True)
+            log_audit(
+                action="AUTH_LOGIN_FAILURE",
+                target="oauth",
+                status="FAILED",
+                details=f"OAuth code exchange failed: {e}"
+            )
             return redirect(url_for('auth.login', error=f"Auth exchange failed: {e}"))
 
     logger.warning("OAuth callback triggered with no code parameter.")

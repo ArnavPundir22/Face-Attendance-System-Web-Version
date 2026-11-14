@@ -23,6 +23,7 @@ from flask import Blueprint, jsonify, redirect, render_template, request, sessio
 
 from src.utils.db import supabase_admin as supabase, is_valid_email, fetch_all_records
 from src.utils.face_cache import get_cached_students, is_cache_populated
+from src.utils.logger import log_audit
 from src import config
 
 logger = logging.getLogger(__name__)
@@ -266,8 +267,21 @@ def admin_delete_student(student_id):
             remove_student_from_cache(student_id)
         except Exception as cache_err:
             logger.error("Face cache removal error for student %s: %s", student_id, cache_err)
+
+        log_audit(
+            action="STUDENT_DELETED",
+            target=student_id,
+            status="SUCCESS",
+            details="Student profile, records, and photo deleted by admin"
+        )
     except Exception as e:
         logger.error("Cascading delete failed for student %s: %s", student_id, e)
+        log_audit(
+            action="STUDENT_DELETED",
+            target=student_id,
+            status="FAILED",
+            details=str(e)
+        )
         
     return redirect(url_for('admin.admin_students'))
 
@@ -460,8 +474,20 @@ def admin_delete_user(user_id):
                 return redirect(url_for('admin.admin_users'))
 
         supabase.auth.admin.delete_user(user_id)
-    except Exception:
-        pass
+        log_audit(
+            action="USER_DELETED",
+            target=user_id,
+            status="SUCCESS",
+            details="User deleted by admin"
+        )
+    except Exception as e:
+        logger.error("Failed to delete user %s: %s", user_id, e)
+        log_audit(
+            action="USER_DELETED",
+            target=user_id,
+            status="FAILED",
+            details=str(e)
+        )
 
     return redirect(url_for('admin.admin_users'))
 
@@ -508,9 +534,21 @@ def admin_reset():
         else:
             return redirect(url_for('admin.admin_dashboard', error="Invalid reset type"))
 
+        log_audit(
+            action="DATABASE_RESET",
+            target=reset_type or "unknown",
+            status="SUCCESS",
+            details=f"Admin reset performed (type={reset_type})"
+        )
         return redirect(url_for('admin.admin_dashboard', status="success", message="Database reset successfully"))
     except Exception as e:
         logger.error("Reset error: %s", e)
+        log_audit(
+            action="DATABASE_RESET",
+            target=reset_type or "unknown",
+            status="FAILED",
+            details=str(e)
+        )
         return redirect(url_for('admin.admin_dashboard', error=str(e)))
 
 

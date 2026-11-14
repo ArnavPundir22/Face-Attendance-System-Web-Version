@@ -13,6 +13,16 @@ from src import config
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Preload NVIDIA CUDA & cuDNN DLLs on Windows (if present via pip wheels)
+# ---------------------------------------------------------------------------
+try:
+    import onnxruntime as _ort
+    if hasattr(_ort, "preload_dlls"):
+        _ort.preload_dlls()
+except Exception:
+    pass
+
+# ---------------------------------------------------------------------------
 # InsightFace model (loaded once at import time)
 # ---------------------------------------------------------------------------
 model = insightface.app.FaceAnalysis(name='buffalo_l')
